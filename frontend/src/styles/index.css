@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #F5F7FB;
+  --color-brand-surface: #FFFFFF;
+  --color-brand-soft: #EEF2F7;
+
+  --color-brand-primary: #0F2747;
+  --color-brand-primaryLight: #1E5A92;
+  --color-brand-primaryDark: #081827;
+
+  --color-brand-gold: #2563EB;
+  --color-brand-goldSoft: #DBEAFE;
+
+  --color-brand-text: #111827;
+  --color-brand-muted: #667085;
+  --color-brand-border: #E2E8F0;
+
+  --color-brand-success: #15803D;
+  --color-brand-warning: #B45309;
+  --color-brand-danger: #B42318;
+
+  --shadow-card: 0 14px 36px rgba(15, 23, 42, 0.07);
+  --font-display: Inter, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34rem),
+    linear-gradient(180deg, #F8FAFC 0%, #F5F7FB 46%, #EEF2F7 100%);
+  color: #111827;
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  color: #111827;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.scrollbar-soft::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-soft::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 999px;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+}

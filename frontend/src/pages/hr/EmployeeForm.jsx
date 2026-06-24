@@ -1,0 +1,79 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import Button from "../../components/ui/Button";
+import Card from "../../components/ui/Card";
+import FormField from "../../components/ui/FormField";
+import { createEmployee, getEmployee, updateEmployee } from "../../services/api";
+import { emptyEmployee, fieldInputClass, HRPageHeader } from "./hrShared";
+import useHrData from "./useHrData";
+
+export default function EmployeeForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const isEdit = Boolean(id);
+  const { departments, notice } = useHrData(["departments"]);
+  const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
+  const [status, setStatus] = useState(isEdit ? "loading" : "ready");
+
+  useEffect(() => {
+    if (!isEdit) return;
+    getEmployee(id)
+      .then((profile) => {
+        setEmployeeForm({ ...emptyEmployee, ...profile.raw, department_id: profile.raw.department_id || "", photo: null });
+        setStatus("ready");
+      })
+      .catch(() => setStatus("error"));
+  }, [id, isEdit]);
+
+  useEffect(() => {
+    setEmployeeForm((current) => ({ ...current, department_id: current.department_id || departments[0]?.id || "" }));
+  }, [departments]);
+
+  const saveEmployee = async (event) => {
+    event.preventDefault();
+    const payload = new FormData();
+    Object.entries(employeeForm).forEach(([key, value]) => {
+      if (key === "photo" && !(value instanceof File)) return;
+      if (value !== null && value !== undefined && value !== "") payload.append(key, value);
+    });
+    payload.set("department_id", employeeForm.department_id || "");
+    payload.set("monthly_salary", Number(employeeForm.monthly_salary || 0));
+    const saved = isEdit ? await updateEmployee(id, payload) : await createEmployee(payload);
+    navigate(`/hr/employees/${saved.id || id}`);
+  };
+
+  const departmentOptions = departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>);
+
+  return <div className="space-y-6">
+    <HRPageHeader
+      title={isEdit ? "Edit Employee" : "Add Employee"}
+      description={isEdit ? "Update employee profile, contract, salary, contact, and emergency information." : "Create a new employee profile with photo, role, department, contact, contract, and salary details."}
+      action={<Link to="/hr/employees"><Button variant="outline">Back to List</Button></Link>}
+    />
+    {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
+    {status === "error" && <Card className="p-5 text-sm text-brand-danger">Employee could not be loaded.</Card>}
+    {status !== "error" && <Card className="p-5 md:p-6">
+      <form onSubmit={saveEmployee} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <FormField label="Name"><input required value={employeeForm.name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Department"><select value={employeeForm.department_id || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, department_id: e.target.value })} className={fieldInputClass}><option value="">No department</option>{departmentOptions}</select></FormField>
+        <FormField label="Photo"><input type="file" accept="image/*" onChange={(e) => setEmployeeForm({ ...employeeForm, photo: e.target.files?.[0] || null })} className={fieldInputClass} /></FormField>
+        <FormField label="Role / Position"><input value={employeeForm.position || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, position: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Monthly salary"><input type="number" value={employeeForm.monthly_salary || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, monthly_salary: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Contract type"><select value={employeeForm.contract_type || "Full Time"} onChange={(e) => setEmployeeForm({ ...employeeForm, contract_type: e.target.value })} className={fieldInputClass}><option>Full Time</option><option>Part Time</option><option>Contract</option><option>Temporary</option><option>Internship</option></select></FormField>
+        <FormField label="Salary grade"><input value={employeeForm.salary_grade || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, salary_grade: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Employment start date"><input type="date" value={employeeForm.employment_start_date || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, employment_start_date: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Phone"><input value={employeeForm.phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Email"><input type="email" value={employeeForm.email || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
+        <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency contact"><input value={employeeForm.emergency_contact_name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_name: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency phone"><input value={employeeForm.emergency_contact_phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_phone: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Notes" className="md:col-span-2"><textarea value={employeeForm.notes || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, notes: e.target.value })} className={fieldInputClass} /></FormField>
+        <div className="flex gap-3 md:col-span-2">
+          <Button>{isEdit ? "Update Employee" : "Save Employee"}</Button>
+          <Link to="/hr/employees"><Button type="button" variant="outline">Cancel</Button></Link>
+        </div>
+      </form>
+    </Card>}
+  </div>;
+}

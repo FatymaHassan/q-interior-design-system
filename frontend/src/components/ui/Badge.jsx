@@ -1,0 +1,31 @@
+const colors = {
+  "In Progress": "bg-blue-50 text-blue-700 ring-blue-100",
+  Completed: "bg-green-50 text-green-700 ring-green-100",
+  Done: "bg-green-50 text-green-700 ring-green-100",
+  Delayed: "bg-red-50 text-red-700 ring-red-100",
+  Overdue: "bg-red-50 text-red-700 ring-red-100",
+  Pending: "bg-amber-50 text-amber-700 ring-amber-100",
+  Draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  Review: "bg-blue-50 text-blue-700 ring-blue-100",
+  Active: "bg-green-50 text-green-700 ring-green-100",
+  Available: "bg-green-50 text-green-700 ring-green-100",
+  "In Stock": "bg-green-50 text-green-700 ring-green-100",
+  "Low Stock": "bg-amber-50 text-amber-700 ring-amber-100",
+  "Out of Stock": "bg-red-50 text-red-700 ring-red-100",
+  Delivered: "bg-green-50 text-green-700 ring-green-100",
+  Partial: "bg-amber-50 text-amber-700 ring-amber-100",
+  "Partially Paid": "bg-amber-50 text-amber-700 ring-amber-100",
+  Approved: "bg-green-50 text-green-700 ring-green-100",
+  Paid: "bg-green-50 text-green-700 ring-green-100",
+  Rejected: "bg-red-50 text-red-700 ring-red-100",
+  Cancelled: "bg-red-50 text-red-700 ring-red-100",
+  Expired: "bg-red-50 text-red-700 ring-red-100",
+  Sent: "bg-blue-50 text-blue-700 ring-blue-100",
+  Revised: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+  Unpaid: "bg-red-50 text-red-700 ring-red-100",
+  Received: "bg-green-50 text-green-700 ring-green-100",
+  "Pending Delivery": "bg-blue-50 text-blue-700 ring-blue-100",
+};
+export default function Badge({ children }) {
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${colors[children] || "bg-brand-soft text-brand-primary ring-brand-border"}`}>{children}</span>;
+}
