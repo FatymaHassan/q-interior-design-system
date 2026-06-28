@@ -300,7 +300,11 @@ class ReportsController extends Controller
 
     protected function taskCompletion(Request $request)
     {
-        return Task::with('assignee')->select('assigned_to', DB::raw('COUNT(*) as total_tasks'), DB::raw("SUM(CASE WHEN status IN ('Done','Completed') THEN 1 ELSE 0 END) as completed_tasks"))->groupBy('assigned_to')->get()->map(fn ($row) => ['staff' => $row->assignee?->name ?: 'Unassigned', 'total_tasks' => (int) $row->total_tasks, 'completed_tasks' => (int) $row->completed_tasks, 'completion_rate' => $row->total_tasks > 0 ? round(($row->completed_tasks / $row->total_tasks) * 100, 2) : 0]);
+        return Task::with(['assignee', 'assigneeEmployee'])
+            ->select('assigned_to', 'employee_id', DB::raw('COUNT(*) as total_tasks'), DB::raw("SUM(CASE WHEN status IN ('Done','Completed') THEN 1 ELSE 0 END) as completed_tasks"))
+            ->groupBy('assigned_to', 'employee_id')
+            ->get()
+            ->map(fn ($row) => ['staff' => $row->assigneeEmployee?->name ?: $row->assignee?->name ?: 'Unassigned', 'total_tasks' => (int) $row->total_tasks, 'completed_tasks' => (int) $row->completed_tasks, 'completion_rate' => $row->total_tasks > 0 ? round(($row->completed_tasks / $row->total_tasks) * 100, 2) : 0]);
     }
 
     protected function conversionRate(): array

@@ -14,9 +14,10 @@ class TaskController extends Controller
     {
         $this->markOverdueTasks();
 
-        return Task::with(['project.client', 'assignee', 'assigner', 'comments.user', 'attachments'])
+        return Task::with(['project.client', 'assignee', 'assigneeEmployee.department', 'assigner', 'comments.user', 'attachments'])
             ->when($request->query('project_id'), fn ($query, $value) => $query->where('project_id', $value))
             ->when($request->query('assigned_to'), fn ($query, $value) => $query->where('assigned_to', $value))
+            ->when($request->query('employee_id'), fn ($query, $value) => $query->where('employee_id', $value))
             ->when($request->query('status'), fn ($query, $value) => $query->where('status', $value))
             ->when($request->query('priority'), fn ($query, $value) => $query->where('priority', $value))
             ->latest()
@@ -28,6 +29,7 @@ class TaskController extends Controller
         $data = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'assigned_to' => 'nullable|exists:users,id',
+            'employee_id' => 'nullable|exists:employees,id',
             'assigned_by' => 'nullable|exists:users,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -49,14 +51,14 @@ class TaskController extends Controller
             ]);
         }
 
-        return $task->load(['project.client', 'assignee', 'assigner', 'comments.user', 'attachments']);
+        return $task->load(['project.client', 'assignee', 'assigneeEmployee.department', 'assigner', 'comments.user', 'attachments']);
     }
 
     public function show(Task $task)
     {
         $this->authorizeTaskAccess(request(), $task);
 
-        return $task->load(['project.client', 'assignee', 'assigner', 'comments.user', 'attachments.uploader', 'statusHistories.changer']);
+        return $task->load(['project.client', 'assignee', 'assigneeEmployee.department', 'assigner', 'comments.user', 'attachments.uploader', 'statusHistories.changer']);
     }
 
     public function update(Request $request, Task $task)
@@ -64,6 +66,7 @@ class TaskController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'assigned_to' => 'nullable|exists:users,id',
+            'employee_id' => 'nullable|exists:employees,id',
             'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'nullable|in:Low,Medium,High',
@@ -80,7 +83,7 @@ class TaskController extends Controller
         $task->update($data);
         $this->recordStatusChange($task, $oldStatus, $data['status'] ?? null, $request);
 
-        return $task->load(['project.client', 'assignee', 'assigner', 'comments.user', 'attachments.uploader', 'statusHistories.changer']);
+        return $task->load(['project.client', 'assignee', 'assigneeEmployee.department', 'assigner', 'comments.user', 'attachments.uploader', 'statusHistories.changer']);
     }
 
     public function destroy(Task $task)
@@ -111,16 +114,19 @@ class TaskController extends Controller
             'is_read' => false,
         ]);
 
-        return $task->load(['project.client', 'assignee', 'statusHistories.changer']);
+        return $task->load(['project.client', 'assignee', 'assigneeEmployee.department', 'statusHistories.changer']);
     }
 
     public function dailySummary(Request $request)
     {
         $this->markOverdueTasks();
         $date = $request->query('date', today()->toDateString());
-        $base = Task::with(['project', 'assignee'])
+        $base = Task::with(['project', 'assignee', 'assigneeEmployee.department'])
             ->when($request->query('project_id'), fn ($query, $value) => $query->where('project_id', $value))
-            ->when($request->query('staff_id'), fn ($query, $value) => $query->where('assigned_to', $value));
+            ->when($request->query('staff_id'), fn ($query, $value) => $query->where(function ($staffQuery) use ($value) {
+                $staffQuery->where('assigned_to', $value)->orWhere('employee_id', $value);
+            }))
+            ->when($request->query('employee_id'), fn ($query, $value) => $query->where('employee_id', $value));
 
         return response()->json([
             'date' => $date,

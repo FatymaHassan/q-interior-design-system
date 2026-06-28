@@ -5,24 +5,24 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { createTask, deleteTask, getProjects, getTaskDailySummary, getTasks, getUsers, updateTaskStatus } from "../../services/api";
+import { createTask, deleteTask, getEmployees, getProjects, getTaskDailySummary, getTasks, updateTaskStatus } from "../../services/api";
 
-const emptyTask = { project_id: "", assigned_to: "", title: "", description: "", priority: "Medium", status: "Pending", deadline: "", notes: "" };
+const emptyTask = { project_id: "", employee_id: "", title: "", description: "", priority: "Medium", status: "Pending", deadline: "", notes: "" };
 
 export default function DailyTasks() {
   const [tasks, setTasks] = useState([]);
   const [summary, setSummary] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(emptyTask);
 
-  const load = () => Promise.all([getTasks(), getTaskDailySummary(), getProjects(), getUsers()])
-    .then(([taskData, summaryData, projectData, userData]) => {
+  const load = () => Promise.all([getTasks(), getTaskDailySummary(), getProjects(), getEmployees({ status: "Active" })])
+    .then(([taskData, summaryData, projectData, employeeData]) => {
       setTasks(taskData);
       setSummary(summaryData);
       setProjects(projectData);
-      setUsers(userData);
-      setForm((current) => ({ ...current, project_id: current.project_id || projectData[0]?.id || "", assigned_to: current.assigned_to || userData[0]?.id || "" }));
+      setEmployees(employeeData);
+      setForm((current) => ({ ...current, project_id: current.project_id || projectData[0]?.id || "", employee_id: current.employee_id || employeeData[0]?.id || "" }));
     })
     .catch(() => {});
 
@@ -40,7 +40,7 @@ export default function DailyTasks() {
 
   const submitTask = async (event) => {
     event.preventDefault();
-    await createTask({ ...form, project_id: Number(form.project_id), assigned_to: form.assigned_to ? Number(form.assigned_to) : null });
+    await createTask({ ...form, project_id: Number(form.project_id), employee_id: form.employee_id ? Number(form.employee_id) : null, assigned_to: null });
     setForm(emptyTask);
     load();
   };
@@ -72,7 +72,7 @@ export default function DailyTasks() {
       <h2 className="text-xl font-bold">Assign Daily Task</h2>
       <form onSubmit={submitTask} className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <FormField label="Project"><select name="project_id" value={form.project_id} onChange={updateField} required className={fieldInputClass}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></FormField>
-        <FormField label="Assigned to"><select name="assigned_to" value={form.assigned_to} onChange={updateField} className={fieldInputClass}><option value="">Unassigned</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></FormField>
+        <FormField label="Assigned employee"><select name="employee_id" value={form.employee_id} onChange={updateField} className={fieldInputClass}><option value="">Unassigned</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name} - {employee.position}</option>)}</select></FormField>
         <FormField label="Task title"><input name="title" value={form.title} onChange={updateField} required className={fieldInputClass} /></FormField>
         <FormField label="Deadline"><input name="deadline" type="date" value={form.deadline} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Priority"><select name="priority" value={form.priority} onChange={updateField} className={fieldInputClass}><option>Low</option><option>Medium</option><option>High</option></select></FormField>

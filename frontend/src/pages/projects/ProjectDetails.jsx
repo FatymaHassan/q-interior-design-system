@@ -4,42 +4,39 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
-import Modal from "../../components/ui/Modal";
 import ProgressBar from "../../components/ui/ProgressBar";
 import Table from "../../components/ui/Table";
-import { addProjectMember, createDocument, createTeamMember, deleteDocument, downloadDocumentFile, getDepartments, getMaterials, getProjectMaterialsUsed, getProjectMembers, getProjectTimeline, getTeamMembers, removeProjectMember, stockOutMaterial, updateDocument } from "../../services/api";
+import { addProjectMember, createDocument, deleteDocument, downloadDocumentFile, getEmployees, getMaterials, getProjectFinanceSummary, getProjectMaterialsUsed, getProjectMembers, getProjectTimeline, removeProjectMember, stockOutMaterial, updateDocument } from "../../services/api";
 import { getProject } from "./projectApi";
 
-const tabs = ["Overview", "Tasks", "Documents", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
+const tabs = ["Overview", "Finance", "Tasks", "Documents", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
 
 export default function ProjectDetails() {
   const { id } = useParams();
   const [project, setProject] = useState(null);
   const [timeline, setTimeline] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [projectMembers, setProjectMembers] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [materialsUsed, setMaterialsUsed] = useState([]);
+  const [finance, setFinance] = useState(null);
   const [activeTab, setActiveTab] = useState("Overview");
   const [memberForm, setMemberForm] = useState({ employee_id: "", role_on_project: "Member", assigned_date: new Date().toISOString().slice(0, 10), notes: "" });
-  const [teamModalOpen, setTeamModalOpen] = useState(false);
-  const [teamForm, setTeamForm] = useState({ name: "", phone: "", email: "", position: "Worker", department_id: "", specialty: "", status: "Active" });
   const [docForm, setDocForm] = useState({ title: "", document_category: "Photo", visibility: "internal", file: null });
   const [editingDocument, setEditingDocument] = useState(null);
   const [materialForm, setMaterialForm] = useState({ material_id: "", quantity: 1, unit_cost: "", notes: "" });
   const [status, setStatus] = useState("loading");
 
-  const loadProject = () => Promise.all([getProject(id), getTeamMembers({ status: "Active" }), getProjectMembers(id), getProjectTimeline(id), getMaterials(), getProjectMaterialsUsed(id), getDepartments()])
-    .then(([data, memberData, projectMemberData, timelineData, materialData, materialsUsedData, departmentData]) => {
+  const loadProject = () => Promise.all([getProject(id), getEmployees({ status: "Active" }), getProjectMembers(id), getProjectTimeline(id), getMaterials(), getProjectMaterialsUsed(id), getProjectFinanceSummary(id)])
+    .then(([data, employeeData, projectMemberData, timelineData, materialData, materialsUsedData, financeData]) => {
       setProject(data);
-      setTeamMembers(memberData);
+      setEmployees(employeeData);
       setProjectMembers(projectMemberData);
       setTimeline(timelineData.items || []);
       setMaterials(materialData);
       setMaterialsUsed(materialsUsedData.movements || []);
-      setDepartments(departmentData);
-      setMemberForm((current) => ({ ...current, employee_id: current.employee_id || memberData[0]?.id || "" }));
+      setFinance(financeData);
+      setMemberForm((current) => ({ ...current, employee_id: current.employee_id || employeeData[0]?.id || "" }));
       setMaterialForm((current) => ({
         ...current,
         material_id: current.material_id || materialData[0]?.id || "",
@@ -75,15 +72,6 @@ export default function ProjectDetails() {
     if (!window.confirm(`Remove ${member.employee?.name || member.user?.name || "this member"} from the project?`)) return;
     await removeProjectMember(id, member.id);
     loadProject();
-  };
-
-  const saveTeamMember = async (event) => {
-    event.preventDefault();
-    const member = await createTeamMember({ ...teamForm, department_id: teamForm.department_id ? Number(teamForm.department_id) : null });
-    setTeamMembers(await getTeamMembers({ status: "Active" }));
-    setMemberForm((current) => ({ ...current, employee_id: member.id }));
-    setTeamForm({ name: "", phone: "", email: "", position: "Worker", department_id: "", specialty: "", status: "Active" });
-    setTeamModalOpen(false);
   };
 
   const uploadDocument = async (event) => {
@@ -181,10 +169,12 @@ export default function ProjectDetails() {
       <Card className="p-5"><h3 className="mb-4 font-bold">Notes</h3><p className="text-sm text-brand-muted">{raw.notes || raw.description || "No notes added."}</p></Card>
     </section>}
 
+    {activeTab === "Finance" && <ProjectFinancePanel finance={finance} />}
+
     {activeTab === "Tasks" && <Card className="p-5">
       <Table columns={[
         { key: "title", label: "Task", render: (task) => <Link to={`/tasks/${task.id}`} className="font-bold text-brand-primary hover:underline">{task.title}</Link> },
-        { key: "assignee", label: "Assigned", render: (task) => task.assignee?.name || "-" },
+        { key: "assignee", label: "Assigned", render: (task) => (task.assignee_employee || task.assigneeEmployee)?.name || task.assignee?.name || "-" },
         { key: "priority", label: "Priority", render: (task) => <Badge>{task.priority}</Badge> },
         { key: "status", label: "Status", render: (task) => <Badge>{task.status}</Badge> },
         { key: "deadline", label: "Deadline" },
@@ -231,7 +221,7 @@ export default function ProjectDetails() {
 
     {activeTab === "Team" && <Card className="p-5">
       <form onSubmit={addMember} className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <FormField label="Member"><select value={memberForm.employee_id} onChange={(event) => setMemberForm((current) => ({ ...current, employee_id: event.target.value }))} className={fieldInputClass}>{teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name} - {member.position}</option>)}</select><button type="button" onClick={() => setTeamModalOpen(true)} className="mt-2 text-sm font-bold text-brand-primary">+ Add New Team Member</button></FormField>
+        <FormField label="Employee"><select value={memberForm.employee_id} onChange={(event) => setMemberForm((current) => ({ ...current, employee_id: event.target.value }))} className={fieldInputClass}>{employees.map((member) => <option key={member.id} value={member.id}>{member.name} - {member.position}</option>)}</select><Link to="/hr/employees/add" className="mt-2 block text-sm font-bold text-brand-primary">+ Add Employee in Directory</Link></FormField>
         <FormField label="Role on project"><input value={memberForm.role_on_project} onChange={(event) => setMemberForm((current) => ({ ...current, role_on_project: event.target.value }))} className={fieldInputClass} /></FormField>
         <div className="flex items-end"><Button disabled={!memberForm.employee_id}>Add</Button></div>
       </form>
@@ -243,7 +233,7 @@ export default function ProjectDetails() {
         { key: "assigned", label: "Assigned", render: (member) => member.assigned_date || member.assigned_at || "-" },
         { key: "status", label: "Status", render: (member) => <Badge>{member.employee?.status || "Active"}</Badge> },
         { key: "actions", label: "Actions", render: (member) => <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeMember(member)}>Remove</Button> },
-      ]} rows={members} empty="No team members assigned yet." />
+      ]} rows={members} empty="No employees assigned yet." />
     </Card>}
 
     {activeTab === "Materials Used" && <Card className="p-5">
@@ -285,17 +275,7 @@ export default function ProjectDetails() {
         {approvals.length === 0 && <p className="text-sm text-brand-muted">No client approvals yet.</p>}
       </div>
     </Card>}
-    <Modal open={teamModalOpen} onClose={() => setTeamModalOpen(false)} title="Add Team Member">
-      <form onSubmit={saveTeamMember} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField label="Full name"><input value={teamForm.name} onChange={(event) => setTeamForm((current) => ({ ...current, name: event.target.value }))} required className={fieldInputClass} /></FormField>
-        <FormField label="Position"><input value={teamForm.position} onChange={(event) => setTeamForm((current) => ({ ...current, position: event.target.value }))} className={fieldInputClass} /></FormField>
-        <FormField label="Phone"><input value={teamForm.phone} onChange={(event) => setTeamForm((current) => ({ ...current, phone: event.target.value }))} className={fieldInputClass} /></FormField>
-        <FormField label="Email"><input type="email" value={teamForm.email} onChange={(event) => setTeamForm((current) => ({ ...current, email: event.target.value }))} className={fieldInputClass} /></FormField>
-        <FormField label="Department"><select value={teamForm.department_id} onChange={(event) => setTeamForm((current) => ({ ...current, department_id: event.target.value }))} className={fieldInputClass}><option value="">No department</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></FormField>
-        <FormField label="Specialty"><input value={teamForm.specialty} onChange={(event) => setTeamForm((current) => ({ ...current, specialty: event.target.value }))} className={fieldInputClass} /></FormField>
-        <div className="flex justify-end gap-2 md:col-span-2"><Button type="button" variant="outline" onClick={() => setTeamModalOpen(false)}>Cancel</Button><Button>Save Team Member</Button></div>
-      </form>
-    </Modal>
+    
   </div>;
 }
 
@@ -305,4 +285,89 @@ function Metric({ label, value }) {
 
 function InfoRows({ rows }) {
   return <div className="space-y-3 text-sm">{rows.map(([label, value]) => <div key={label} className="flex justify-between rounded-xl bg-brand-soft p-3"><span>{label}</span><b>{value || "-"}</b></div>)}</div>;
+}
+
+function ProjectFinancePanel({ finance }) {
+  const metrics = finance?.metrics || {};
+  const money = (value) => `$${Number(value || 0).toLocaleString()}`;
+
+  return <div className="space-y-5">
+    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <Metric label="Contract Amount" value={money(metrics.expected_revenue)} />
+      <Metric label="Paid Amount" value={money(metrics.received_revenue)} />
+      <Metric label="Remaining Balance" value={money(metrics.outstanding_client_balance)} />
+      <Metric label="Payment %" value={`${Number(metrics.payment_percentage || 0)}%`} />
+      <Metric label="Project Expenses" value={money(metrics.project_expenses)} />
+      <Metric label="Design Costs" value={money(metrics.design_costs)} />
+      <Metric label="Materials" value={money(metrics.materials)} />
+      <Metric label="Labour Costs" value={money(metrics.labour_costs)} />
+      <Metric label="Site Expenses" value={money(metrics.site_expenses)} />
+      <Metric label="Supplier Costs" value={money(metrics.supplier_costs)} />
+      <Metric label="Supplier Payables" value={money(metrics.supplier_payables)} />
+      <Metric label="Profit / Loss" value={`${money(metrics.project_profit)} (${Number(metrics.profit_margin || 0)}%)`} />
+    </section>
+
+    <Card className="p-5">
+      <h3 className="mb-4 font-bold">Payment Stages</h3>
+      <Table columns={[
+        { key: "name", label: "Stage", render: (stage) => <b>{stage.name}</b> },
+        { key: "percentage", label: "%", render: (stage) => `${Number(stage.percentage || 0)}%` },
+        { key: "amount", label: "Amount", render: (stage) => money(stage.amount) },
+        { key: "paid_amount", label: "Paid", render: (stage) => money(stage.paid_amount) },
+        { key: "balance", label: "Balance", render: (stage) => money(stage.balance) },
+        { key: "due_condition", label: "Due Condition" },
+        { key: "status", label: "Status", render: (stage) => <Badge>{stage.status}</Badge> },
+      ]} rows={finance?.payment_stages || []} empty="No payment stages yet." />
+    </Card>
+
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <FinanceTable title="Project Cost Groups" rows={Object.entries(finance?.expense_breakdown || {}).map(([group, amount]) => ({ group, amount }))} columns={[
+        { key: "group", label: "Group", render: (row) => <b>{row.group}</b> },
+        { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+      ]} />
+      <FinanceTable title="Project Expenses" rows={finance?.project_expenses || []} columns={[
+        { key: "expense_date", label: "Date" },
+        { key: "title", label: "Item", render: (row) => <b>{row.title || row.item_name}</b> },
+        { key: "category", label: "Group", render: (row) => row.category_model?.group_name || row.category_model?.name || row.category || "-" },
+        { key: "supplier", label: "Supplier", render: (row) => row.supplier?.name || "-" },
+        { key: "total_cost", label: "Amount", render: (row) => money(row.total_cost || row.amount) },
+      ]} />
+    </section>
+
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <FinanceTable title="Client Payments" rows={finance?.client_payments || []} columns={[
+        { key: "payment_date", label: "Date" },
+        { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+        { key: "payment_method", label: "Method" },
+        { key: "reference_number", label: "Reference" },
+      ]} />
+      <FinanceTable title="Client Invoices" rows={finance?.client_invoices || []} columns={[
+        { key: "invoice_number", label: "Invoice", render: (row) => <b>{row.invoice_number}</b> },
+        { key: "total_amount", label: "Total", render: (row) => money(row.total_amount) },
+        { key: "paid_amount", label: "Paid", render: (row) => money(row.paid_amount) },
+        { key: "balance_due", label: "Balance", render: (row) => money(row.balance_due) },
+        { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
+      ]} />
+      <FinanceTable title="Supplier Invoices" rows={finance?.supplier_invoices || []} columns={[
+        { key: "invoice_number", label: "Invoice", render: (row) => <b>{row.invoice_number}</b> },
+        { key: "supplier", label: "Supplier", render: (row) => row.supplier?.name || "-" },
+        { key: "total_amount", label: "Total", render: (row) => money(row.total_amount) },
+        { key: "balance_due", label: "Balance", render: (row) => money(row.balance_due) },
+        { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
+      ]} />
+      <FinanceTable title="Supplier Payments" rows={finance?.supplier_payments || []} columns={[
+        { key: "payment_date", label: "Date" },
+        { key: "supplier", label: "Supplier", render: (row) => row.supplier?.name || "-" },
+        { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+        { key: "payment_method", label: "Method" },
+      ]} />
+    </section>
+  </div>;
+}
+
+function FinanceTable({ title, rows, columns }) {
+  return <Card className="p-5">
+    <h3 className="mb-4 font-bold">{title}</h3>
+    <Table columns={columns} rows={rows} empty={`No ${title.toLowerCase()} yet.`} />
+  </Card>;
 }

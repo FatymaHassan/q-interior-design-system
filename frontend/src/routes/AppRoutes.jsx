@@ -19,28 +19,31 @@ import Settings from "../pages/settings/Settings";
 import Documents from "../pages/documents/Documents";
 import Login from "../pages/auth/Login";
 import UsersRoles from "../pages/users-roles/UsersRoles";
-import FinanceOverview from "../pages/finance/FinanceOverview";
-import Invoices from "../pages/invoices/Invoices";
-import Expenses from "../pages/expenses/Expenses";
-import ExpenseAdd from "../pages/expenses/ExpenseAdd";
-import ExpenseEdit from "../pages/expenses/ExpenseEdit";
-import ExpenseCategories from "../pages/expense-categories/ExpenseCategories";
-import TeamMembers from "../pages/team-members/TeamMembers";
-import Payments from "../pages/payments/Payments";
-import PaymentAdd from "../pages/payments/PaymentAdd";
-import PaymentEdit from "../pages/payments/PaymentEdit";
+import ProfitLoss from "../pages/finance/ProfitLoss";
+import Invoices from "../pages/finance/Invoices";
+import Expenses from "../pages/finance/Expenses";
+import ExpenseAdd from "../pages/finance/ExpenseAdd";
+import ExpenseEdit from "../pages/finance/ExpenseEdit";
+import ExpenseCategories from "../pages/finance/ExpenseCategories";
+import Payments from "../pages/finance/Payments";
+import PaymentAdd from "../pages/finance/PaymentAdd";
+import PaymentEdit from "../pages/finance/PaymentEdit";
+import Suppliers from "../pages/finance/Suppliers";
+import SupplierAdd from "../pages/finance/SupplierAdd";
+import SupplierEdit from "../pages/finance/SupplierEdit";
 import Quotations from "../pages/quotations/Quotations";
 import QuotationForm from "../pages/quotations/QuotationForm";
 import QuotationDetails from "../pages/quotations/QuotationDetails";
-import Overheads from "../pages/overheads/Overheads";
-import OverheadAdd from "../pages/overheads/OverheadAdd";
-import OverheadEdit from "../pages/overheads/OverheadEdit";
+import Overheads from "../pages/finance/Overheads";
+import OverheadAdd from "../pages/finance/OverheadAdd";
+import OverheadEdit from "../pages/finance/OverheadEdit";
 import HRDashboard from "../pages/hr/HRDashboard";
 import EmployeeDirectory from "../pages/hr/EmployeeDirectory";
 import EmployeeDetails from "../pages/hr/EmployeeDetails";
 import EmployeeForm from "../pages/hr/EmployeeForm";
 import Departments from "../pages/hr/Departments";
 import Attendance from "../pages/hr/Attendance";
+import AttendanceSettings from "../pages/hr/AttendanceSettings";
 import Leave from "../pages/hr/Leave";
 import Holidays from "../pages/hr/Holidays";
 import Payroll from "../pages/hr/Payroll";
@@ -48,7 +51,9 @@ import ReviewsGoals from "../pages/hr/ReviewsGoals";
 import InventoryModule from "../pages/inventory/InventoryModule";
 import ReportsCenter from "../pages/reports/ReportsCenter";
 import AuditLogs from "../pages/audit/AuditLogs";
-import { isAuthenticated, userHasRole } from "../services/api";
+import EmployeeLogin from "../pages/employee-portal/EmployeeLogin";
+import EmployeePortal from "../pages/employee-portal/EmployeePortal";
+import { isAuthenticated, isEmployeePortalAuthenticated, userHasRole } from "../services/api";
 
 function ProtectedLayout({ children }) {
   const location = useLocation();
@@ -65,9 +70,19 @@ function RoleRoute({ roles, children }) {
   return children;
 }
 
+function EmployeePortalRoute({ children }) {
+  const location = useLocation();
+  if (!isEmployeePortalAuthenticated()) {
+    return <Navigate to="/employee-login" replace state={{ from: location.pathname }} />;
+  }
+  return children;
+}
+
 export default function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<Login />} />
+    <Route path="/employee-login" element={<EmployeeLogin />} />
+    <Route path="/employee-portal" element={<EmployeePortalRoute><EmployeePortal /></EmployeePortalRoute>} />
     <Route path="/client-login" element={<Navigate to="/login" replace />} />
     <Route path="/client-portal" element={<ClientPortal />} />
     <Route path="/*" element={<ProtectedLayout>
@@ -79,7 +94,6 @@ export default function AppRoutes() {
         <Route path="/clients/:id" element={<ClientDetails />} />
         <Route path="/clients/:id/edit" element={<ClientEdit />} />
         <Route path="/projects" element={<Projects />} />
-        <Route path="/team-members" element={<RoleRoute roles={["admin", "manager"]}><TeamMembers /></RoleRoute>} />
         <Route path="/project-board" element={<ProjectBoard />} />
         <Route path="/projects/add" element={<ProjectAdd />} />
         <Route path="/projects/:id" element={<ProjectDetails />} />
@@ -89,7 +103,8 @@ export default function AppRoutes() {
         <Route path="/client-messages" element={<ClientMessagesInbox />} />
         <Route path="/photos" element={<Documents mode="photos" />} />
         <Route path="/documents" element={<Documents mode="documents" />} />
-        <Route path="/finance" element={<RoleRoute roles={["admin", "manager", "finance"]}><FinanceOverview /></RoleRoute>} />
+        <Route path="/finance" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProfitLoss /></RoleRoute>} />
+        <Route path="/finance/pnl" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProfitLoss /></RoleRoute>} />
         <Route path="/invoices" element={<RoleRoute roles={["admin", "manager", "finance"]}><Invoices /></RoleRoute>} />
         <Route path="/expenses" element={<RoleRoute roles={["admin", "manager", "finance"]}><Expenses /></RoleRoute>} />
         <Route path="/expense-categories" element={<RoleRoute roles={["admin", "manager", "finance"]}><ExpenseCategories /></RoleRoute>} />
@@ -98,6 +113,9 @@ export default function AppRoutes() {
         <Route path="/payments" element={<RoleRoute roles={["admin", "manager", "finance"]}><Payments /></RoleRoute>} />
         <Route path="/payments/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><PaymentAdd /></RoleRoute>} />
         <Route path="/payments/:id/edit" element={<RoleRoute roles={["admin", "manager", "finance"]}><PaymentEdit /></RoleRoute>} />
+        <Route path="/suppliers" element={<RoleRoute roles={["admin", "manager", "finance"]}><Suppliers /></RoleRoute>} />
+        <Route path="/suppliers/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><SupplierAdd /></RoleRoute>} />
+        <Route path="/suppliers/:id/edit" element={<RoleRoute roles={["admin", "manager", "finance"]}><SupplierEdit /></RoleRoute>} />
         <Route path="/quotations" element={<Quotations />} />
         <Route path="/quotations/add" element={<QuotationForm />} />
         <Route path="/quotations/:id" element={<QuotationDetails />} />
@@ -105,6 +123,7 @@ export default function AppRoutes() {
         <Route path="/overheads" element={<RoleRoute roles={["admin", "manager", "finance"]}><Overheads /></RoleRoute>} />
         <Route path="/overheads/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><OverheadAdd /></RoleRoute>} />
         <Route path="/overheads/:id/edit" element={<RoleRoute roles={["admin", "manager", "finance"]}><OverheadEdit /></RoleRoute>} />
+        <Route path="/finance/payroll" element={<RoleRoute roles={["admin", "manager", "finance"]}><Payroll /></RoleRoute>} />
         <Route path="/hr" element={<RoleRoute roles={["admin", "manager", "hr"]}><HRDashboard /></RoleRoute>} />
         <Route path="/hr/employees" element={<RoleRoute roles={["admin", "manager", "hr"]}><EmployeeDirectory /></RoleRoute>} />
         <Route path="/hr/employees/add" element={<RoleRoute roles={["admin", "manager", "hr"]}><EmployeeForm /></RoleRoute>} />
@@ -112,9 +131,10 @@ export default function AppRoutes() {
         <Route path="/hr/employees/:id/edit" element={<RoleRoute roles={["admin", "manager", "hr"]}><EmployeeForm /></RoleRoute>} />
         <Route path="/hr/departments" element={<RoleRoute roles={["admin", "manager", "hr"]}><Departments /></RoleRoute>} />
         <Route path="/hr/attendance" element={<RoleRoute roles={["admin", "manager", "hr"]}><Attendance /></RoleRoute>} />
+        <Route path="/hr/attendance-settings" element={<RoleRoute roles={["admin", "manager", "hr"]}><AttendanceSettings /></RoleRoute>} />
         <Route path="/hr/leave" element={<RoleRoute roles={["admin", "manager", "hr"]}><Leave /></RoleRoute>} />
         <Route path="/hr/holidays" element={<RoleRoute roles={["admin", "manager", "hr"]}><Holidays /></RoleRoute>} />
-        <Route path="/hr/payroll" element={<RoleRoute roles={["admin", "manager", "hr", "finance"]}><Payroll /></RoleRoute>} />
+        <Route path="/hr/payroll" element={<Navigate to="/finance/payroll" replace />} />
         <Route path="/hr/reviews" element={<RoleRoute roles={["admin", "manager", "hr"]}><ReviewsGoals /></RoleRoute>} />
         <Route path="/inventory" element={<RoleRoute roles={["admin", "manager", "finance", "staff"]}><InventoryModule /></RoleRoute>} />
         <Route path="/reports" element={<RoleRoute roles={["admin", "manager", "finance"]}><ReportsCenter /></RoleRoute>} />

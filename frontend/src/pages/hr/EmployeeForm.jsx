@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField from "../../components/ui/FormField";
 import { createEmployee, getEmployee, updateEmployee } from "../../services/api";
+import { formatDateOnly } from "../../utils/dateTime";
 import { emptyEmployee, fieldInputClass, HRPageHeader } from "./hrShared";
 import useHrData from "./useHrData";
 
@@ -19,7 +20,7 @@ export default function EmployeeForm() {
     if (!isEdit) return;
     getEmployee(id)
       .then((profile) => {
-        setEmployeeForm({ ...emptyEmployee, ...profile.raw, department_id: profile.raw.department_id || "", photo: null });
+        setEmployeeForm({ ...emptyEmployee, ...profile.raw, department_id: profile.raw.department_id || "", employment_start_date: formatDateOnly(profile.raw.employment_start_date), photo: null });
         setStatus("ready");
       })
       .catch(() => setStatus("error"));
@@ -47,7 +48,7 @@ export default function EmployeeForm() {
   return <div className="space-y-6">
     <HRPageHeader
       title={isEdit ? "Edit Employee" : "Add Employee"}
-      description={isEdit ? "Update employee profile, contract, salary, contact, and emergency information." : "Create a new employee profile with photo, role, department, contact, contract, and salary details."}
+      description={isEdit ? "Update employee profile, portal login, contract, salary, contact, and emergency information." : "Create a new employee profile with portal login, photo, role, department, contact, contract, and salary details."}
       action={<Link to="/hr/employees"><Button variant="outline">Back to List</Button></Link>}
     />
     {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
@@ -64,6 +65,18 @@ export default function EmployeeForm() {
         <FormField label="Employment start date"><input type="date" value={employeeForm.employment_start_date || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, employment_start_date: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input value={employeeForm.phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input type="email" value={employeeForm.email || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label={isEdit ? "Portal password" : "Portal password"}>
+          <input
+            type="password"
+            required={!isEdit}
+            minLength={6}
+            autoComplete="new-password"
+            placeholder={isEdit ? "Leave blank to keep current password" : "Minimum 6 characters"}
+            value={employeeForm.password || ""}
+            onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+            className={fieldInputClass}
+          />
+        </FormField>
         <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
         <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Emergency contact"><input value={employeeForm.emergency_contact_name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_name: e.target.value })} className={fieldInputClass} /></FormField>

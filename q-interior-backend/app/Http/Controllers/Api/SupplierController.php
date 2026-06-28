@@ -10,7 +10,7 @@ class SupplierController extends Controller
 {
     public function index()
     {
-        return Supplier::with(['expenses', 'payments', 'materials', 'purchaseOrders'])->latest()->get();
+        return Supplier::with(['expenses', 'payments', 'invoices', 'materials', 'purchaseOrders'])->latest()->get();
     }
 
     public function store(Request $request)
@@ -42,7 +42,7 @@ class SupplierController extends Controller
 
     public function show(Supplier $supplier)
     {
-        return $supplier->load(['expenses', 'payments', 'materials', 'purchaseOrders.items.material']);
+        return $supplier->load(['expenses', 'payments.invoice', 'invoices.items', 'materials', 'purchaseOrders.items.material']);
     }
 
     public function update(Request $request, Supplier $supplier)
@@ -74,8 +74,38 @@ class SupplierController extends Controller
 
     public function destroy(Supplier $supplier)
     {
+        if (
+            $supplier->expenses()->exists()
+            || $supplier->payments()->exists()
+            || $supplier->invoices()->exists()
+            || $supplier->materials()->exists()
+            || $supplier->purchaseOrders()->exists()
+        ) {
+            $supplier->update(['status' => 'Inactive']);
+
+            return response()->json([
+                'message' => 'Supplier has linked records, so it was deactivated instead of deleted.',
+                'supplier' => $supplier->fresh(['expenses', 'payments', 'invoices', 'materials', 'purchaseOrders']),
+            ]);
+        }
+
         $supplier->delete();
 
         return response()->json(['message' => 'Supplier deleted successfully']);
+    }
+
+    public function expenses(Supplier $supplier)
+    {
+        return $supplier->expenses()->with(['project', 'categoryModel'])->latest()->get();
+    }
+
+    public function invoices(Supplier $supplier)
+    {
+        return $supplier->invoices()->where('invoice_type', 'supplier')->with(['project', 'items'])->latest()->get();
+    }
+
+    public function payments(Supplier $supplier)
+    {
+        return $supplier->payments()->supplierPayment()->with(['project', 'invoice'])->latest()->get();
     }
 }

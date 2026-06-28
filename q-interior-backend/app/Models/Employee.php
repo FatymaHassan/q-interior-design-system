@@ -32,7 +32,7 @@ class Employee extends Model
     protected function casts(): array
     {
         return [
-            'employment_start_date' => 'date',
+            'employment_start_date' => 'date:Y-m-d',
             'daily_rate' => 'decimal:2',
             'monthly_salary' => 'decimal:2',
         ];

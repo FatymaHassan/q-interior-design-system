@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
+use App\Models\OfficeLocation;
 use App\Models\Payroll;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -41,7 +43,9 @@ class HrModuleTest extends TestCase
             'check_in' => '09:00',
             'check_out' => '17:00',
             'status' => 'Present',
-        ])->assertCreated()->assertJsonFragment(['status' => 'Present']);
+        ])->assertCreated()
+            ->assertJsonFragment(['status' => 'Present'])
+            ->assertJsonPath('date', now()->toDateString());
 
         $leave = $this->postJson('/api/leave-requests', [
             'employee_id' => $employee['id'],
@@ -81,5 +85,114 @@ class HrModuleTest extends TestCase
         $this->assertSame(1, Department::count());
         $this->assertSame(1, Employee::count());
         $this->assertGreaterThan(0, LeaveBalance::count());
+    }
+
+    public function test_employee_created_with_password_can_login_to_employee_portal(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+
+        $employee = $this->postJson('/api/employees', [
+            'name' => 'Portal Employee',
+            'position' => 'Designer',
+            'email' => 'portal-employee@example.com',
+            'password' => 'secret123',
+            'monthly_salary' => 1200,
+            'status' => 'Active',
+        ])->assertCreated()->json();
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee['id'],
+            'email' => 'portal-employee@example.com',
+        ]);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'portal-employee@example.com',
+            'role' => 'staff',
+        ]);
+
+        $this->postJson('/api/employee/login', [
+            'email' => 'portal-employee@example.com',
+            'password' => 'secret123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('employee.email', 'portal-employee@example.com')
+            ->assertJsonStructure(['token']);
+    }
+
+    public function test_existing_employee_can_be_updated_with_portal_password_and_login(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+
+        $employee = $this->postJson('/api/employees', [
+            'name' => 'Existing Employee',
+            'position' => 'Designer',
+            'email' => 'existing-employee@example.com',
+            'monthly_salary' => 1200,
+            'status' => 'Active',
+        ])->assertCreated()->json();
+
+        $this->post('/api/employees/' . $employee['id'], [
+            '_method' => 'PUT',
+            'name' => 'Existing Employee Updated',
+            'email' => 'existing-employee@example.com',
+            'password' => 'updated123',
+            'monthly_salary' => 1300,
+            'status' => 'Active',
+        ])->assertOk()->assertJsonFragment(['name' => 'Existing Employee Updated']);
+
+        $this->postJson('/api/employee/login', [
+            'email' => 'existing-employee@example.com',
+            'password' => 'updated123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('employee.name', 'Existing Employee Updated')
+            ->assertJsonStructure(['token']);
+    }
+
+    public function test_employee_portal_marks_late_employee_early_checkout(): void
+    {
+        $user = User::factory()->create(['role' => 'staff']);
+        Employee::create([
+            'user_id' => $user->id,
+            'name' => 'Early Checkout Employee',
+            'email' => $user->email,
+            'status' => 'Active',
+        ]);
+        OfficeLocation::query()->update(['status' => 'Inactive']);
+        OfficeLocation::create([
+            'name' => 'SOMOIL CAR WASH',
+            'latitude' => 2.0314625,
+            'longitude' => 45.3122031,
+            'allowed_radius_meters' => 100,
+            'work_start_time' => '08:00',
+            'work_end_time' => '17:00',
+            'late_threshold_time' => '08:15',
+            'status' => 'Active',
+        ]);
+
+        Sanctum::actingAs($user);
+        Carbon::setTestNow(Carbon::parse('2026-07-04 08:30:00', 'Africa/Mogadishu'));
+
+        $this->postJson('/api/employee/attendance/check-in', [
+            'latitude' => 2.0314625,
+            'longitude' => 45.3122031,
+        ])->assertOk()->assertJsonPath('attendance.date', '2026-07-04');
+
+        $this->postJson('/api/employee/attendance/check-out', [
+            'latitude' => 2.0314625,
+            'longitude' => 45.3122031,
+        ])->assertStatus(422)->assertJsonPath('message', 'Check out cannot be the same time as check in.');
+
+        Carbon::setTestNow(Carbon::parse('2026-07-04 10:00:00', 'Africa/Mogadishu'));
+        $this->postJson('/api/employee/attendance/check-out', [
+            'latitude' => 2.0314625,
+            'longitude' => 45.3122031,
+        ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Checked out before the work end time.')
+            ->assertJsonPath('attendance.status', 'Late / Early Out')
+            ->assertJsonPath('attendance.check_out', '10:00:00');
+
+        Carbon::setTestNow();
     }
 }

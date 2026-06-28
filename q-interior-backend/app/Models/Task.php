@@ -9,6 +9,7 @@ class Task extends Model
     protected $fillable = [
         'project_id',
         'assigned_to',
+        'employee_id',
         'assigned_by',
         'title',
         'description',
@@ -31,6 +32,11 @@ class Task extends Model
     public function assignee()
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function assigneeEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
     }
 
     public function assigner()

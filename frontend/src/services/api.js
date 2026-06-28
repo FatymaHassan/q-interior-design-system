@@ -1,4 +1,5 @@
 import axios from "axios";
+import { formatDateOnly } from "../utils/dateTime";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
@@ -55,6 +56,11 @@ export function mapProject(project) {
     client: project.client?.name || "No client assigned",
     location: project.location || "Not set",
     budget: money(project.budget),
+    contractAmount: money(project.contract_amount || project.revenue || project.budget),
+    paidAmount: money(project.paid_amount),
+    remainingBalance: money(project.remaining_balance),
+    paymentPercentage: Number(project.payment_percentage || 0),
+    paymentPlanType: project.payment_plan_type || "Deposit + Final Payment",
     expenses: money(project.actual_cost),
     progress: Number(project.progress || 0),
     status: project.status || "Pending",
@@ -212,11 +218,16 @@ export function mapExpense(expense) {
   return {
     id: expense.id,
     title: expense.title || expense.item_name,
+    expenseType: expense.expense_type || "project",
+    expenseTypeLabel: expenseTypeLabel(expense.expense_type),
     project: expense.project?.name || expense.project?.project_name || "Unassigned",
     supplier: expense.supplier?.name || "-",
+    employee: expense.employee?.name || "-",
     category: expense.category_model?.name || expense.category || "General",
+    groupName: expense.category_model?.group_name || "-",
     quantity: Number(expense.quantity || 0),
     unitPrice: money(expense.unit_cost || expense.unit_price),
+    amountValue: Number(expense.total_cost || expense.amount || 0),
     amount: money(expense.total_cost || expense.amount),
     date: expense.expense_date || "-",
     method: expense.payment_method || "-",
@@ -236,8 +247,14 @@ export function mapPayment(payment) {
     isClientPayment: isClientPayment(payment.type),
     isSupplierPayment: isSupplierPayment(payment.type),
     project: payment.project?.name || payment.project?.project_name || "-",
+    projectId: payment.project_id || payment.project?.id || "",
     client: payment.client?.name || "-",
+    clientId: payment.client_id || payment.client?.id || "",
     supplier: payment.supplier?.name || "-",
+    supplierId: payment.supplier_id || payment.supplier?.id || "",
+    invoiceId: payment.invoice_id || payment.invoice?.id || "",
+    paymentStageId: payment.payment_stage_id || payment.payment_stage?.id || "",
+    paymentStage: payment.payment_stage?.name || "-",
     amount: money(payment.amount),
     date: payment.payment_date || "-",
     method: payment.payment_method || payment.method || "-",
@@ -251,18 +268,28 @@ export function mapInvoice(invoice) {
   return {
     id: invoice.id,
     number: invoice.invoice_number,
+    internalReference: invoice.internal_reference || "",
+    type: invoice.invoice_type || "client",
     client: invoice.client?.name || "-",
     clientId: invoice.client_id || "",
+    supplier: invoice.supplier?.name || "-",
+    supplierId: invoice.supplier_id || "",
     project: invoice.project?.name || invoice.project?.project_name || "-",
     projectId: invoice.project_id || "",
+    paymentStageId: invoice.payment_stage_id || invoice.payment_stage?.id || "",
+    paymentStage: invoice.payment_stage?.name || "-",
+    issueDate: invoice.issue_date || invoice.invoice_date || "",
     invoiceDate: invoice.invoice_date || "",
     dueDate: invoice.due_date || "",
     subtotal: money(invoice.subtotal),
     discount: money(invoice.discount),
     tax: money(invoice.tax),
     total: money(invoice.total_amount),
+    paid: money(invoice.paid_amount),
+    balance: money(invoice.balance_due),
     status: invoice.status || "Unpaid",
     notes: invoice.notes || "",
+    attachmentFile: invoice.attachment_file || "",
     items: invoice.items || [],
     raw: invoice,
   };
@@ -304,6 +331,9 @@ export function mapCategory(category) {
     id: category.id,
     name: category.name,
     type: category.type,
+    expenseType: category.expense_type || "project",
+    expenseTypeLabel: expenseTypeLabel(category.expense_type),
+    groupName: category.group_name || "",
     typeLabel: categoryTypeLabel(category.type),
     description: category.description || "",
     status: category.status || "Active",
@@ -336,11 +366,13 @@ export function mapDocument(document) {
 }
 
 export function mapTask(task) {
+  const employee = task.assignee_employee || task.assigneeEmployee;
   return {
     id: task.id,
     title: task.title,
     project: task.project?.name || task.project?.project_name || "-",
-    assignee: task.assignee?.name || "-",
+    assignee: employee?.name || task.assignee?.name || "-",
+    employeeId: task.employee_id || employee?.id || "",
     priority: task.priority || "Medium",
     status: task.status || "Pending",
     deadline: task.deadline || "-",
@@ -411,7 +443,7 @@ export function mapEmployee(employee) {
     phone: employee.phone || "-",
     email: employee.email || "-",
     address: employee.address || "",
-    startDate: employee.employment_start_date || "",
+    startDate: formatDateOnly(employee.employment_start_date) || "",
     contractType: employee.contract_type || "",
     salaryGrade: employee.salary_grade || "",
     emergencyContact: employee.emergency_contact_name || "",
@@ -433,6 +465,15 @@ export function categoryTypeLabel(type) {
     other: "Other",
   };
   return labels[type] || type || "Other";
+}
+
+export function expenseTypeLabel(type) {
+  const labels = {
+    project: "Project Expense",
+    overhead: "Overhead",
+    payroll: "Payroll",
+  };
+  return labels[type] || type || "Project Expense";
 }
 
 export async function login(payload) {
@@ -609,8 +650,8 @@ export async function checkOverdueTasks() {
   return response.data;
 }
 
-export async function getExpenses() {
-  const response = await api.get("/expenses");
+export async function getExpenses(params = {}) {
+  const response = await api.get("/expenses", { params });
   return response.data.map(mapExpense);
 }
 
@@ -667,6 +708,11 @@ export async function deletePayment(id) {
   await api.delete(`/payments/${id}`);
 }
 
+export async function getSupplierPayments(params = {}) {
+  const response = await api.get("/supplier-payments", { params });
+  return response.data.map(mapPayment);
+}
+
 export async function getInvoices(params = {}) {
   const response = await api.get("/invoices", { params });
   return response.data.map(mapInvoice);
@@ -684,6 +730,16 @@ export async function updateInvoice(id, payload) {
 
 export async function deleteInvoice(id) {
   await api.delete(`/invoices/${id}`);
+}
+
+export async function getSupplierInvoices(params = {}) {
+  const response = await api.get("/supplier-invoices", { params });
+  return response.data.map(mapInvoice);
+}
+
+export async function createSupplierInvoice(payload) {
+  const response = await api.post("/supplier-invoices", { ...payload, invoice_type: "supplier" });
+  return mapInvoice(response.data);
 }
 
 export async function sendInvoiceReminder(id) {
@@ -723,6 +779,30 @@ export async function markAllNotificationsRead() {
 export async function getProjects() {
   const response = await api.get("/projects");
   return response.data.map(mapProject);
+}
+
+export async function getProjectFinanceSummary(id) {
+  const response = await api.get(`/projects/${id}/finance-summary`);
+  return response.data;
+}
+
+export async function getProjectPaymentStages(id) {
+  const response = await api.get(`/projects/${id}/payment-stages`);
+  return response.data;
+}
+
+export async function createProjectPaymentStage(id, payload) {
+  const response = await api.post(`/projects/${id}/payment-stages`, payload);
+  return response.data;
+}
+
+export async function updateProjectPaymentStage(id, payload) {
+  const response = await api.put(`/project-payment-stages/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteProjectPaymentStage(id) {
+  await api.delete(`/project-payment-stages/${id}`);
 }
 
 export async function getSuppliers() {
@@ -885,6 +965,26 @@ export async function getFinanceOverview() {
   return response.data;
 }
 
+export async function getFinancePnl(params = {}) {
+  const response = await api.get("/finance/pnl", { params });
+  return response.data;
+}
+
+export async function getProjectProfitReport(params = {}) {
+  const response = await api.get("/finance/project-profit-report", { params });
+  return response.data;
+}
+
+export async function getOverheadReport(params = {}) {
+  const response = await api.get("/finance/overhead-report", { params });
+  return response.data;
+}
+
+export async function getPayrollReport(params = {}) {
+  const response = await api.get("/finance/payroll-report", { params });
+  return response.data;
+}
+
 export async function getQuotationReport() {
   const response = await api.get("/reports/quotations");
   return response.data;
@@ -892,6 +992,26 @@ export async function getQuotationReport() {
 
 export async function getHrOverview() {
   const response = await api.get("/hr/overview");
+  return response.data;
+}
+
+export async function getHrAttendanceAnalytics(params = {}) {
+  const response = await api.get("/hr/attendance/analytics", { params });
+  return response.data;
+}
+
+export async function getOfficeLocations() {
+  const response = await api.get("/hr/office-locations");
+  return response.data;
+}
+
+export async function saveOfficeLocation(id, payload) {
+  const response = id ? await api.put(`/hr/office-locations/${id}`, payload) : await api.post("/hr/office-locations", payload);
+  return response.data;
+}
+
+export async function getAttendanceAttemptLogs(params = {}) {
+  const response = await api.get("/hr/attendance/attempt-logs", { params });
   return response.data;
 }
 
@@ -911,7 +1031,13 @@ export async function createEmployee(payload) {
 }
 
 export async function updateEmployee(id, payload) {
-  const response = await api.put(`/employees/${id}`, payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  if (payload instanceof FormData) {
+    payload.set("_method", "PUT");
+    const response = await api.post(`/employees/${id}`, payload, { headers: { "Content-Type": "multipart/form-data" } });
+    return mapEmployee(response.data);
+  }
+
+  const response = await api.put(`/employees/${id}`, payload);
   return mapEmployee(response.data);
 }
 
@@ -997,6 +1123,28 @@ export async function getPayrolls(params = {}) {
 export async function generatePayroll(payload) {
   const response = await api.post("/payrolls/generate", payload);
   return response.data;
+}
+
+export async function updatePayroll(id, payload) {
+  const response = await api.put(`/payrolls/${id}`, payload);
+  return response.data;
+}
+
+export async function deletePayroll(id) {
+  await api.delete(`/payrolls/${id}`);
+}
+
+export async function downloadPayrollExport(format = "excel", params = {}) {
+  const response = await api.get("/payrolls/export", { params: { ...params, format }, responseType: "blob" });
+  const extension = format === "pdf" ? "pdf" : "csv";
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `payroll-export.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function approvePayroll(id) {
@@ -1118,30 +1266,6 @@ export async function deleteExpenseCategory(id) {
 export async function updateExpenseCategoryStatus(id, status) {
   const response = await api.patch(`/expense-categories/${id}/status`, { status });
   return mapCategory(response.data);
-}
-
-export async function getTeamMembers(params = {}) {
-  const response = await api.get("/team-members", { params });
-  return response.data.map(mapEmployee);
-}
-
-export async function createTeamMember(payload) {
-  const response = await api.post("/team-members", payload);
-  return mapEmployee(response.data);
-}
-
-export async function updateTeamMember(id, payload) {
-  const response = await api.put(`/team-members/${id}`, payload);
-  return mapEmployee(response.data);
-}
-
-export async function deleteTeamMember(id) {
-  await api.delete(`/team-members/${id}`);
-}
-
-export async function updateTeamMemberStatus(id, status) {
-  const response = await api.patch(`/team-members/${id}/status`, { status });
-  return mapEmployee(response.data);
 }
 
 export async function getProjectMembers(projectId) {
@@ -1384,6 +1508,110 @@ export async function replyClientMessage(projectId, message) {
 
 export async function markClientMessageRead(id) {
   const response = await api.patch(`/client-messages/${id}/read`);
+  return response.data;
+}
+
+const employeeApi = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+  headers: { Accept: "application/json" },
+});
+
+employeeApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("q_employee_portal_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+employeeApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("q_employee_portal_token");
+      localStorage.removeItem("q_employee_portal_employee");
+      if (window.location.pathname.startsWith("/employee-portal")) {
+        window.location.assign("/employee-login");
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export async function employeePortalLogin(payload) {
+  const response = await employeeApi.post("/employee/login", payload);
+  localStorage.setItem("q_employee_portal_token", response.data.token);
+  localStorage.setItem("q_employee_portal_employee", JSON.stringify(response.data.employee));
+  return response.data;
+}
+
+export function isEmployeePortalAuthenticated() {
+  return Boolean(localStorage.getItem("q_employee_portal_token"));
+}
+
+export function logoutEmployeePortal() {
+  localStorage.removeItem("q_employee_portal_token");
+  localStorage.removeItem("q_employee_portal_employee");
+}
+
+export async function employeePortalLogout() {
+  try {
+    await employeeApi.post("/employee/logout");
+  } finally {
+    logoutEmployeePortal();
+  }
+}
+
+export async function getEmployeePortalDashboard() {
+  const response = await employeeApi.get("/employee/dashboard");
+  return response.data;
+}
+
+export async function employeeCheckIn(payload) {
+  const response = await employeeApi.post("/employee/attendance/check-in", payload);
+  return response.data;
+}
+
+export async function employeeCheckOut(payload) {
+  const response = await employeeApi.post("/employee/attendance/check-out", payload);
+  return response.data;
+}
+
+export async function getEmployeeTodayAttendance() {
+  const response = await employeeApi.get("/employee/attendance/today");
+  return response.data;
+}
+
+export async function getEmployeeAttendanceAnalytics(params = {}) {
+  const response = await employeeApi.get("/employee/attendance/analytics", { params });
+  return response.data;
+}
+
+export async function getEmployeePortalAttendance(params = {}) {
+  const response = await employeeApi.get("/employee/attendance/monthly", { params });
+  return response.data;
+}
+
+export async function getEmployeePortalLeaveRequests() {
+  const response = await employeeApi.get("/employee/leave-requests");
+  return response.data;
+}
+
+export async function createEmployeePortalLeaveRequest(payload) {
+  const response = await employeeApi.post("/employee/leave-requests", payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  return response.data;
+}
+
+export async function getEmployeePortalLeaveBalances() {
+  const response = await employeeApi.get("/employee/leave-balances");
+  return response.data;
+}
+
+export async function getEmployeePortalPayslips() {
+  const response = await employeeApi.get("/employee/payslips");
+  return response.data;
+}
+
+export async function getEmployeePortalReviews() {
+  const response = await employeeApi.get("/employee/performance-reviews");
   return response.data;
 }
 

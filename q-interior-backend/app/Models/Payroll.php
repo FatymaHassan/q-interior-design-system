@@ -11,7 +11,7 @@ class Payroll extends Model
     protected function casts(): array
     {
         return [
-            'payment_date' => 'date',
+            'payment_date' => 'date:Y-m-d',
             'base_salary' => 'decimal:2',
             'overtime_amount' => 'decimal:2',
             'bonus' => 'decimal:2',

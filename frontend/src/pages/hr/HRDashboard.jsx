@@ -10,11 +10,13 @@ export default function HRDashboard() {
     ["Total Employees", overview?.total_employees || 0],
     ["Active Employees", overview?.active_employees || 0],
     ["Present Today", overview?.present_today || 0],
-    ["Absent Today", overview?.absent_today || 0],
     ["Late Today", overview?.late_today || 0],
+    ["Absent Today", overview?.absent_today || 0],
+    ["On Leave Today", overview?.on_leave_today || 0],
     ["Pending Leave", overview?.pending_leave_requests || 0],
     ["Payroll Pending", overview?.payroll_pending_approval || 0],
-    ["Payroll Paid", overview?.payroll_paid_this_month || 0],
+    ["Avg Attendance", `${overview?.average_attendance_percentage || 0}%`],
+    ["Avg Late", `${overview?.average_late_percentage || 0}%`],
   ];
 
   return <div className="space-y-4">

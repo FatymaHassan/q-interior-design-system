@@ -6,20 +6,20 @@ import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import ProgressBar from "../../components/ui/ProgressBar";
 import Table from "../../components/ui/Table";
-import { getClients, getProjectBoard, getTeamMembers, updateProjectStage } from "../../services/api";
+import { getClients, getEmployees, getProjectBoard, updateProjectStage } from "../../services/api";
 
 export default function ProjectBoard() {
   const [stages, setStages] = useState([]);
   const [clients, setClients] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [filters, setFilters] = useState({ search: "", status: "", client_id: "", staff_id: "" });
   const [view, setView] = useState("board");
   const [status, setStatus] = useState("loading");
 
-  const loadBoard = () => Promise.all([getProjectBoard(filters), getClients(), getTeamMembers({ status: "Active" })]).then(([data, clientData, memberData]) => {
+  const loadBoard = () => Promise.all([getProjectBoard(filters), getClients(), getEmployees({ status: "Active" })]).then(([data, clientData, employeeData]) => {
     setStages(data);
     setClients(clientData);
-    setTeamMembers(memberData);
+    setEmployees(employeeData);
     setStatus("connected");
   }).catch(() => setStatus("error"));
 
@@ -66,7 +66,7 @@ export default function ProjectBoard() {
         <FormField label="Search"><input name="search" value={filters.search} onChange={updateFilter} placeholder="Project or client" className={fieldInputClass} /></FormField>
         <FormField label="Status"><select name="status" value={filters.status} onChange={updateFilter} className={fieldInputClass}><option value="">All</option><option>Pending</option><option>Active</option><option>In Progress</option><option>Completed</option><option>Delayed</option><option>Cancelled</option></select></FormField>
         <FormField label="Client"><select name="client_id" value={filters.client_id} onChange={updateFilter} className={fieldInputClass}><option value="">All clients</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></FormField>
-        <FormField label="Assigned team"><select name="staff_id" value={filters.staff_id} onChange={updateFilter} className={fieldInputClass}><option value="">All team</option>{teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></FormField>
+        <FormField label="Assigned employee"><select name="staff_id" value={filters.staff_id} onChange={updateFilter} className={fieldInputClass}><option value="">All employees</option>{employees.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></FormField>
       </div>
     </Card>
 

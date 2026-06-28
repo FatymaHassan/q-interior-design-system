@@ -13,6 +13,7 @@ export const emptyEmployee = {
   photo: null,
   phone: "",
   email: "",
+  password: "",
   address: "",
   employment_start_date: "",
   contract_type: "Full Time",

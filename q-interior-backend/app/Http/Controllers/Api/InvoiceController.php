@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Notification;
+use App\Models\ProjectPaymentStage;
 use App\Models\Setting;
+use App\Services\ProjectFinanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -13,9 +15,14 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        return Invoice::with(['client', 'project', 'items'])
+        $invoiceType = $request->query('invoice_type') ?? $request->route('invoice_type');
+
+        return Invoice::with(['client', 'supplier', 'project', 'paymentStage', 'items'])
+            ->when($invoiceType, fn ($query, $value) => $query->where('invoice_type', $value))
             ->when($request->query('client_id'), fn ($query, $value) => $query->where('client_id', $value))
+            ->when($request->query('supplier_id'), fn ($query, $value) => $query->where('supplier_id', $value))
             ->when($request->query('project_id'), fn ($query, $value) => $query->where('project_id', $value))
+            ->when($request->query('payment_stage_id'), fn ($query, $value) => $query->where('payment_stage_id', $value))
             ->when($request->query('status'), fn ($query, $value) => $query->where('status', $value))
             ->when($request->query('overdue'), fn ($query) => $query->whereDate('due_date', '<', now())->where('status', '!=', 'Paid'))
             ->latest()
@@ -23,46 +30,54 @@ class InvoiceController extends Controller
             ->map(fn ($invoice) => $this->withComputedStatus($invoice));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ProjectFinanceService $finance)
     {
         $data = $this->validated($request);
+        $data['invoice_type'] = $data['invoice_type'] ?? $request->route('invoice_type') ?? 'client';
 
-        return DB::transaction(function () use ($data, $request) {
+        return DB::transaction(function () use ($data, $request, $finance) {
             $items = $data['items'] ?? [];
             unset($data['items']);
+            $data['invoice_date'] = $data['invoice_date'] ?? $data['issue_date'] ?? now()->toDateString();
+            $data['issue_date'] = $data['issue_date'] ?? $data['invoice_date'];
 
             $invoice = Invoice::create([
                 ...$data,
-                'invoice_number' => $data['invoice_number'] ?? $this->nextInvoiceNumber(),
-                'invoice_date' => $data['invoice_date'] ?? now()->toDateString(),
+                'invoice_number' => $data['invoice_number'] ?? $this->nextInvoiceNumber($data['invoice_type']),
                 'created_by' => $request->user()?->id,
             ]);
 
             $this->syncItems($invoice, $items);
+            $finance->refreshInvoice($invoice->refresh());
 
-            return $this->withComputedStatus($invoice->load(['client', 'project', 'items']));
+            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
         });
     }
 
     public function show(Invoice $invoice)
     {
-        return $this->withComputedStatus($invoice->load(['client', 'project', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
     }
 
-    public function update(Request $request, Invoice $invoice)
+    public function update(Request $request, Invoice $invoice, ProjectFinanceService $finance)
     {
         $data = $this->validated($request, true);
 
-        return DB::transaction(function () use ($data, $invoice) {
+        return DB::transaction(function () use ($data, $invoice, $finance, $request) {
             $items = $data['items'] ?? null;
             unset($data['items']);
+            if (isset($data['issue_date']) && ! isset($data['invoice_date'])) {
+                $data['invoice_date'] = $data['issue_date'];
+            }
+            $data['updated_by'] = $request->user()?->id;
 
             $invoice->update($data);
             if (is_array($items)) {
                 $this->syncItems($invoice, $items);
             }
+            $finance->refreshInvoice($invoice->refresh());
 
-            return $this->withComputedStatus($invoice->load(['client', 'project', 'items']));
+            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
         });
     }
 
@@ -86,12 +101,27 @@ class InvoiceController extends Controller
             'is_read' => false,
         ]);
 
-        return $this->withComputedStatus($invoice->load(['client', 'project', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+    }
+
+    public function markSent(Invoice $invoice)
+    {
+        $invoice->update(['status' => $invoice->invoice_type === 'supplier' ? 'Received' : 'Sent']);
+
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+    }
+
+    public function uploadFile(Request $request, Invoice $invoice)
+    {
+        $data = $request->validate(['attachment_file' => 'required|string|max:255']);
+        $invoice->update($data);
+
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
     }
 
     public function pdf(Invoice $invoice)
     {
-        $invoice->load(['client', 'project', 'items']);
+        $invoice->load(['client', 'supplier', 'project', 'items']);
 
         return response($this->simplePdf($invoice))
             ->header('Content-Type', 'application/pdf')
@@ -102,19 +132,32 @@ class InvoiceController extends Controller
     {
         return $request->validate([
             'invoice_number' => 'nullable|string|max:255',
-            'client_id' => [$partial ? 'sometimes' : 'required', 'exists:clients,id'],
+            'internal_reference' => 'nullable|string|max:255',
+            'invoice_type' => 'nullable|in:client,supplier',
+            'client_id' => 'nullable|exists:clients,id',
+            'supplier_id' => 'nullable|exists:suppliers,id',
             'project_id' => 'nullable|exists:projects,id',
+            'payment_stage_id' => 'nullable|exists:project_payment_stages,id',
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
             'quotation_id' => 'nullable|exists:quotations,id',
+            'issue_date' => 'nullable|date',
             'invoice_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'discount' => 'nullable|numeric|min:0',
             'tax' => 'nullable|numeric|min:0',
-            'status' => 'nullable|in:Unpaid,Partially Paid,Paid,Overdue',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'balance_due' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:Draft,Sent,Received,Unpaid,Partially Paid,Paid,Overdue,Cancelled',
             'notes' => 'nullable|string',
+            'attachment_file' => 'nullable|string|max:255',
+            'pdf_file' => 'nullable|string|max:255',
             'items' => 'nullable|array',
             'items.*.description' => 'required_with:items|string|max:255',
             'items.*.quantity' => 'nullable|numeric|min:0',
+            'items.*.unit' => 'nullable|string|max:255',
             'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.tax' => 'nullable|numeric|min:0',
         ]);
     }
 
@@ -126,13 +169,18 @@ class InvoiceController extends Controller
         foreach ($items as $item) {
             $quantity = (float) ($item['quantity'] ?? 1);
             $unitPrice = (float) ($item['unit_price'] ?? 0);
-            $total = round($quantity * $unitPrice, 2);
+            $discount = (float) ($item['discount'] ?? 0);
+            $tax = (float) ($item['tax'] ?? 0);
+            $total = round(max(0, $quantity * $unitPrice - $discount + $tax), 2);
             $subtotal += $total;
 
             $invoice->items()->create([
                 'description' => $item['description'],
                 'quantity' => $quantity,
+                'unit' => $item['unit'] ?? 'Unit',
                 'unit_price' => $unitPrice,
+                'discount' => $discount,
+                'tax' => $tax,
                 'total' => $total,
             ]);
         }
@@ -142,21 +190,22 @@ class InvoiceController extends Controller
         $invoice->update([
             'subtotal' => round($subtotal, 2),
             'total_amount' => max(0, round($subtotal - $discount + $tax, 2)),
+            'balance_due' => max(0, round($subtotal - $discount + $tax, 2) - (float) $invoice->paid_amount),
         ]);
     }
 
     private function withComputedStatus(Invoice $invoice): Invoice
     {
-        if ($invoice->due_date && $invoice->due_date->isPast() && ! in_array($invoice->status, ['Paid', 'Overdue'], true)) {
+        if ($invoice->due_date && $invoice->due_date->isPast() && (float) $invoice->balance_due > 0 && ! in_array($invoice->status, ['Paid', 'Overdue', 'Cancelled'], true)) {
             $invoice->forceFill(['status' => 'Overdue'])->save();
         }
 
         return $invoice;
     }
 
-    private function nextInvoiceNumber(): string
+    private function nextInvoiceNumber(string $type = 'client'): string
     {
-        $prefix = Setting::where('key', 'invoice_prefix')->value('value') ?: 'INV-';
+        $prefix = $type === 'supplier' ? 'SUP-INV-' : (Setting::where('key', 'invoice_prefix')->value('value') ?: 'INV-');
         $next = (int) Invoice::max('id') + 1;
 
         return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
@@ -166,8 +215,8 @@ class InvoiceController extends Controller
     {
         $content = [];
         $this->pdfText($content, 'Q INTERIOR DESIGN STUDIO', 42, 790, 16, true);
-        $this->pdfText($content, 'INVOICE ' . $invoice->invoice_number, 42, 760, 14, true);
-        $this->pdfText($content, 'Client: ' . ($invoice->client?->name ?? '-'), 42, 730);
+        $this->pdfText($content, strtoupper($invoice->invoice_type ?: 'client') . ' INVOICE ' . $invoice->invoice_number, 42, 760, 14, true);
+        $this->pdfText($content, 'Client/Supplier: ' . ($invoice->client?->name ?? $invoice->supplier?->name ?? '-'), 42, 730);
         $this->pdfText($content, 'Project: ' . ($invoice->project?->name ?: $invoice->project?->project_name ?: '-'), 42, 712);
         $this->pdfText($content, 'Invoice Date: ' . optional($invoice->invoice_date)->toDateString(), 340, 730);
         $this->pdfText($content, 'Due Date: ' . optional($invoice->due_date)->toDateString(), 340, 712);
@@ -185,6 +234,8 @@ class InvoiceController extends Controller
         $this->pdfText($content, 'Discount: $' . number_format((float) $invoice->discount, 2), 360, $y - 40);
         $this->pdfText($content, 'Tax: $' . number_format((float) $invoice->tax, 2), 360, $y - 60);
         $this->pdfText($content, 'Total: $' . number_format((float) $invoice->total_amount, 2), 360, $y - 84, 12, true);
+        $this->pdfText($content, 'Paid: $' . number_format((float) $invoice->paid_amount, 2), 360, $y - 106);
+        $this->pdfText($content, 'Balance: $' . number_format((float) $invoice->balance_due, 2), 360, $y - 126, 11, true);
         $this->pdfText($content, 'Status: ' . $invoice->status, 42, $y - 84, 10, true);
 
         return $this->buildPdf(implode("\n", $content));

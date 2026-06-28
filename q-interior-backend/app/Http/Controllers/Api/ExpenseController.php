@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -12,10 +13,12 @@ class ExpenseController extends Controller
 {
     public function index(Request $request)
     {
-        return Expense::with(['project', 'supplier', 'categoryModel', 'approver'])
+        return Expense::with(['project', 'supplier', 'employee', 'categoryModel', 'approver'])
             ->when($request->query('project_id'), fn ($query, $value) => $query->where('project_id', $value))
             ->when($request->query('supplier_id'), fn ($query, $value) => $query->where('supplier_id', $value))
+            ->when($request->query('employee_id'), fn ($query, $value) => $query->where('employee_id', $value))
             ->when($request->query('category_id'), fn ($query, $value) => $query->where('category_id', $value))
+            ->when($request->query('expense_type'), fn ($query, $value) => $query->where('expense_type', $value))
             ->when($request->query('payment_method'), fn ($query, $value) => $query->where('payment_method', $value))
             ->when($request->query('approval_status'), fn ($query, $value) => $query->where('approval_status', $value))
             ->when($request->query('month'), fn ($query, $value) => $query->whereMonth('expense_date', $value))
@@ -31,7 +34,9 @@ class ExpenseController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            'employee_id' => 'nullable|exists:employees,id',
             'category_id' => 'nullable|exists:expense_categories,id',
+            'expense_type' => 'nullable|in:project,overhead,payroll',
             'title' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
             'item_name' => 'nullable|string|max:255',
@@ -41,6 +46,7 @@ class ExpenseController extends Controller
             'unit_cost' => 'nullable|numeric|min:0',
             'amount' => 'nullable|numeric|min:0',
             'total_cost' => 'nullable|numeric|min:0',
+            'is_manual_total' => 'nullable|boolean',
             'paid_by' => 'nullable|string|max:255',
             'expense_date' => 'nullable|date',
             'date' => 'nullable|date',
@@ -50,15 +56,16 @@ class ExpenseController extends Controller
             'approval_status' => 'nullable|in:Pending,Approved,Rejected',
             'notes' => 'nullable|string',
             'created_by' => 'nullable|exists:users,id',
+            'updated_by' => 'nullable|exists:users,id',
         ]);
         $data = $this->normalizeExpense($data, $request);
 
-        return Expense::create($data)->load(['project', 'supplier', 'categoryModel', 'approver']);
+        return Expense::create($data)->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
     public function show(Expense $expense)
     {
-        return $expense->load(['project', 'supplier', 'categoryModel', 'approver']);
+        return $expense->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
     public function update(Request $request, Expense $expense)
@@ -66,7 +73,9 @@ class ExpenseController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            'employee_id' => 'nullable|exists:employees,id',
             'category_id' => 'nullable|exists:expense_categories,id',
+            'expense_type' => 'nullable|in:project,overhead,payroll',
             'title' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
             'item_name' => 'nullable|string|max:255',
@@ -76,6 +85,7 @@ class ExpenseController extends Controller
             'unit_cost' => 'nullable|numeric|min:0',
             'amount' => 'nullable|numeric|min:0',
             'total_cost' => 'nullable|numeric|min:0',
+            'is_manual_total' => 'nullable|boolean',
             'paid_by' => 'nullable|string|max:255',
             'expense_date' => 'nullable|date',
             'date' => 'nullable|date',
@@ -85,12 +95,13 @@ class ExpenseController extends Controller
             'approval_status' => 'nullable|in:Pending,Approved,Rejected',
             'notes' => 'nullable|string',
             'created_by' => 'nullable|exists:users,id',
+            'updated_by' => 'nullable|exists:users,id',
         ]);
         $data = $this->normalizeExpense($data, $request, $expense);
 
         $expense->update($data);
 
-        return $expense->load(['project', 'supplier', 'categoryModel', 'approver']);
+        return $expense->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
     public function destroy(Expense $expense)
@@ -126,14 +137,29 @@ class ExpenseController extends Controller
     {
         $data['title'] = $data['title'] ?? $data['item_name'] ?? 'Expense';
         $data['item_name'] = $data['item_name'] ?? $data['title'];
+        $category = isset($data['category_id']) ? ExpenseCategory::find($data['category_id']) : $expense?->categoryModel;
+        $data['expense_type'] = $data['expense_type'] ?? $category?->expense_type ?? $this->expenseTypeFromCategoryType($category?->type) ?? ($data['project_id'] ?? $expense?->project_id ? 'project' : 'overhead');
+        if ($data['expense_type'] === 'project' && empty($data['project_id']) && ! $expense?->project_id) {
+            abort(422, 'Project expenses must be linked to a project.');
+        }
+        if ($data['expense_type'] !== 'project') {
+            $data['project_id'] = null;
+        }
+        if ($data['expense_type'] !== 'payroll') {
+            $data['employee_id'] = null;
+        }
         $data['unit_price'] = $data['unit_price'] ?? $data['unit_cost'] ?? 0;
         $data['unit_cost'] = $data['unit_cost'] ?? $data['unit_price'];
         $data['expense_date'] = $data['expense_date'] ?? $data['date'] ?? null;
         $quantity = (float) ($data['quantity'] ?? 1);
         $unitCost = (float) ($data['unit_cost'] ?? 0);
-        $total = (float) ($data['total_cost'] ?? $data['amount'] ?? ($quantity * $unitCost));
+        $manualTotal = (bool) ($data['is_manual_total'] ?? $request->boolean('is_manual_total'));
+        $total = $manualTotal
+            ? (float) ($data['total_cost'] ?? $data['amount'] ?? ($quantity * $unitCost))
+            : (float) ($quantity * $unitCost);
         $data['amount'] = $total;
         $data['total_cost'] = $total;
+        $data['is_manual_total'] = $manualTotal;
 
         if ($request->hasFile('receipt')) {
             $data['receipt_file'] = $request->file('receipt')->store('receipts', 'public');
@@ -152,5 +178,15 @@ class ExpenseController extends Controller
         unset($data['date'], $data['receipt']);
 
         return $data;
+    }
+
+    private function expenseTypeFromCategoryType(?string $type): ?string
+    {
+        return match ($type) {
+            'overhead' => 'overhead',
+            'payroll' => 'payroll',
+            'project_expense', 'inventory', 'other' => 'project',
+            default => null,
+        };
     }
 }

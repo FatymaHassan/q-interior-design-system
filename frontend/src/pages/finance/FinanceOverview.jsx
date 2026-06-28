@@ -34,6 +34,7 @@ export default function FinanceOverview() {
         <Link to="/expenses/add"><Button>Add Expense</Button></Link>
         <Link to="/payments/add"><Button variant="outline">Add Payment</Button></Link>
         <Link to="/overheads/add"><Button variant="outline">Add Overhead</Button></Link>
+        <Link to="/finance/pnl"><Button variant="outline">P&L Summary</Button></Link>
       </div>}
     />
 
@@ -43,6 +44,7 @@ export default function FinanceOverview() {
       <MetricCard label="Total Revenue" value={money(overview?.total_revenue)} icon={DollarSign} />
       <MetricCard label="Project Expenses" value={money(overview?.total_project_expenses)} icon={Receipt} />
       <MetricCard label="Company Overhead" value={money(overview?.total_overhead)} icon={Receipt} />
+      <MetricCard label="Payroll" value={money(overview?.total_payroll)} icon={Receipt} />
       <MetricCard label="Net Profit" value={money(overview?.net_profit)} icon={Wallet} />
       <MetricCard label="Gross Profit" value={money(overview?.gross_profit)} icon={Wallet} />
       <MetricCard label="Profit Margin" value={`${Number(overview?.profit_margin || 0)}%`} icon={DollarSign} />

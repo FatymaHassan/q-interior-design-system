@@ -25,7 +25,7 @@ class ProjectMemberController extends Controller
             'assigned_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
-        abort_unless(! empty($data['employee_id']) || ! empty($data['user_id']), 422, 'Choose a team member or user.');
+        abort_unless(! empty($data['employee_id']) || ! empty($data['user_id']), 422, 'Choose an employee or user.');
         $data['role'] = $data['role'] ?? $data['role_on_project'] ?? 'Member';
         $data['role_on_project'] = $data['role_on_project'] ?? $data['role'];
         $data['assigned_date'] = $data['assigned_date'] ?? $data['assigned_at'] ?? now()->toDateString();

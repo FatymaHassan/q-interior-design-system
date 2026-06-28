@@ -1,5 +1,6 @@
-import { NavLink } from "react-router-dom";
-import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Sparkles, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Sparkles, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
 import { userHasRole } from "../../services/api";
 
 const sections = [
@@ -16,7 +17,6 @@ const sections = [
       { label: "Projects", icon: Briefcase, to: "/projects" },
       { label: "Project Board", icon: Columns3, to: "/project-board" },
       { label: "Daily Tasks", icon: CheckSquare, to: "/daily-tasks" },
-      { label: "Team Members", icon: UserRoundCog, to: "/team-members", roles: ["admin", "manager"] },
       { label: "Photos", icon: Image, to: "/photos" },
       { label: "Documents", icon: FileText, to: "/documents" },
       { label: "Client Messages", icon: Inbox, to: "/client-messages" },
@@ -25,12 +25,14 @@ const sections = [
   {
     label: "Finance",
     items: [
-      { label: "Finance Overview", icon: Wallet, to: "/finance", roles: ["admin", "manager", "finance"] },
+      { label: "P&L Summary", icon: ClipboardList, to: "/finance", roles: ["admin", "manager", "finance"] },
       { label: "Invoices", icon: ScrollText, to: "/invoices", roles: ["admin", "manager", "finance"] },
       { label: "Expenses", icon: Receipt, to: "/expenses", roles: ["admin", "manager", "finance"] },
       { label: "Expense Categories", icon: Tags, to: "/expense-categories", roles: ["admin", "manager", "finance"] },
+      { label: "Suppliers", icon: Users, to: "/suppliers", roles: ["admin", "manager", "finance"] },
       { label: "Payments", icon: Wallet, to: "/payments", roles: ["admin", "manager", "finance"] },
       { label: "Overheads", icon: FileText, to: "/overheads", roles: ["admin", "manager", "finance"] },
+      { label: "Payroll", icon: Wallet, to: "/finance/payroll", roles: ["admin", "manager", "finance"] },
       { label: "Quotations", icon: ScrollText, to: "/quotations", roles: ["admin", "manager", "designer"] },
     ],
   },
@@ -50,7 +52,6 @@ const sections = [
       { label: "Attendance", icon: Clock, to: "/hr/attendance", roles: ["admin", "manager", "hr"] },
       { label: "Leave", icon: Plane, to: "/hr/leave", roles: ["admin", "manager", "hr"] },
       { label: "Holidays", icon: CalendarDays, to: "/hr/holidays", roles: ["admin", "manager", "hr"] },
-      { label: "Payroll", icon: Wallet, to: "/hr/payroll", roles: ["admin", "manager", "hr", "finance"] },
       { label: "Reviews & Goals", icon: ClipboardList, to: "/hr/reviews", roles: ["admin", "manager", "hr"] },
     ],
   },
@@ -65,37 +66,73 @@ const sections = [
   },
 ];
 
+const isItemActive = (pathname, item) => {
+  if (item.to === "/dashboard" || item.to === "/finance" || item.to === "/hr") return pathname === item.to;
+  return pathname === item.to || pathname.startsWith(`${item.to}/`);
+};
+
 function SidebarContent({ onNavigate }) {
+  const location = useLocation();
+  const visibleSections = useMemo(() => sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.roles || userHasRole(item.roles)),
+    }))
+    .filter((section) => section.items.length > 0), []);
+  const activeSection = visibleSections.find((section) => section.items.some((item) => isItemActive(location.pathname, item)))?.label || visibleSections[0]?.label;
+  const [openSection, setOpenSection] = useState(activeSection);
+
+  useEffect(() => {
+    if (activeSection) setOpenSection(activeSection);
+  }, [activeSection]);
+
   return <>
-    <div className="mb-4 flex items-center gap-3 px-2">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-lg font-black text-brand-primary shadow-sm">Q</div>
-      <div>
+    <div className="mb-3 flex items-center gap-3 px-2">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-black text-brand-primary shadow-sm">Q</div>
+      <div className="min-w-0">
         <h1 className="text-xl font-black leading-tight text-white">Q Interior</h1>
         <p className="mt-0.5 text-xs font-medium text-white/55">Company management</p>
       </div>
     </div>
 
-    <div className="mb-3 rounded-2xl border border-white/10 bg-white/8 p-3 text-white">
+    <div className="mb-3 rounded-xl border border-white/10 bg-white/8 p-3 text-white">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/55"><Sparkles size={14} />Workspace</div>
       <p className="mt-2 text-sm font-semibold">Operations, design work, clients, and finance in one dashboard.</p>
     </div>
 
-    <nav className="space-y-4 overflow-y-auto pr-1 scrollbar-soft">
-      {sections.map((section) => {
-        const visibleItems = section.items.filter((item) => !item.roles || userHasRole(item.roles));
-        if (visibleItems.length === 0) return null;
-        return <div key={section.label}>
-          <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.18em] text-white/38">{section.label}</p>
-          <div className="space-y-1">
-            {visibleItems.map((item) => {
+    <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-soft">
+      {visibleSections.map((section) => {
+        const isOpen = openSection === section.label;
+        const hasActiveItem = section.items.some((item) => isItemActive(location.pathname, item));
+        const SectionIcon = section.items[0]?.icon || LayoutDashboard;
+
+        return <div key={section.label} className="rounded-xl border border-white/8 bg-white/[0.035] p-1">
+          <button
+            type="button"
+            onClick={() => setOpenSection((current) => current === section.label ? "" : section.label)}
+            className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition ${hasActiveItem || isOpen ? "bg-white/12 text-white" : "text-white/70 hover:bg-white/8 hover:text-white"}`}
+            aria-expanded={isOpen}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+              <SectionIcon size={16} />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-black">{section.label}</span>
+            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/70">{section.items.length}</span>
+            <ChevronDown size={16} className={`shrink-0 transition ${isOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+            <div className="overflow-hidden">
+              <div className="space-y-1 pb-1 pl-2 pt-1.5">
+                {section.items.map((item) => {
               const Icon = item.icon;
               return <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === "/hr"}
+                end={item.to === "/hr" || item.to === "/finance" || item.to === "/dashboard"}
                 onClick={onNavigate}
                 className={({ isActive }) => `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
-                  isActive ? "bg-white text-brand-primary shadow-sm" : "text-white/72 hover:bg-white/10 hover:text-white"
+                  isActive ? "bg-white text-brand-primary shadow-sm" : "text-white/68 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 group-hover:bg-white/15">
@@ -104,12 +141,12 @@ function SidebarContent({ onNavigate }) {
                 <span className="truncate font-semibold">{item.label}</span>
               </NavLink>;
             })}
+              </div>
+            </div>
           </div>
         </div>;
       })}
     </nav>
-
-    
   </>;
 }
 
@@ -120,8 +157,8 @@ export default function Sidebar({ open = false, onClose }) {
     </aside>
 
     {open && <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm lg:hidden" onClick={onClose}>
-      <aside className="h-full w-[min(24rem,90vw)] bg-brand-primaryDark p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="mb-4 flex justify-end">
+      <aside className="flex h-full w-[min(24rem,90vw)] flex-col bg-brand-primaryDark p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex justify-end">
           <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
             <X size={20} />
           </button>

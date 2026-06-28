@@ -33,9 +33,9 @@ export default function Dashboard() {
       eyebrow="Executive Dashboard"
       title="Management Overview"
       description="Finance, projects, quotations, HR, inventory, and daily operations in one clear workspace."
-      action={<div className="flex flex-wrap gap-2">
-          <select value={filters.month} onChange={(event) => setFilters({ ...filters, month: event.target.value })} className="h-11 rounded-xl border border-brand-border bg-white px-3 text-sm"><option value="">All months</option>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select>
-          <input type="number" value={filters.year} onChange={(event) => setFilters({ ...filters, year: event.target.value })} className="h-11 w-28 rounded-xl border border-brand-border bg-white px-3 text-sm" />
+      action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <select value={filters.month} onChange={(event) => setFilters({ ...filters, month: event.target.value })} className="h-10 rounded-lg border border-brand-border bg-white px-3 text-sm"><option value="">All months</option>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select>
+          <input type="number" value={filters.year} onChange={(event) => setFilters({ ...filters, year: event.target.value })} className="h-10 w-full rounded-lg border border-brand-border bg-white px-3 text-sm sm:w-24" />
           <Button type="button" onClick={load}>Apply</Button>
           <Link to="/reports"><Button variant="outline">Reports</Button></Link>
         </div>}
@@ -43,7 +43,7 @@ export default function Dashboard() {
 
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">Dashboard could not be loaded. Please check the backend connection.</Card>}
 
-    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 min-[1340px]:grid-cols-4">
       <MetricCard label="Total Revenue" value={money(kpis.total_revenue)} icon={DollarSign} />
       <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} />
       <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} />
@@ -58,9 +58,9 @@ export default function Dashboard() {
       <MetricCard label="Active Employees" value={kpis.active_employees ?? "..."} icon={Users} />
     </section>
 
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
       <ChartCard title="Monthly Revenue vs Expenses" subtitle="Compare income and spending performance by month.">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={210}>
           <BarChart data={charts.monthly_revenue_expenses || []}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
             <XAxis dataKey="month" fontSize={11} />
@@ -73,7 +73,7 @@ export default function Dashboard() {
       </ChartCard>
 
       <ChartCard title="Profit Trend" subtitle="Net movement after expenses for the selected period.">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={210}>
           <LineChart data={(charts.monthly_revenue_expenses || []).map((row) => ({ ...row, profit: Number(row.revenue || 0) - Number(row.expenses || 0) }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
             <XAxis dataKey="month" fontSize={11} />
@@ -85,7 +85,7 @@ export default function Dashboard() {
       </ChartCard>
 
       <ChartCard title="Project Status Breakdown" subtitle="Current project distribution across delivery stages.">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={210}>
           <PieChart>
             <Pie data={charts.project_status_breakdown || []} dataKey="total" nameKey="status" outerRadius={90} label>
               {(charts.project_status_breakdown || []).map((_, index) => <Cell key={index} fill={colors[index % colors.length]} />)}
@@ -100,7 +100,7 @@ export default function Dashboard() {
       </ChartCard>
     </section>
 
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-3">
       <SectionCard title="Operational Alerts" subtitle="Items that need management attention."><InfoRows rows={[
         ["Overdue Payments", kpis.overdue_payments],
         ["Pending Tasks", kpis.pending_tasks],
@@ -109,7 +109,7 @@ export default function Dashboard() {
         ["Payroll Pending Approval", kpis.payroll_pending_approval],
         ["Supplier Outstanding Balance", money(kpis.supplier_outstanding_balance)],
       ]} /></SectionCard>
-      <SectionCard title="Inventory Low Stock" subtitle="Materials that may block active work." className="xl:col-span-2"><Table columns={[{ key: "name", label: "Material" }, { key: "current_stock", label: "Stock" }, { key: "minimum_stock", label: "Minimum" }, { key: "stock_status", label: "Status" }]} rows={charts.inventory_low_stock || []} empty="No low-stock materials." /></SectionCard>
+      <SectionCard title="Inventory Low Stock" subtitle="Materials that may block active work." className="min-[1180px]:col-span-2"><Table columns={[{ key: "name", label: "Material" }, { key: "current_stock", label: "Stock" }, { key: "minimum_stock", label: "Minimum" }, { key: "stock_status", label: "Status" }]} rows={charts.inventory_low_stock || []} empty="No low-stock materials." /></SectionCard>
     </section>
   </div>;
 }

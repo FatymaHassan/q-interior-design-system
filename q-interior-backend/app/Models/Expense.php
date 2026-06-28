@@ -9,7 +9,9 @@ class Expense extends Model
     protected $fillable = [
         'project_id',
         'supplier_id',
+        'employee_id',
         'category_id',
+        'expense_type',
         'title',
         'category',
         'item_name',
@@ -19,6 +21,7 @@ class Expense extends Model
         'unit_cost',
         'amount',
         'total_cost',
+        'is_manual_total',
         'paid_by',
         'expense_date',
         'payment_method',
@@ -28,6 +31,7 @@ class Expense extends Model
         'approved_at',
         'notes',
         'created_by',
+        'updated_by',
     ];
 
     public function project()
@@ -38,6 +42,11 @@ class Expense extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 
     public function categoryModel()

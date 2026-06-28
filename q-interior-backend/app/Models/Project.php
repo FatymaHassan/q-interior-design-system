@@ -16,8 +16,16 @@ class Project extends Model
         'end_date',
         'deadline',
         'budget',
+        'contract_amount',
+        'payment_plan_type',
+        'deposit_percentage',
+        'deposit_amount',
+        'payment_terms',
         'revenue',
         'actual_cost',
+        'paid_amount',
+        'remaining_balance',
+        'payment_percentage',
         'progress',
         'status',
         'description',
@@ -43,6 +51,16 @@ class Project extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function paymentStages()
+    {
+        return $this->hasMany(ProjectPaymentStage::class);
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function documents()
