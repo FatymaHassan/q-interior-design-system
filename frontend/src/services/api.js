@@ -458,6 +458,8 @@ export function mapEmployee(employee) {
     salaryGrade: employee.salary_grade || "",
     emergencyContact: employee.emergency_contact_name || "",
     emergencyPhone: employee.emergency_contact_phone || "",
+    emergencyContact2: employee.emergency_contact_2_name || "",
+    emergencyPhone2: employee.emergency_contact_2_phone || "",
     status: employee.status || "Active",
     portalAccess: Boolean(employee.user_id || employee.user),
     passwordStatus: employee.user_id || employee.user ? "Set" : "Not Set",

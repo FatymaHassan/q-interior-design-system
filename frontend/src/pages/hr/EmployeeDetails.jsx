@@ -95,7 +95,8 @@ export default function EmployeeDetails() {
         <Info label="Phone" value={employee.phone || "-"} />
         <Info label="Email" value={employee.email || "-"} />
         <Info label="Address" value={employee.address || "-"} />
-        <Info label="Emergency" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
+        <Info label="Emergency 1" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
+        <Info label="Emergency 2" value={`${employee.emergency_contact_2_name || "-"} ${employee.emergency_contact_2_phone || ""}`} />
         <Info label="Portal Access" value={employee.user_id || employee.user ? "Enabled" : "Disabled"} />
         <Info label="Login Email" value={employee.email || "-"} />
         <Info label="Password Status" value={employee.user_id || employee.user ? "Set" : "Not Set"} />

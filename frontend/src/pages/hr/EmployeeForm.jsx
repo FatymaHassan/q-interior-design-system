@@ -123,8 +123,10 @@ export default function EmployeeForm() {
         </FormField>
         <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
         <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>
-        <FormField label="Emergency contact"><input value={employeeForm.emergency_contact_name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_name: e.target.value })} className={fieldInputClass} /></FormField>
-        <FormField label="Emergency phone"><input value={employeeForm.emergency_contact_phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_phone: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency contact 1"><input value={employeeForm.emergency_contact_name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_name: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency phone 1"><input value={employeeForm.emergency_contact_phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_phone: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency contact 2"><input value={employeeForm.emergency_contact_2_name || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_2_name: e.target.value })} className={fieldInputClass} /></FormField>
+        <FormField label="Emergency phone 2"><input value={employeeForm.emergency_contact_2_phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_2_phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Notes" className="md:col-span-2"><textarea value={employeeForm.notes || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, notes: e.target.value })} className={fieldInputClass} /></FormField>
         <div className="flex gap-3 md:col-span-2">
           <Button>{isEdit ? "Update Employee" : "Save Employee"}</Button>

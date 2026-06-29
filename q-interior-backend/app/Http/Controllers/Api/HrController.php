@@ -669,6 +669,8 @@ class HrController extends Controller
             'monthly_salary' => 'nullable|numeric|min:0',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:255',
+            'emergency_contact_2_name' => 'nullable|string|max:255',
+            'emergency_contact_2_phone' => 'nullable|string|max:255',
             'status' => 'nullable|in:Active,Inactive',
             'notes' => 'nullable|string',
             'salary_change_reason' => 'nullable|string',

@@ -22,6 +22,8 @@ export const emptyEmployee = {
   monthly_salary: "",
   emergency_contact_name: "",
   emergency_contact_phone: "",
+  emergency_contact_2_name: "",
+  emergency_contact_2_phone: "",
   status: "Active",
   notes: "",
 };
@@ -86,7 +88,8 @@ export function EmployeeProfile({ employee, documentForm, setDocumentForm, submi
       <Info label="Start Date" value={employee.employment_start_date || "-"} />
       <Info label="Phone" value={employee.phone || "-"} />
       <Info label="Email" value={employee.email || "-"} />
-      <Info label="Emergency" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
+      <Info label="Emergency 1" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
+      <Info label="Emergency 2" value={`${employee.emergency_contact_2_name || "-"} ${employee.emergency_contact_2_phone || ""}`} />
       <Info label="Leave Balances" value={(employee.leave_balances || []).map((item) => `${item.leave_type}: ${item.remaining_days}`).join(", ") || "-"} />
     </div>
 

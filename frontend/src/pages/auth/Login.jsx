@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LockIcon, MailIcon, SparklesIcon } from "lucide-react";
+import { LockIcon, MailIcon } from "lucide-react";
 import Button from "../../components/ui/Button";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { clientPortalLogin, employeePortalLogin, login, logoutClientPortal, logoutEmployeePortal } from "../../services/api";
+import qInteriorLogo from "../../assets/images/q-interior-logo.jpeg";
 
 const dashboardRoles = ["admin", "manager", "finance", "designer", "hr"];
 
@@ -72,28 +73,14 @@ export default function Login() {
 
   return <main className="flex min-h-screen items-center justify-center bg-[#f4f0e8] px-4 py-8">
     <section className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.14)] lg:grid-cols-[1.05fr_0.95fr]">
-      <div className="relative hidden min-h-[560px] bg-slate-950 p-10 text-white lg:block">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(135deg, transparent 0 42%, rgba(245, 158, 11, .7) 42% 43%, transparent 43% 100%)" }} />
-        <div className="relative flex h-full flex-col justify-between">
-          <div>
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-400 text-3xl font-black text-slate-950">Q</div>
-            <p className="mt-8 text-xs font-black uppercase tracking-[0.28em] text-amber-200">Interior Design Studio</p>
-            <h1 className="mt-4 max-w-sm text-4xl font-black leading-tight">A clean workspace for projects, clients, finance, and teams.</h1>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {["Projects", "Finance", "Client Portal"].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-white/10 p-4">
-              <p className="text-sm font-black">{item}</p>
-            </div>)}
-          </div>
-        </div>
+      <div className="hidden min-h-[560px] items-center justify-center bg-[#d7ccbb] p-10 lg:flex">
+        <img src={qInteriorLogo} alt="Q Interior Design Studio" className="h-auto w-full max-w-sm rounded-3xl object-contain shadow-[0_24px_70px_rgba(15,23,42,0.18)]" />
       </div>
 
       <div className="flex min-h-[560px] items-center p-6 sm:p-8 lg:p-10">
         <div className="w-full">
           <div className="mb-8">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-              <SparklesIcon className="h-5 w-5" />
-            </div>
+            <img src={qInteriorLogo} alt="Q Interior Design Studio" className="mb-5 h-16 w-16 rounded-2xl object-cover" />
             <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-muted">Q Interior</p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">Welcome back</h2>
             <p className="mt-2 text-sm leading-6 text-brand-muted">Use one login for admin, employee, or client access. We will open the right page automatically.</p>

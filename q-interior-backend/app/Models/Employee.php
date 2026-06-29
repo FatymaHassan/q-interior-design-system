@@ -23,6 +23,8 @@ class Employee extends Model
         'monthly_salary',
         'emergency_contact_name',
         'emergency_contact_phone',
+        'emergency_contact_2_name',
+        'emergency_contact_2_phone',
         'status',
         'portal_last_login_at',
         'notes',
