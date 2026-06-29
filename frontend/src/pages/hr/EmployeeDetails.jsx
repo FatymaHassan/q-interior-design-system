@@ -4,8 +4,10 @@ import { CalendarDays, FileText, Mail, Phone, Shield, Wallet } from "lucide-reac
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import PasswordResetModal from "../../components/ui/PasswordResetModal";
 import Table from "../../components/ui/Table";
-import { getDocumentStorageUrl, getEmployee, uploadEmployeeDocument } from "../../services/api";
+import TemporaryPasswordNotice from "../../components/ui/TemporaryPasswordNotice";
+import { getDocumentStorageUrl, getEmployee, resetEmployeePassword, uploadEmployeeDocument } from "../../services/api";
 import { fieldInputClass, HRPageHeader, Info } from "./hrShared";
 
 export default function EmployeeDetails() {
@@ -13,6 +15,9 @@ export default function EmployeeDetails() {
   const [employee, setEmployee] = useState(null);
   const [status, setStatus] = useState("loading");
   const [documentForm, setDocumentForm] = useState({ title: "", document_type: "Contract", file: null });
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState(null);
 
   const loadEmployee = () => getEmployee(id)
     .then((profile) => {
@@ -41,6 +46,18 @@ export default function EmployeeDetails() {
   if (status === "loading") return <Card className="p-5 text-sm text-brand-muted">Loading employee...</Card>;
   if (status === "error" || !employee) return <Card className="p-5 text-sm text-brand-danger">Employee could not be loaded.</Card>;
 
+  const submitReset = async (payload) => {
+    setResetting(true);
+    try {
+      const updated = await resetEmployeePassword(employee.id, payload);
+      setEmployee({ ...employee, ...updated.raw });
+      setTemporaryPassword({ email: employee.email, password: payload.password });
+      setResetOpen(false);
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const documents = employee.documents || [];
   const attendances = employee.attendances || [];
   const leaveBalances = employee.leave_balances || [];
@@ -51,8 +68,9 @@ export default function EmployeeDetails() {
     <HRPageHeader
       title="Employee Detail"
       description="Modern employee profile with documents, attendance, leave balance, payroll, and salary history."
-      action={<div className="flex flex-wrap gap-3"><Link to="/hr/employees"><Button variant="outline">Back to List</Button></Link><Link to={`/hr/employees/${employee.id}/edit`}><Button>Edit Employee</Button></Link></div>}
+      action={<div className="flex flex-wrap gap-3"><Link to="/hr/employees"><Button variant="outline">Back to List</Button></Link><Link to={`/hr/employees/${employee.id}/edit`}><Button>Edit Employee</Button></Link><Button type="button" variant="outline" onClick={() => setResetOpen(true)}>Reset Password</Button></div>}
     />
+    {temporaryPassword && <TemporaryPasswordNotice title="Employee portal password reset" email={temporaryPassword.email} password={temporaryPassword.password} onClose={() => setTemporaryPassword(null)} />}
 
     <Card className="overflow-hidden">
       <div className="bg-brand-primaryDark px-5 py-6 text-white md:px-6">
@@ -78,12 +96,16 @@ export default function EmployeeDetails() {
         <Info label="Email" value={employee.email || "-"} />
         <Info label="Address" value={employee.address || "-"} />
         <Info label="Emergency" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
+        <Info label="Portal Access" value={employee.user_id || employee.user ? "Enabled" : "Disabled"} />
+        <Info label="Login Email" value={employee.email || "-"} />
+        <Info label="Password Status" value={employee.user_id || employee.user ? "Set" : "Not Set"} />
+        <Info label="Last Login" value={employee.portal_last_login_at ? new Date(employee.portal_last_login_at).toLocaleString() : "Never"} />
       </div>
       <div className="border-t border-brand-border px-5 py-4 text-sm font-semibold text-brand-muted md:px-6">
-        <p>Employee portal password: <span className="text-brand-primary">Password already saved</span></p>
-        <p className="mt-1 text-xs">Use Edit Employee to generate or set a new password if you forget the old one.</p>
+        Admin cannot view portal passwords. Use Reset Password to create a new temporary password.
       </div>
     </Card>
+    {resetOpen && <PasswordResetModal title="Reset Employee Password" email={employee.email} onCancel={() => setResetOpen(false)} onSave={submitReset} saving={resetting} />}
 
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <Card className="p-5 xl:col-span-2">

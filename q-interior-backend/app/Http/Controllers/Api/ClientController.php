@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -23,7 +24,7 @@ class ClientController extends Controller
             'address' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
-            'portal_password' => 'nullable|string|min:6',
+            'portal_password' => 'nullable|string|min:6|confirmed',
         ]);
 
         if (! empty($data['portal_password'])) {
@@ -49,7 +50,7 @@ class ClientController extends Controller
             'address' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
-            'portal_password' => 'nullable|string|min:6',
+            'portal_password' => 'nullable|string|min:6|confirmed',
         ]);
 
         if (! empty($data['portal_password'])) {
@@ -61,6 +62,33 @@ class ClientController extends Controller
         }
 
         $client->update($data);
+
+        return $client->append('has_portal_access');
+    }
+
+    public function resetPassword(Request $request, Client $client)
+    {
+        $data = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $client->update([
+            'portal_password' => Hash::make($data['password']),
+            'portal_token_hash' => null,
+            'portal_token_expires_at' => null,
+        ]);
+
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'action' => 'reset_client_portal_password',
+            'module' => 'clients',
+            'record_type' => Client::class,
+            'record_id' => $client->id,
+            'new_values' => ['client_id' => $client->id, 'email' => $client->email],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
 
         return $client->append('has_portal_access');
     }

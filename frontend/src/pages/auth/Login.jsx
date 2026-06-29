@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LockIcon, MailIcon, SparklesIcon } from "lucide-react";
 import Button from "../../components/ui/Button";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
@@ -114,6 +114,9 @@ export default function Login() {
                 <input className={`${fieldInputClass} pl-10`} name="password" type="password" value={form.password} onChange={updateField} placeholder="Enter your password" autoComplete="current-password" required />
               </div>
             </FormField>
+            <div className="flex justify-end">
+              <Link to="/forgot-password" className="text-sm font-bold text-brand-primary hover:underline">Forgot password?</Link>
+            </div>
             <Button className="min-h-12 w-full rounded-2xl" disabled={loading}>{loading ? "Checking account..." : "Sign In"}</Button>
           </form>
         </div>

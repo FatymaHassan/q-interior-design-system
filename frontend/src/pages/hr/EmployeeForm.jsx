@@ -4,17 +4,11 @@ import { Eye, EyeOff } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField from "../../components/ui/FormField";
+import TemporaryPasswordNotice from "../../components/ui/TemporaryPasswordNotice";
 import { createEmployee, getEmployee, updateEmployee } from "../../services/api";
 import { formatDateOnly } from "../../utils/dateTime";
 import { emptyEmployee, fieldInputClass, HRPageHeader } from "./hrShared";
 import useHrData from "./useHrData";
-
-function generatePassword() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const values = new Uint32Array(12);
-  window.crypto.getRandomValues(values);
-  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
-}
 
 export default function EmployeeForm() {
   const { id } = useParams();
@@ -24,6 +18,8 @@ export default function EmployeeForm() {
   const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
   const [status, setStatus] = useState(isEdit ? "loading" : "ready");
   const [showPassword, setShowPassword] = useState(false);
+  const [createdPassword, setCreatedPassword] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isEdit) return;
@@ -41,6 +37,12 @@ export default function EmployeeForm() {
 
   const saveEmployee = async (event) => {
     event.preventDefault();
+    setError("");
+    if (employeeForm.password && employeeForm.password !== employeeForm.password_confirmation) {
+      setError("Employee portal passwords do not match.");
+      return;
+    }
+
     const payload = new FormData();
     Object.entries(employeeForm).forEach(([key, value]) => {
       if (key === "photo" && !(value instanceof File)) return;
@@ -49,15 +51,15 @@ export default function EmployeeForm() {
     payload.set("department_id", employeeForm.department_id || "");
     payload.set("monthly_salary", Number(employeeForm.monthly_salary || 0));
     const saved = isEdit ? await updateEmployee(id, payload) : await createEmployee(payload);
+    if (!isEdit && employeeForm.password) {
+      setCreatedPassword({ email: employeeForm.email, password: employeeForm.password, id: saved.id || id });
+      setEmployeeForm(emptyEmployee);
+      return;
+    }
     navigate(`/hr/employees/${saved.id || id}`);
   };
 
   const departmentOptions = departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>);
-
-  const generateNewPassword = () => {
-    setEmployeeForm((current) => ({ ...current, password: generatePassword() }));
-    setShowPassword(true);
-  };
 
   return <div className="space-y-6">
     <HRPageHeader
@@ -66,6 +68,8 @@ export default function EmployeeForm() {
       action={<Link to="/hr/employees"><Button variant="outline">Back to List</Button></Link>}
     />
     {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
+    {error && <p className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-brand-danger">{error}</p>}
+    {createdPassword && <TemporaryPasswordNotice title="Employee portal password created" email={createdPassword.email} password={createdPassword.password} onClose={() => navigate(`/hr/employees/${createdPassword.id}`)} />}
     {status === "error" && <Card className="p-5 text-sm text-brand-danger">Employee could not be loaded.</Card>}
     {status !== "error" && <Card className="p-5 md:p-6">
       <form onSubmit={saveEmployee} className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -79,10 +83,10 @@ export default function EmployeeForm() {
         <FormField label="Employment start date"><input type="date" value={employeeForm.employment_start_date || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, employment_start_date: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input value={employeeForm.phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input type="email" value={employeeForm.email || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className={fieldInputClass} /></FormField>
-        {isEdit && <FormField label="Current employee portal password">
-          <input value="Password already saved" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
+        {isEdit && <FormField label="Portal access">
+          <input value="Current password is kept unless you enter a new one" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
         </FormField>}
-        <FormField label={isEdit ? "Reset employee portal password" : "Employee portal password"}>
+        <FormField label={isEdit ? "New Password" : "Employee portal password"}>
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
@@ -103,10 +107,19 @@ export default function EmployeeForm() {
               {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" className="min-h-8 px-3 py-1.5 text-xs" onClick={generateNewPassword}>Generate new password</Button>
-            {isEdit && <p className="text-xs font-semibold text-brand-muted">Leave blank to keep the saved password.</p>}
-          </div>
+          {isEdit && <p className="mt-1 text-xs font-semibold text-brand-muted">Leave blank to keep current password.</p>}
+        </FormField>
+        <FormField label={isEdit ? "Confirm New Password" : "Confirm employee portal password"}>
+          <input
+            type={showPassword ? "text" : "password"}
+            required={!isEdit}
+            minLength={6}
+            autoComplete="new-password"
+            placeholder={isEdit ? "Repeat new password" : "Repeat password"}
+            value={employeeForm.password_confirmation || ""}
+            onChange={(e) => setEmployeeForm({ ...employeeForm, password_confirmation: e.target.value })}
+            className={fieldInputClass}
+          />
         </FormField>
         <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
         <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>

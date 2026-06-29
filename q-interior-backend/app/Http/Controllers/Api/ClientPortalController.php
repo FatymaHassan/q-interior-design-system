@@ -34,6 +34,7 @@ class ClientPortalController extends Controller
             'portal_token' => null,
             'portal_token_hash' => hash('sha256', $token),
             'portal_token_expires_at' => null,
+            'portal_last_login_at' => now(),
         ]);
 
         return response()->json([

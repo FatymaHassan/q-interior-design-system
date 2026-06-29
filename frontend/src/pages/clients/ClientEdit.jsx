@@ -6,14 +6,7 @@ import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { getClient, updateClient } from "./clientApi";
 
-const emptyClient = { name: "", phone: "", email: "", portal_password: "", address: "", location: "", notes: "" };
-
-function generatePassword() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const values = new Uint32Array(12);
-  window.crypto.getRandomValues(values);
-  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
-}
+const emptyClient = { name: "", phone: "", email: "", portal_password: "", portal_password_confirmation: "", address: "", location: "", notes: "" };
 
 export default function ClientEdit() {
   const { id } = useParams();
@@ -31,6 +24,7 @@ export default function ClientEdit() {
         phone: client.phone === "-" ? "" : client.phone || "",
         email: client.email === "-" ? "" : client.email || "",
         portal_password: "",
+        portal_password_confirmation: "",
         address: client.address || "",
         location: client.location === "-" ? "" : client.location || "",
         notes: client.notes || "",
@@ -44,15 +38,15 @@ export default function ClientEdit() {
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
 
-  const generateNewPassword = () => {
-    setForm((current) => ({ ...current, portal_password: generatePassword() }));
-    setShowPassword(true);
-  };
-
   const submitClient = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError("");
+    if (form.portal_password && form.portal_password !== form.portal_password_confirmation) {
+      setError("Client portal passwords do not match.");
+      setSaving(false);
+      return;
+    }
     try {
       await updateClient(id, form);
       navigate("/clients");
@@ -73,10 +67,10 @@ export default function ClientEdit() {
         <FormField label="Client name"><input name="name" value={form.name} onChange={updateField} required className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input name="phone" value={form.phone} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input name="email" type="email" value={form.email} onChange={updateField} className={fieldInputClass} /></FormField>
-        <FormField label="Current client portal password">
-          <input value="Password already saved" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
+        <FormField label="Portal access">
+          <input value="Current password is kept unless you enter a new one" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
         </FormField>
-        <FormField label="Reset client portal password">
+        <FormField label="New Password">
           <div className="relative">
             <input name="portal_password" type={showPassword ? "text" : "password"} value={form.portal_password} onChange={updateField} placeholder="Leave blank to keep current" minLength={6} className={`${fieldInputClass} pr-12`} />
             <button
@@ -88,11 +82,9 @@ export default function ClientEdit() {
               {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" className="min-h-8 px-3 py-1.5 text-xs" onClick={generateNewPassword}>Generate new password</Button>
-            <p className="text-xs font-semibold text-brand-muted">Leave blank to keep the saved password.</p>
-          </div>
+          <p className="mt-1 text-xs font-semibold text-brand-muted">Leave blank to keep current password.</p>
         </FormField>
+        <FormField label="Confirm New Password"><input name="portal_password_confirmation" type={showPassword ? "text" : "password"} value={form.portal_password_confirmation} onChange={updateField} placeholder="Repeat new password" minLength={6} className={fieldInputClass} /></FormField>
         <FormField label="Location"><input name="location" value={form.location} onChange={updateField} className={fieldInputClass} /></FormField>
         <div className="lg:col-span-2"><FormField label="Address"><input name="address" value={form.address} onChange={updateField} className={fieldInputClass} /></FormField></div>
         <div className="lg:col-span-2"><FormField label="Notes"><textarea name="notes" value={form.notes} onChange={updateField} className={`${fieldInputClass} min-h-24 resize-y`} /></FormField></div>

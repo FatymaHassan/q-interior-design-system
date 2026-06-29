@@ -16,6 +16,7 @@ class Client extends Model
         'portal_token',
         'portal_token_hash',
         'portal_token_expires_at',
+        'portal_last_login_at',
         'address',
         'location',
         'notes',
@@ -46,6 +47,7 @@ class Client extends Model
     {
         return [
             'portal_token_expires_at' => 'datetime',
+            'portal_last_login_at' => 'datetime',
         ];
     }
 }

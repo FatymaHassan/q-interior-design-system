@@ -20,9 +20,11 @@ use App\Models\User;
 use App\Models\AttendanceQrCode;
 use App\Models\AttendanceScanLog;
 use App\Models\AttendanceAttemptLog;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class HrController extends Controller
@@ -117,6 +119,50 @@ class HrController extends Controller
         $employee->delete();
 
         return response()->json(['message' => 'Employee deleted successfully']);
+    }
+
+    public function resetEmployeePassword(Request $request, Employee $employee)
+    {
+        $data = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = $employee->user;
+        if (! $user && $employee->email) {
+            $user = User::where('email', $employee->email)->first();
+        }
+
+        if (! $employee->email) {
+            return response()->json(['message' => 'Employee email is required before resetting portal password.'], 422);
+        }
+
+        if (! $user) {
+            $user = User::create([
+                'name' => $employee->name,
+                'email' => $employee->email,
+                'password' => Hash::make($data['password']),
+                'role' => 'staff',
+            ]);
+            $employee->update(['user_id' => $user->id]);
+        } else {
+            $user->forceFill(['password' => Hash::make($data['password'])])->save();
+        }
+
+        $user->tokens()->delete();
+
+        AuditLog::create([
+            'user_id' => $request->user()?->id,
+            'action' => 'reset_employee_portal_password',
+            'module' => 'hr',
+            'record_type' => Employee::class,
+            'record_id' => $employee->id,
+            'new_values' => ['employee_id' => $employee->id, 'email' => $employee->email],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return $employee->fresh(['department', 'user']);
     }
 
     public function uploadEmployeeDocument(Request $request, Employee $employee)
@@ -615,7 +661,7 @@ class HrController extends Controller
             'daily_rate' => 'nullable|numeric|min:0',
             'phone' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
-            'password' => 'nullable|string|min:6|max:255',
+            'password' => 'nullable|string|min:6|max:255|confirmed',
             'address' => 'nullable|string',
             'employment_start_date' => 'nullable|date',
             'contract_type' => 'nullable|string|max:255',
@@ -654,7 +700,7 @@ class HrController extends Controller
         $user->role = $user->role ?: 'staff';
 
         if ($password) {
-            $user->password = $password;
+            $user->password = Hash::make($password);
         }
 
         $user->save();

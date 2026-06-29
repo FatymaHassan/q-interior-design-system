@@ -216,6 +216,9 @@ export function mapClient(client) {
     location: client.location || "-",
     notes: client.notes || "",
     hasPortalAccess: Boolean(client.has_portal_access || client.portal_token_hash || client.portal_token_expires_at),
+    passwordStatus: client.has_portal_access ? "Set" : "Not Set",
+    portalLastLoginAt: client.portal_last_login_at || "",
+    portalLastLogin: client.portal_last_login_at ? new Date(client.portal_last_login_at).toLocaleString() : "Never",
     projects: client.projects || [],
     raw: client,
   };
@@ -456,6 +459,10 @@ export function mapEmployee(employee) {
     emergencyContact: employee.emergency_contact_name || "",
     emergencyPhone: employee.emergency_contact_phone || "",
     status: employee.status || "Active",
+    portalAccess: Boolean(employee.user_id || employee.user),
+    passwordStatus: employee.user_id || employee.user ? "Set" : "Not Set",
+    portalLastLoginAt: employee.portal_last_login_at || "",
+    portalLastLogin: employee.portal_last_login_at ? new Date(employee.portal_last_login_at).toLocaleString() : "Never",
     dailyRate: money(employee.daily_rate),
     monthlySalary: money(employee.monthly_salary),
     notes: employee.notes || "",
@@ -552,6 +559,11 @@ export async function createClient(payload) {
 
 export async function updateClient(id, payload) {
   const response = await api.put(`/clients/${id}`, payload);
+  return mapClient(response.data);
+}
+
+export async function resetClientPassword(id, payload) {
+  const response = await api.post(`/clients/${id}/reset-password`, payload);
   return mapClient(response.data);
 }
 
@@ -1045,6 +1057,11 @@ export async function updateEmployee(id, payload) {
   }
 
   const response = await api.put(`/employees/${id}`, payload);
+  return mapEmployee(response.data);
+}
+
+export async function resetEmployeePassword(id, payload) {
+  const response = await api.post(`/employees/${id}/reset-password`, payload);
   return mapEmployee(response.data);
 }
 

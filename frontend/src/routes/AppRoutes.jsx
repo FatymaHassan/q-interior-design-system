@@ -18,6 +18,7 @@ import Notifications from "../pages/notifications/Notifications";
 import Settings from "../pages/settings/Settings";
 import Documents from "../pages/documents/Documents";
 import Login from "../pages/auth/Login";
+import ForgotPassword from "../pages/auth/ForgotPassword";
 import UsersRoles from "../pages/users-roles/UsersRoles";
 import ProfitLoss from "../pages/finance/ProfitLoss";
 import Invoices from "../pages/finance/Invoices";
@@ -80,6 +81,7 @@ function EmployeePortalRoute({ children }) {
 export default function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<Login />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
     <Route path="/employee-login" element={<Navigate to="/login" replace />} />
     <Route path="/employee-portal" element={<EmployeePortalRoute><EmployeePortal /></EmployeePortalRoute>} />
     <Route path="/client-login" element={<Navigate to="/login" replace />} />

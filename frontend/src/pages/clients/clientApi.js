@@ -1,1 +1,1 @@
-export { createClient, deleteClient, getClient, getClients, updateClient } from "../../services/api";
+export { createClient, deleteClient, getClient, getClients, resetClientPassword, updateClient } from "../../services/api";

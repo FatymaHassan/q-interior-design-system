@@ -172,6 +172,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->middleware('role:admin');
     Route::apiResource('permissions', PermissionController::class)->middleware('role:admin');
     Route::apiResource('clients', ClientController::class);
+    Route::post('/clients/{client}/reset-password', [ClientController::class, 'resetPassword'])->middleware('role:admin,manager');
     Route::apiResource('projects', ProjectController::class);
     Route::get('/project-board', ProjectBoardController::class);
     Route::get('/project-stages', [ProjectStageController::class, 'index']);
@@ -299,6 +300,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employees', [HrController::class, 'storeEmployee'])->middleware('role:admin,manager,hr');
     Route::get('/employees/{employee}', [HrController::class, 'showEmployee'])->middleware('role:admin,manager,hr');
     Route::put('/employees/{employee}', [HrController::class, 'updateEmployee'])->middleware('role:admin,manager,hr');
+    Route::post('/employees/{employee}/reset-password', [HrController::class, 'resetEmployeePassword'])->middleware('role:admin,manager,hr');
     Route::delete('/employees/{employee}', [HrController::class, 'destroyEmployee'])->middleware('role:admin,manager,hr');
     Route::post('/employees/{employee}/documents', [HrController::class, 'uploadEmployeeDocument'])->middleware('role:admin,manager,hr');
     Route::get('/departments', [HrController::class, 'departments'])->middleware('role:admin,manager,hr');

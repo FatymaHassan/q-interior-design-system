@@ -24,6 +24,7 @@ class Employee extends Model
         'emergency_contact_name',
         'emergency_contact_phone',
         'status',
+        'portal_last_login_at',
         'notes',
         'created_by',
         'updated_by',
@@ -33,6 +34,7 @@ class Employee extends Model
     {
         return [
             'employment_start_date' => 'date:Y-m-d',
+            'portal_last_login_at' => 'datetime',
             'daily_rate' => 'decimal:2',
             'monthly_salary' => 'decimal:2',
         ];
