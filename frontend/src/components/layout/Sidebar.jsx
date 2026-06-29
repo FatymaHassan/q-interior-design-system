@@ -50,6 +50,7 @@ const sections = [
       { label: "Employee Directory", icon: Users, to: "/hr/employees", roles: ["admin", "manager", "hr"] },
       { label: "Departments", icon: Briefcase, to: "/hr/departments", roles: ["admin", "manager", "hr"] },
       { label: "Attendance", icon: Clock, to: "/hr/attendance", roles: ["admin", "manager", "hr"] },
+      { label: "Attendance Setup", icon: Settings, to: "/hr/attendance-settings", roles: ["admin", "manager", "hr"] },
       { label: "Leave", icon: Plane, to: "/hr/leave", roles: ["admin", "manager", "hr"] },
       { label: "Holidays", icon: CalendarDays, to: "/hr/holidays", roles: ["admin", "manager", "hr"] },
       { label: "Reviews & Goals", icon: ClipboardList, to: "/hr/reviews", roles: ["admin", "manager", "hr"] },
