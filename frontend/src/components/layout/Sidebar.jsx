@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Sparkles, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
+import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
 import { userHasRole } from "../../services/api";
 
 const sections = [
@@ -95,11 +95,6 @@ function SidebarContent({ onNavigate }) {
       </div>
     </div>
 
-    <div className="mb-3 rounded-xl border border-white/10 bg-white/8 p-3 text-white">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/55"><Sparkles size={14} />Workspace</div>
-      <p className="mt-2 text-sm font-semibold">Operations, design work, clients, and finance in one dashboard.</p>
-    </div>
-
     <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-soft">
       {visibleSections.map((section) => {
         const isOpen = openSection === section.label;
@@ -116,14 +111,13 @@ function SidebarContent({ onNavigate }) {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
               <SectionIcon size={16} />
             </span>
-            <span className="min-w-0 flex-1 truncate font-black">{section.label}</span>
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/70">{section.items.length}</span>
+            <span className="min-w-0 flex-1 truncate font-bold">{section.label}</span>
             <ChevronDown size={16} className={`shrink-0 transition ${isOpen ? "rotate-180" : ""}`} />
           </button>
 
           <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
             <div className="overflow-hidden">
-              <div className="space-y-1 pb-1 pl-2 pt-1.5">
+              <div className="space-y-1 pb-1 pt-1.5">
                 {section.items.map((item) => {
               const Icon = item.icon;
               return <NavLink

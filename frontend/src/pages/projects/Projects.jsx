@@ -5,12 +5,11 @@ import Button from "../../components/ui/Button";
 import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
 import ProjectList from "./ProjectList";
-import { projects as mockProjects } from "../../data/mockData";
 import { getClients } from "../../services/api";
 import { deleteProject, getProjects } from "./projectApi";
 
 export default function Projects() {
-  const [projects, setProjects] = useState(mockProjects);
+  const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [status, setStatus] = useState("loading");
 
@@ -30,6 +29,8 @@ export default function Projects() {
       setStatus("connected");
     }).catch(() => {
       if (!active) return;
+      setProjects([]);
+      setClients([]);
       setStatus("fallback");
     });
   };

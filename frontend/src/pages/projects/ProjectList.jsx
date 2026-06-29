@@ -50,17 +50,24 @@ function ProjectCard({ project, onDelete }) {
 }
 
 export default function ProjectList({ projects, status, onDelete }) {
+  const isLoading = status === "loading";
+  const isEmpty = !isLoading && projects.length === 0;
+
   return <div className="space-y-4">
     <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
       <div>
         <h2 className="text-xl font-bold">Project Portfolio</h2>
-        {status === "fallback" && <p className="mt-1 text-sm text-brand-muted">Showing sample data because the backend is not reachable.</p>}
+        {isLoading && <p className="mt-1 text-sm text-brand-muted">Loading your projects...</p>}
+        {status === "fallback" && <p className="mt-1 text-sm text-brand-danger">Could not load projects from the backend. Please check the connection and try again.</p>}
         {status === "connected" && <p className="mt-1 text-sm text-green-700">Loaded from Laravel API.</p>}
       </div>
       <p className="text-sm text-brand-muted">{projects.length} total projects</p>
     </div>
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+    {isEmpty ? <div className="rounded-xl border border-dashed border-brand-border bg-white p-8 text-center">
+      <h3 className="text-lg font-bold text-brand-primary">No projects yet</h3>
+      <p className="mt-2 text-sm text-brand-muted">Create your first real project to start tracking clients, budget, and progress.</p>
+    </div> : <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
       {projects.map((project) => <ProjectCard key={project.id} project={project} onDelete={onDelete} />)}
-    </div>
+    </div>}
   </div>;
 }
