@@ -12,7 +12,7 @@ class TaskAttachmentController extends Controller
     public function store(Request $request, Task $task)
     {
         $data = $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|max:25600',
         ]);
 
         $file = $data['file'];

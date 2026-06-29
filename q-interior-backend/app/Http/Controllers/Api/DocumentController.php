@@ -51,7 +51,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'title' => 'required|string|max:255',
-            'file' => 'nullable|file|max:10240',
+            'file' => 'nullable|file|max:25600',
             'file_path' => 'nullable|string|max:255',
             'file_type' => 'nullable|string|max:255',
             'document_category' => 'nullable|string|max:255',
@@ -60,14 +60,12 @@ class DocumentController extends Controller
         ]);
 
         if ($request->hasFile('file')) {
-            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-                Storage::disk('public')->delete($document->file_path);
-            }
             $data['file_path'] = $request->file('file')->store('documents', 'public');
             $data['file_type'] = $request->file('file')->getClientMimeType();
         }
 
         $data['file_path'] = $data['file_path'] ?? '';
+        $data['uploaded_by'] = $data['uploaded_by'] ?? $request->user()?->id;
         unset($data['file']);
 
         $document = Document::create($data);
@@ -93,7 +91,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'title' => 'sometimes|required|string|max:255',
-            'file' => 'nullable|file|max:10240',
+            'file' => 'nullable|file|max:25600',
             'file_path' => 'nullable|string|max:255',
             'file_type' => 'nullable|string|max:255',
             'document_category' => 'nullable|string|max:255',
@@ -102,10 +100,14 @@ class DocumentController extends Controller
         ]);
 
         if ($request->hasFile('file')) {
+            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
+            }
             $data['file_path'] = $request->file('file')->store('documents', 'public');
             $data['file_type'] = $request->file('file')->getClientMimeType();
         }
 
+        $data['uploaded_by'] = $data['uploaded_by'] ?? $request->user()?->id;
         unset($data['file']);
         $document->update($data);
 

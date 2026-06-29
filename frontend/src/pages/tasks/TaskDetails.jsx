@@ -5,7 +5,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { addTaskComment, deleteTaskAttachment, getTask, updateTaskStatus, uploadTaskAttachment } from "../../services/api";
+import { addTaskComment, deleteTaskAttachment, getDocumentStorageUrl, getTask, updateTaskStatus, uploadTaskAttachment } from "../../services/api";
 
 export default function TaskDetails() {
   const { id } = useParams();
@@ -104,7 +104,7 @@ export default function TaskDetails() {
           columns={[
             { key: "file_type", label: "Type" },
             { key: "uploaded_by", label: "Uploaded By", render: (item) => item.uploader?.name || "-" },
-            { key: "file_path", label: "File", render: (item) => item.file_path ? <a href={`/storage/${item.file_path}`} target="_blank" rel="noreferrer" className="font-semibold text-brand-primary underline">Open</a> : "-" },
+            { key: "file_path", label: "File", render: (item) => item.file_path ? <a href={getDocumentStorageUrl(item.file_path)} target="_blank" rel="noreferrer" className="font-semibold text-brand-primary underline">Open</a> : "-" },
             { key: "actions", label: "Actions", render: (item) => <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeAttachment(item)}>Delete</Button> },
           ]}
           rows={attachments}

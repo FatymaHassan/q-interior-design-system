@@ -171,7 +171,7 @@ class HrController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'document_type' => 'required|string|max:255',
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|max:25600',
         ]);
 
         $document = $employee->documents()->create([
@@ -661,7 +661,7 @@ class HrController extends Controller
                 'max:255',
                 Rule::unique('employees', 'name')->ignore($employee?->id),
             ],
-            'photo' => 'nullable|file|image|max:4096',
+            'photo' => 'nullable|file|image|max:10240',
             'position' => 'nullable|string|max:255',
             'specialty' => 'nullable|string|max:255',
             'daily_rate' => 'nullable|numeric|min:0',

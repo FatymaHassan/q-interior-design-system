@@ -658,7 +658,7 @@ export async function addTaskComment(id, comment) {
 export async function uploadTaskAttachment(id, file) {
   const form = new FormData();
   form.append("file", file);
-  const response = await api.post(`/tasks/${id}/attachments`, form, { headers: { "Content-Type": "multipart/form-data" } });
+  const response = await api.post(`/tasks/${id}/attachments`, form);
   return response.data;
 }
 
@@ -1047,14 +1047,14 @@ export async function getEmployee(id) {
 }
 
 export async function createEmployee(payload) {
-  const response = await api.post("/employees", payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  const response = await api.post("/employees", payload);
   return mapEmployee(response.data);
 }
 
 export async function updateEmployee(id, payload) {
   if (payload instanceof FormData) {
     payload.set("_method", "PUT");
-    const response = await api.post(`/employees/${id}`, payload, { headers: { "Content-Type": "multipart/form-data" } });
+    const response = await api.post(`/employees/${id}`, payload);
     return mapEmployee(response.data);
   }
 
@@ -1072,7 +1072,7 @@ export async function deleteEmployee(id) {
 }
 
 export async function uploadEmployeeDocument(id, payload) {
-  const response = await api.post(`/employees/${id}/documents`, payload, { headers: { "Content-Type": "multipart/form-data" } });
+  const response = await api.post(`/employees/${id}/documents`, payload);
   return response.data;
 }
 
@@ -1112,7 +1112,7 @@ export async function getLeaveRequests(params = {}) {
 }
 
 export async function createLeaveRequest(payload) {
-  const response = await api.post("/leave-requests", payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  const response = await api.post("/leave-requests", payload);
   return response.data;
 }
 
@@ -1254,7 +1254,7 @@ export async function convertQuotation(id) {
 }
 
 export async function uploadQuotationAttachment(id, payload) {
-  const response = await api.post(`/quotations/${id}/attachments`, payload, { headers: { "Content-Type": "multipart/form-data" } });
+  const response = await api.post(`/quotations/${id}/attachments`, payload);
   return response.data;
 }
 
@@ -1319,7 +1319,7 @@ export async function getDocuments(params = {}) {
 }
 
 export async function createDocument(payload) {
-  const response = await api.post("/documents", payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  const response = await api.post("/documents", payload);
   return mapDocument(response.data);
 }
 
@@ -1327,7 +1327,7 @@ export async function updateDocument(id, payload) {
   if (payload instanceof FormData && !payload.has("_method")) {
     payload.append("_method", "PUT");
   }
-  const response = await api.post(`/documents/${id}`, payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  const response = await api.post(`/documents/${id}`, payload);
   return mapDocument(response.data);
 }
 
@@ -1622,7 +1622,7 @@ export async function getEmployeePortalLeaveRequests() {
 }
 
 export async function createEmployeePortalLeaveRequest(payload) {
-  const response = await employeeApi.post("/employee/leave-requests", payload, payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined);
+  const response = await employeeApi.post("/employee/leave-requests", payload);
   return response.data;
 }
 
