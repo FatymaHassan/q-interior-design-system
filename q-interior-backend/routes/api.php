@@ -47,28 +47,73 @@ Route::get('/health', function () {
 });
 
 Route::get('/health/database', function () {
-    $requiredTables = [
-        'users',
-        'roles',
-        'permissions',
-        'settings',
-        'clients',
-        'projects',
-        'expense_categories',
-        'project_stages',
-        'departments',
-    ];
+    try {
+        $requiredTables = [
+            'users',
+            'roles',
+            'permissions',
+            'settings',
+            'clients',
+            'projects',
+            'expense_categories',
+            'project_stages',
+            'departments',
+        ];
 
-    DB::connection()->getPdo();
+        $connection = DB::connection();
+        $connection->getPdo();
 
-    $tables = collect($requiredTables)
-        ->mapWithKeys(fn (string $table) => [$table => Schema::hasTable($table)]);
+        $database = $connection->getDatabaseName();
+        $driver = $connection->getDriverName();
 
-    return response()->json([
-        'status' => $tables->contains(false) ? 'missing_tables' : 'ok',
-        'database' => DB::connection()->getDatabaseName(),
-        'tables' => $tables,
-    ]);
+        $requiredTableStatus = collect($requiredTables)
+            ->mapWithKeys(fn (string $table) => [$table => Schema::hasTable($table)]);
+
+        $allTables = collect(match ($driver) {
+            'mysql', 'mariadb' => DB::select('SHOW TABLES'),
+            'sqlite' => DB::select("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"),
+            'pgsql' => DB::select("SELECT table_name AS name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"),
+            'sqlsrv' => DB::select("SELECT table_name AS name FROM information_schema.tables WHERE table_type = 'BASE TABLE'"),
+            default => [],
+        })
+            ->map(fn (object $table) => array_values((array) $table)[0] ?? null)
+            ->filter()
+            ->sort()
+            ->values();
+
+        $migrationStatus = Schema::hasTable('migrations')
+            ? [
+                'table_exists' => true,
+                'migration_count' => DB::table('migrations')->count(),
+                'latest_batch' => DB::table('migrations')->max('batch'),
+                'latest_migration' => DB::table('migrations')->orderByDesc('batch')->orderByDesc('migration')->value('migration'),
+            ]
+            : [
+                'table_exists' => false,
+                'migration_count' => 0,
+                'latest_batch' => null,
+                'latest_migration' => null,
+            ];
+
+        return response()->json([
+            'status' => $requiredTableStatus->contains(false) ? 'error' : 'ok',
+            'database' => $database,
+            'required_tables' => $requiredTableStatus,
+            'table_count' => $allTables->count(),
+            'all_tables' => $allTables,
+            'migration_status' => $migrationStatus,
+        ]);
+    } catch (\Throwable $exception) {
+        return response()->json([
+            'status' => 'error',
+            'database' => DB::connection()->getDatabaseName(),
+            'required_tables' => null,
+            'table_count' => 0,
+            'all_tables' => [],
+            'migration_status' => null,
+            'message' => 'Database health check failed.',
+        ], 500);
+    }
 });
 
 Route::post('/auth/login', [AuthController::class, 'login']);
