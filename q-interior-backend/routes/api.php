@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\ClientController;
@@ -41,6 +43,31 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
         'app' => 'Q Interior Design System',
+    ]);
+});
+
+Route::get('/health/database', function () {
+    $requiredTables = [
+        'users',
+        'roles',
+        'permissions',
+        'settings',
+        'clients',
+        'projects',
+        'expense_categories',
+        'project_stages',
+        'departments',
+    ];
+
+    DB::connection()->getPdo();
+
+    $tables = collect($requiredTables)
+        ->mapWithKeys(fn (string $table) => [$table => Schema::hasTable($table)]);
+
+    return response()->json([
+        'status' => $tables->contains(false) ? 'missing_tables' : 'ok',
+        'database' => DB::connection()->getDatabaseName(),
+        'tables' => $tables,
     ]);
 });
 
