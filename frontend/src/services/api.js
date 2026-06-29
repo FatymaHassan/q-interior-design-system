@@ -1,8 +1,15 @@
 import axios from "axios";
 import { formatDateOnly } from "../utils/dateTime";
 
+const defaultApiUrl =
+  typeof window !== "undefined" && window.location.hostname.includes("localhost")
+    ? "/api"
+    : "https://q-interior-design-system.onrender.com/api";
+
+const apiBaseUrl = import.meta.env.VITE_API_URL || defaultApiUrl;
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: apiBaseUrl,
   headers: {
     Accept: "application/json",
   },
@@ -1420,7 +1427,7 @@ export async function getAuditLogs(params = {}) {
 }
 
 const portalApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: apiBaseUrl,
   headers: { Accept: "application/json" },
 });
 
@@ -1512,7 +1519,7 @@ export async function markClientMessageRead(id) {
 }
 
 const employeeApi = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: apiBaseUrl,
   headers: { Accept: "application/json" },
 });
 
