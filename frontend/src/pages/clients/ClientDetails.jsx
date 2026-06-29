@@ -45,7 +45,8 @@ export default function ClientDetails() {
       </div>
 
       <div className="mt-5 rounded-xl border border-brand-border bg-brand-soft p-4 text-sm font-semibold text-brand-muted">
-      Client portal password is protected and cannot be viewed. Use Edit Client to set a new password when needed.
+        <p>Client portal password: <span className="text-brand-primary">Password already saved</span></p>
+        <p className="mt-1 text-xs">Use Edit Client to generate or set a new password if you forget the old one.</p>
       </div>
     </Card>
   </div>;

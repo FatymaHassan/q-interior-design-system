@@ -9,6 +9,13 @@ import { formatDateOnly } from "../../utils/dateTime";
 import { emptyEmployee, fieldInputClass, HRPageHeader } from "./hrShared";
 import useHrData from "./useHrData";
 
+function generatePassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const values = new Uint32Array(12);
+  window.crypto.getRandomValues(values);
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+}
+
 export default function EmployeeForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -47,6 +54,11 @@ export default function EmployeeForm() {
 
   const departmentOptions = departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>);
 
+  const generateNewPassword = () => {
+    setEmployeeForm((current) => ({ ...current, password: generatePassword() }));
+    setShowPassword(true);
+  };
+
   return <div className="space-y-6">
     <HRPageHeader
       title={isEdit ? "Edit Employee" : "Add Employee"}
@@ -67,6 +79,9 @@ export default function EmployeeForm() {
         <FormField label="Employment start date"><input type="date" value={employeeForm.employment_start_date || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, employment_start_date: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input value={employeeForm.phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input type="email" value={employeeForm.email || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className={fieldInputClass} /></FormField>
+        {isEdit && <FormField label="Current employee portal password">
+          <input value="Password already saved" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
+        </FormField>}
         <FormField label={isEdit ? "Reset employee portal password" : "Employee portal password"}>
           <div className="relative">
             <input
@@ -88,7 +103,10 @@ export default function EmployeeForm() {
               {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
-          {isEdit && <p className="mt-1 text-xs font-semibold text-brand-muted">Saved passwords are encrypted. Leave this blank to keep the current password, or type a new one to change it.</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" className="min-h-8 px-3 py-1.5 text-xs" onClick={generateNewPassword}>Generate new password</Button>
+            {isEdit && <p className="text-xs font-semibold text-brand-muted">Leave blank to keep the saved password.</p>}
+          </div>
         </FormField>
         <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
         <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>

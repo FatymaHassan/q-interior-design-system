@@ -8,6 +8,13 @@ import { getClient, updateClient } from "./clientApi";
 
 const emptyClient = { name: "", phone: "", email: "", portal_password: "", address: "", location: "", notes: "" };
 
+function generatePassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const values = new Uint32Array(12);
+  window.crypto.getRandomValues(values);
+  return Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+}
+
 export default function ClientEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,6 +44,11 @@ export default function ClientEdit() {
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
 
+  const generateNewPassword = () => {
+    setForm((current) => ({ ...current, portal_password: generatePassword() }));
+    setShowPassword(true);
+  };
+
   const submitClient = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -61,6 +73,9 @@ export default function ClientEdit() {
         <FormField label="Client name"><input name="name" value={form.name} onChange={updateField} required className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input name="phone" value={form.phone} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input name="email" type="email" value={form.email} onChange={updateField} className={fieldInputClass} /></FormField>
+        <FormField label="Current client portal password">
+          <input value="Password already saved" disabled className={`${fieldInputClass} bg-brand-soft font-semibold text-brand-muted`} />
+        </FormField>
         <FormField label="Reset client portal password">
           <div className="relative">
             <input name="portal_password" type={showPassword ? "text" : "password"} value={form.portal_password} onChange={updateField} placeholder="Leave blank to keep current" minLength={6} className={`${fieldInputClass} pr-12`} />
@@ -73,7 +88,10 @@ export default function ClientEdit() {
               {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
             </button>
           </div>
-          <p className="mt-1 text-xs font-semibold text-brand-muted">Saved passwords are encrypted. Leave this blank to keep the current password, or type a new one to change it.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" className="min-h-8 px-3 py-1.5 text-xs" onClick={generateNewPassword}>Generate new password</Button>
+            <p className="text-xs font-semibold text-brand-muted">Leave blank to keep the saved password.</p>
+          </div>
         </FormField>
         <FormField label="Location"><input name="location" value={form.location} onChange={updateField} className={fieldInputClass} /></FormField>
         <div className="lg:col-span-2"><FormField label="Address"><input name="address" value={form.address} onChange={updateField} className={fieldInputClass} /></FormField></div>
