@@ -18,6 +18,8 @@ export default function EmployeeDetails() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState(null);
+  const [documentSaving, setDocumentSaving] = useState(false);
+  const [documentError, setDocumentError] = useState("");
 
   const loadEmployee = () => getEmployee(id)
     .then((profile) => {
@@ -33,14 +35,22 @@ export default function EmployeeDetails() {
   const submitDocument = async (event) => {
     event.preventDefault();
     if (!documentForm.file) return;
+    setDocumentError("");
+    setDocumentSaving(true);
     const form = new FormData();
     form.append("title", documentForm.title || documentForm.file.name);
     form.append("document_type", documentForm.document_type);
     form.append("file", documentForm.file);
-    await uploadEmployeeDocument(id, form);
-    setDocumentForm({ title: "", document_type: "Contract", file: null });
-    event.target.reset();
-    loadEmployee();
+    try {
+      await uploadEmployeeDocument(id, form);
+      setDocumentForm({ title: "", document_type: "Contract", file: null });
+      event.target.reset();
+      loadEmployee();
+    } catch (error) {
+      setDocumentError(apiErrorMessage(error, "Employee document could not be uploaded."));
+    } finally {
+      setDocumentSaving(false);
+    }
   };
 
   if (status === "loading") return <Card className="p-5 text-sm text-brand-muted">Loading employee...</Card>;
@@ -111,11 +121,12 @@ export default function EmployeeDetails() {
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
       <Card className="p-5 xl:col-span-2">
         <h3 className="mb-4 text-xl font-bold text-brand-primary">HR Documents</h3>
+        {documentError && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-brand-danger">{documentError}</p>}
         <form onSubmit={submitDocument} className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
           <input placeholder="Document title" value={documentForm.title} onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })} className={fieldInputClass} />
           <select value={documentForm.document_type} onChange={(e) => setDocumentForm({ ...documentForm, document_type: e.target.value })} className={fieldInputClass}><option>Contract</option><option>ID document</option><option>Certificates</option><option>CV</option><option>Warning letter</option><option>Promotion letter</option><option>Other</option></select>
           <input type="file" onChange={(e) => setDocumentForm({ ...documentForm, file: e.target.files?.[0] || null })} className={fieldInputClass} />
-          <Button>Upload</Button>
+          <Button disabled={documentSaving || !documentForm.file}>{documentSaving ? "Uploading..." : "Upload"}</Button>
         </form>
         <Table columns={[
           { key: "title", label: "Document", render: (row) => <span className="flex items-center gap-2 font-semibold"><FileText size={16} />{row.title}</span> },
@@ -164,6 +175,12 @@ export default function EmployeeDetails() {
       </Card>
     </div>
   </div>;
+}
+
+function apiErrorMessage(error, fallback) {
+  const errors = error?.response?.data?.errors;
+  const firstError = errors && Object.values(errors).flat()[0];
+  return firstError || error?.response?.data?.message || fallback;
 }
 
 function Metric({ icon: Icon, label, value }) {
