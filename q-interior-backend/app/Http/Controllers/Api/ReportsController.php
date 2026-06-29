@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Expense;
 use App\Models\InventoryMovement;
@@ -101,6 +102,10 @@ class ReportsController extends Controller
                 'net_profit' => round($netProfit, 2),
                 'profit_margin' => $revenue > 0 ? round(($netProfit / $revenue) * 100, 2) : 0,
                 'active_projects' => Project::where('status', 'In Progress')->count(),
+                'total_clients' => Client::count(),
+                'total_projects' => Project::count(),
+                'total_employees' => Employee::count(),
+                'total_documents' => Document::count(),
                 'completed_projects' => Project::where('status', 'Completed')->count(),
                 'pending_quotations' => Quotation::whereIn('status', ['Draft', 'Sent', 'Pending', 'Revision Requested'])->count(),
                 'approved_quotations' => Quotation::where('status', 'Approved')->count(),
@@ -122,6 +127,37 @@ class ReportsController extends Controller
                 'expense_by_category' => $this->expenseByCategoryRows($request)->take(8)->values(),
                 'inventory_low_stock' => Material::with('category')->get()->filter(fn ($material) => $material->stock_status !== 'In Stock')->values()->take(10),
                 'payroll_by_month' => Payroll::select('year', 'month', DB::raw('SUM(net_salary) as total'))->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get(),
+            ],
+            'recent' => [
+                'revenue' => Payment::clientRevenue()
+                    ->with(['client:id,name', 'project:id,name,project_name'])
+                    ->latest('payment_date')
+                    ->latest('id')
+                    ->limit(6)
+                    ->get()
+                    ->map(fn ($payment) => [
+                        'id' => $payment->id,
+                        'date' => optional($payment->payment_date)->format('Y-m-d') ?: $payment->payment_date,
+                        'client' => $payment->client?->name ?: '-',
+                        'project' => $payment->project?->name ?: $payment->project?->project_name ?: '-',
+                        'amount' => round((float) $payment->amount, 2),
+                    ]),
+                'expenses' => Expense::with(['project:id,name,project_name'])
+                    ->latest('expense_date')
+                    ->latest('id')
+                    ->limit(6)
+                    ->get()
+                    ->map(fn ($expense) => [
+                        'id' => $expense->id,
+                        'date' => optional($expense->expense_date)->format('Y-m-d') ?: $expense->expense_date,
+                        'project' => $expense->project?->name ?: $expense->project?->project_name ?: '-',
+                        'category' => $expense->category ?: $expense->description ?: '-',
+                        'amount' => round((float) ($expense->total_cost ?: $expense->amount), 2),
+                    ]),
+                'clients' => Client::latest()->limit(6)->get(['id', 'name', 'phone', 'email', 'created_at']),
+                'projects' => Project::with('client:id,name')->latest()->limit(6)->get(['id', 'client_id', 'name', 'project_name', 'status', 'created_at']),
+                'employees' => Employee::with('department:id,name')->latest()->limit(6)->get(['id', 'department_id', 'name', 'position', 'status', 'created_at']),
+                'documents' => Document::with('project:id,name,project_name')->latest()->limit(6)->get(['id', 'project_id', 'title', 'document_category', 'created_at']),
             ],
         ];
     }

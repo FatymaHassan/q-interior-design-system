@@ -27,6 +27,7 @@ export default function Dashboard() {
 
   const kpis = dashboard?.kpis || {};
   const charts = dashboard?.charts || {};
+  const recent = dashboard?.recent || {};
 
   return <div className="space-y-4">
     <PageHeader
@@ -48,6 +49,10 @@ export default function Dashboard() {
       <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} />
       <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} />
       <MetricCard label="Profit Margin" value={`${kpis.profit_margin ?? 0}%`} icon={TrendingUp} />
+      <MetricCard label="Total Clients" value={kpis.total_clients ?? "..."} icon={Users} />
+      <MetricCard label="Total Projects" value={kpis.total_projects ?? "..."} icon={Briefcase} />
+      <MetricCard label="Total Employees" value={kpis.total_employees ?? "..."} icon={Users} />
+      <MetricCard label="Documents" value={kpis.total_documents ?? "..."} icon={FileText} />
       <MetricCard label="Active Projects" value={kpis.active_projects ?? "..."} icon={Briefcase} />
       <MetricCard label="Completed Projects" value={kpis.completed_projects ?? "..."} icon={CheckCircle} />
       <MetricCard label="Pending Quotations" value={kpis.pending_quotations ?? "..."} icon={FileText} />
@@ -56,6 +61,60 @@ export default function Dashboard() {
       <MetricCard label="Overdue Tasks" value={kpis.overdue_tasks ?? "..."} icon={AlertTriangle} />
       <MetricCard label="Low Stock Materials" value={kpis.low_stock_materials ?? "..."} icon={Boxes} />
       <MetricCard label="Active Employees" value={kpis.active_employees ?? "..."} icon={Users} />
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
+      <SectionCard title="Latest Revenue" subtitle="Newest client payments saved in finance.">
+        <Table columns={[
+          { key: "date", label: "Date" },
+          { key: "client", label: "Client" },
+          { key: "project", label: "Project" },
+          { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+        ]} rows={recent.revenue || []} empty="No revenue payments yet." />
+      </SectionCard>
+      <SectionCard title="Latest Expenses" subtitle="Newest project or company costs saved.">
+        <Table columns={[
+          { key: "date", label: "Date" },
+          { key: "project", label: "Project" },
+          { key: "category", label: "Category" },
+          { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+        ]} rows={recent.expenses || []} empty="No expenses yet." />
+      </SectionCard>
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
+      <SectionCard title="Recently Added Clients" subtitle="Newest client records.">
+        <Table columns={[
+          { key: "name", label: "Client" },
+          { key: "phone", label: "Phone" },
+          { key: "email", label: "Email" },
+          { key: "created_at", label: "Created", render: (row) => dateLabel(row.created_at) },
+        ]} rows={recent.clients || []} empty="No clients yet." />
+      </SectionCard>
+      <SectionCard title="Recently Added Projects" subtitle="Newest project records.">
+        <Table columns={[
+          { key: "name", label: "Project", render: (row) => row.name || row.project_name || "-" },
+          { key: "client", label: "Client", render: (row) => row.client?.name || "-" },
+          { key: "status", label: "Status" },
+          { key: "created_at", label: "Created", render: (row) => dateLabel(row.created_at) },
+        ]} rows={recent.projects || []} empty="No projects yet." />
+      </SectionCard>
+      <SectionCard title="Recently Added Employees" subtitle="Newest employee profiles.">
+        <Table columns={[
+          { key: "name", label: "Employee" },
+          { key: "position", label: "Role" },
+          { key: "department", label: "Department", render: (row) => row.department?.name || "-" },
+          { key: "created_at", label: "Created", render: (row) => dateLabel(row.created_at) },
+        ]} rows={recent.employees || []} empty="No employees yet." />
+      </SectionCard>
+      <SectionCard title="Recently Uploaded Documents" subtitle="Newest project documents and photos.">
+        <Table columns={[
+          { key: "title", label: "Document" },
+          { key: "project", label: "Project", render: (row) => row.project?.name || row.project?.project_name || "-" },
+          { key: "document_category", label: "Category" },
+          { key: "created_at", label: "Uploaded", render: (row) => dateLabel(row.created_at) },
+        ]} rows={recent.documents || []} empty="No documents uploaded yet." />
+      </SectionCard>
     </section>
 
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
@@ -131,6 +190,10 @@ function InfoRows({ rows }) {
 
 function money(value) {
   return `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+function dateLabel(value) {
+  return value ? new Date(value).toLocaleDateString() : "-";
 }
 
 function clean(filters) {
