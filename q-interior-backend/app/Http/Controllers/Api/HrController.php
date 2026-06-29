@@ -223,7 +223,7 @@ class HrController extends Controller
 
     public function attendances(Request $request)
     {
-        return Attendance::with('employee.department')
+        return Attendance::with(['employee.department', 'officeLocation'])
             ->when($request->query('employee_id'), fn ($query, $value) => $query->where('employee_id', $value))
             ->when($request->query('status'), fn ($query, $value) => $query->where('status', $value))
             ->when($request->query('date_from'), fn ($query, $value) => $query->whereDate('date', '>=', $value))
@@ -276,6 +276,7 @@ class HrController extends Controller
     {
         $data = $request->validate([
             'employee_id' => 'required|exists:employees,id',
+            'office_location_id' => 'nullable|exists:office_locations,id',
             'date' => 'required|date',
             'check_in' => 'nullable|date_format:H:i',
             'check_out' => 'nullable|date_format:H:i',
@@ -298,7 +299,7 @@ class HrController extends Controller
         }
         $data['total_hours'] = $this->hours($data['date'], $data['check_in'] ?? null, $data['check_out'] ?? null);
 
-        return Attendance::updateOrCreate(['employee_id' => $data['employee_id'], 'date' => $data['date']], $data)->load('employee');
+        return Attendance::updateOrCreate(['employee_id' => $data['employee_id'], 'date' => $data['date']], $data)->load(['employee', 'officeLocation']);
     }
 
     public function leaveRequests(Request $request)
