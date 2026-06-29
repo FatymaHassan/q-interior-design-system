@@ -53,23 +53,7 @@ return new class extends Migration
             ]);
         }
 
-        foreach ($this->defaultCategories() as $category) {
-            $values = [
-                'expense_type' => $category['expense_type'],
-                'group_name' => $category['group_name'],
-                'description' => $category['description'],
-                'status' => 'Active',
-                'updated_at' => now(),
-                'created_at' => now(),
-            ];
-            if ($hasCategoryType) {
-                $values['type'] = $category['type'];
-            }
-            DB::table('expense_categories')->updateOrInsert(
-                ['name' => $category['name'], 'expense_type' => $category['expense_type']],
-                $values
-            );
-        }
+        // Default expense categories are created by ExpenseCategoriesSeeder.
     }
 
     public function down(): void
@@ -94,19 +78,5 @@ return new class extends Migration
                 }
             }
         });
-    }
-
-    private function defaultCategories(): array
-    {
-        return [
-            ['name' => 'Design Consultation', 'type' => 'project_expense', 'expense_type' => 'project', 'group_name' => 'Design Costs', 'description' => 'Design fees, drawings, renders, and consultation costs.'],
-            ['name' => 'Materials', 'type' => 'project_expense', 'expense_type' => 'project', 'group_name' => 'Materials', 'description' => 'Project material purchases and material usage.'],
-            ['name' => 'Labour', 'type' => 'project_expense', 'expense_type' => 'project', 'group_name' => 'Labour Costs', 'description' => 'Project labour and contractor work.'],
-            ['name' => 'Site Expenses', 'type' => 'project_expense', 'expense_type' => 'project', 'group_name' => 'Site Expenses', 'description' => 'Transport, site petty cash, fuel, and site operations.'],
-            ['name' => 'Other Project Costs', 'type' => 'project_expense', 'expense_type' => 'project', 'group_name' => 'Other Project Costs', 'description' => 'Other project-specific costs.'],
-            ['name' => 'Office Rent', 'type' => 'overhead', 'expense_type' => 'overhead', 'group_name' => 'Company Overhead', 'description' => 'Office rent and recurring company operating cost.'],
-            ['name' => 'Utilities', 'type' => 'overhead', 'expense_type' => 'overhead', 'group_name' => 'Company Overhead', 'description' => 'Electricity, internet, water, and utilities.'],
-            ['name' => 'Employee Payroll', 'type' => 'payroll', 'expense_type' => 'payroll', 'group_name' => 'Payroll', 'description' => 'Salary and payroll expenses.'],
-        ];
     }
 };

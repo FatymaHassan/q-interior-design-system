@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -112,18 +111,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        foreach ([
-            ['name' => 'Inquiry', 'order' => 1, 'color' => '#f59e0b'],
-            ['name' => 'Design', 'order' => 2, 'color' => '#3b82f6'],
-            ['name' => 'Materials Order', 'order' => 3, 'color' => '#8b5cf6'],
-            ['name' => 'Installation', 'order' => 4, 'color' => '#14b8a6'],
-            ['name' => 'Completed', 'order' => 5, 'color' => '#22c55e'],
-        ] as $stage) {
-            DB::table('project_stages')->updateOrInsert(['name' => $stage['name']], $stage);
-        }
-
-        $inquiryId = DB::table('project_stages')->where('name', 'Inquiry')->value('id');
-        DB::table('projects')->whereNull('project_stage_id')->update(['project_stage_id' => $inquiryId]);
+        // Default project stages are created by ProjectStagesSeeder.
     }
 
     public function down(): void
