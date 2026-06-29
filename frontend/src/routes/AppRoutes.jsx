@@ -51,7 +51,6 @@ import ReviewsGoals from "../pages/hr/ReviewsGoals";
 import InventoryModule from "../pages/inventory/InventoryModule";
 import ReportsCenter from "../pages/reports/ReportsCenter";
 import AuditLogs from "../pages/audit/AuditLogs";
-import EmployeeLogin from "../pages/employee-portal/EmployeeLogin";
 import EmployeePortal from "../pages/employee-portal/EmployeePortal";
 import { isAuthenticated, isEmployeePortalAuthenticated, userHasRole } from "../services/api";
 
@@ -73,7 +72,7 @@ function RoleRoute({ roles, children }) {
 function EmployeePortalRoute({ children }) {
   const location = useLocation();
   if (!isEmployeePortalAuthenticated()) {
-    return <Navigate to="/employee-login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   return children;
 }
@@ -81,7 +80,7 @@ function EmployeePortalRoute({ children }) {
 export default function AppRoutes() {
   return <Routes>
     <Route path="/login" element={<Login />} />
-    <Route path="/employee-login" element={<EmployeeLogin />} />
+    <Route path="/employee-login" element={<Navigate to="/login" replace />} />
     <Route path="/employee-portal" element={<EmployeePortalRoute><EmployeePortal /></EmployeePortalRoute>} />
     <Route path="/client-login" element={<Navigate to="/login" replace />} />
     <Route path="/client-portal" element={<ClientPortal />} />

@@ -79,6 +79,9 @@ export default function EmployeeDetails() {
         <Info label="Address" value={employee.address || "-"} />
         <Info label="Emergency" value={`${employee.emergency_contact_name || "-"} ${employee.emergency_contact_phone || ""}`} />
       </div>
+      <div className="border-t border-brand-border px-5 py-4 text-sm font-semibold text-brand-muted md:px-6">
+        Employee portal password is protected and cannot be viewed. Use Edit Employee to set a new password when needed.
+      </div>
     </Card>
 
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">

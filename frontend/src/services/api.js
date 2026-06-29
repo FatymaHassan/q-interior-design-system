@@ -1536,7 +1536,7 @@ employeeApi.interceptors.response.use(
       localStorage.removeItem("q_employee_portal_token");
       localStorage.removeItem("q_employee_portal_employee");
       if (window.location.pathname.startsWith("/employee-portal")) {
-        window.location.assign("/employee-login");
+        window.location.assign("/login");
       }
     }
     return Promise.reject(error);

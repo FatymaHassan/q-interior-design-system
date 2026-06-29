@@ -33,7 +33,7 @@ class ClientPortalController extends Controller
         $client->update([
             'portal_token' => null,
             'portal_token_hash' => hash('sha256', $token),
-            'portal_token_expires_at' => now()->addHours(8),
+            'portal_token_expires_at' => null,
         ]);
 
         return response()->json([

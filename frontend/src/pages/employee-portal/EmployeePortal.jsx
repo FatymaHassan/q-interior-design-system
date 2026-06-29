@@ -53,7 +53,7 @@ export default function EmployeePortal() {
 
   const signOut = async () => {
     await employeePortalLogout();
-    navigate("/employee-login", { replace: true });
+    navigate("/login", { replace: true });
   };
 
   const pendingLeaves = leaveRequests.filter((item) => item.status === "Pending").length;

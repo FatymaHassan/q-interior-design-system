@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField from "../../components/ui/FormField";
@@ -15,6 +16,7 @@ export default function EmployeeForm() {
   const { departments, notice } = useHrData(["departments"]);
   const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
   const [status, setStatus] = useState(isEdit ? "loading" : "ready");
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -65,17 +67,28 @@ export default function EmployeeForm() {
         <FormField label="Employment start date"><input type="date" value={employeeForm.employment_start_date || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, employment_start_date: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Phone"><input value={employeeForm.phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Email"><input type="email" value={employeeForm.email || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} className={fieldInputClass} /></FormField>
-        <FormField label={isEdit ? "Portal password" : "Portal password"}>
-          <input
-            type="password"
-            required={!isEdit}
-            minLength={6}
-            autoComplete="new-password"
-            placeholder={isEdit ? "Leave blank to keep current password" : "Minimum 6 characters"}
-            value={employeeForm.password || ""}
-            onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
-            className={fieldInputClass}
-          />
+        <FormField label={isEdit ? "Reset employee portal password" : "Employee portal password"}>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              required={!isEdit}
+              minLength={6}
+              autoComplete="new-password"
+              placeholder={isEdit ? "Leave blank to keep current password" : "Minimum 6 characters"}
+              value={employeeForm.password || ""}
+              onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+              className={`${fieldInputClass} pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-brand-muted hover:bg-brand-soft hover:text-brand-primary"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+          {isEdit && <p className="mt-1 text-xs font-semibold text-brand-muted">Saved passwords are encrypted. Leave this blank to keep the current password, or type a new one to change it.</p>}
         </FormField>
         <FormField label="Status"><select value={employeeForm.status || "Active"} onChange={(e) => setEmployeeForm({ ...employeeForm, status: e.target.value })} className={fieldInputClass}><option>Active</option><option>Inactive</option></select></FormField>
         <FormField label="Address"><input value={employeeForm.address || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, address: e.target.value })} className={fieldInputClass} /></FormField>

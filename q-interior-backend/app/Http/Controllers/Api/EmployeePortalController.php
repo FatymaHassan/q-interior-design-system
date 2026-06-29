@@ -38,8 +38,6 @@ class EmployeePortalController extends Controller
             throw ValidationException::withMessages(['email' => ['Employee portal access was not found for this account.']]);
         }
 
-        $user->tokens()->delete();
-
         return response()->json([
             'employee' => $employee,
             'token' => $user->createToken('employee-portal-token')->plainTextToken,

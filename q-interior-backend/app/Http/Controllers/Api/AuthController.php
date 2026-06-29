@@ -26,7 +26,6 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->tokens()->delete();
         AuditLog::create([
             'user_id' => $user->id,
             'action' => 'login',

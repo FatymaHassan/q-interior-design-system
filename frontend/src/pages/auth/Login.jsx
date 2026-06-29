@@ -3,7 +3,18 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { LockIcon, MailIcon, SparklesIcon } from "lucide-react";
 import Button from "../../components/ui/Button";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
-import { clientPortalLogin, login, logoutClientPortal } from "../../services/api";
+import { clientPortalLogin, employeePortalLogin, login, logoutClientPortal, logoutEmployeePortal } from "../../services/api";
+
+const dashboardRoles = ["admin", "manager", "finance", "designer", "hr"];
+
+function shouldUseDashboard(user) {
+  const roleNames = [
+    user?.role,
+    ...(user?.roles || []).map((role) => role.name),
+  ].filter(Boolean);
+
+  return roleNames.some((role) => dashboardRoles.includes(role));
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -19,16 +30,39 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      await login(form);
-      logoutClientPortal();
-      navigate(location.state?.from || "/dashboard", { replace: true });
-    } catch (staffError) {
       try {
+        const staffSession = await login(form);
+        logoutClientPortal();
+        logoutEmployeePortal();
+
+        if (shouldUseDashboard(staffSession.user)) {
+          navigate(location.state?.from || "/dashboard", { replace: true });
+          return;
+        }
+
         localStorage.removeItem("q_interior_token");
         localStorage.removeItem("q_interior_user");
+      } catch (staffError) {
+        localStorage.removeItem("q_interior_token");
+        localStorage.removeItem("q_interior_user");
+      }
+
+      try {
+        await employeePortalLogin(form);
+        logoutClientPortal();
+        navigate("/employee-portal", { replace: true });
+        return;
+      } catch (employeeError) {
+        logoutEmployeePortal();
+      }
+
+      try {
         await clientPortalLogin(form);
+        logoutEmployeePortal();
         navigate("/client-portal", { replace: true });
       } catch {
+        localStorage.removeItem("q_interior_token");
+        localStorage.removeItem("q_interior_user");
         setError("Login failed. Check your email and password.");
       }
     } finally {
@@ -62,7 +96,7 @@ export default function Login() {
             </div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-muted">Q Interior</p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">Welcome back</h2>
-            <p className="mt-2 text-sm leading-6 text-brand-muted">Use one login for staff dashboard or client portal access.</p>
+            <p className="mt-2 text-sm leading-6 text-brand-muted">Use one login for admin, employee, or client access. We will open the right page automatically.</p>
           </div>
 
           {error && <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm font-semibold text-brand-danger">{error}</p>}
