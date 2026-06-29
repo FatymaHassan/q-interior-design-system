@@ -1,6 +1,7 @@
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
+import { Edit3, Eye, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function ClientList({ clients, onDelete }) {
@@ -19,9 +20,23 @@ export default function ClientList({ clients, onDelete }) {
       { key: "location", label: "Location" },
       { key: "projects", label: "Projects", render: (client) => client.projects.length },
       { key: "actions", label: "Actions", render: (client) => <div className="flex flex-wrap gap-2">
-        <Link to={`/clients/${client.id}/edit`}><Button variant="outline" className="px-3 py-2">Edit</Button></Link>
-        <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => onDelete?.(client)}>Delete</Button>
+        <Link to={`/clients/${client.id}`}><ActionIcon label="View client"><Eye size={16} /></ActionIcon></Link>
+        <Link to={`/clients/${client.id}/edit`}><ActionIcon label="Edit client"><Edit3 size={16} /></ActionIcon></Link>
+        <ActionIcon label="Delete client" danger onClick={() => onDelete?.(client)}><Trash2 size={16} /></ActionIcon>
       </div> },
     ]} rows={clients} />
   </Card>;
+}
+
+function ActionIcon({ children, label, danger = false, ...props }) {
+  return <Button
+    type="button"
+    variant="outline"
+    className={`h-9 w-9 rounded-lg p-0 ${danger ? "text-brand-danger hover:border-red-200 hover:bg-red-50" : ""}`}
+    title={label}
+    aria-label={label}
+    {...props}
+  >
+    {children}
+  </Button>;
 }

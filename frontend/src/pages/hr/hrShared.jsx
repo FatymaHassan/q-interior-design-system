@@ -2,6 +2,7 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
+import { Edit3, Eye, Trash2 } from "lucide-react";
 import { getDocumentStorageUrl } from "../../services/api";
 
 export const fieldInputClass = "w-full rounded-xl border border-brand-border bg-white px-4 py-3 text-sm outline-none focus:border-brand-gold";
@@ -58,11 +59,24 @@ export function EmployeeTable({ employees, onView, onEdit, onDelete }) {
     { key: "phone", label: "Contact" },
     { key: "status", label: "Status", render: (employee) => <Badge>{employee.status}</Badge> },
     { key: "actions", label: "Actions", render: (employee) => <div className="flex flex-wrap gap-2">
-      <Button variant="outline" className="px-3 py-2" onClick={() => onView(employee)}>View</Button>
-      <Button variant="outline" className="px-3 py-2" onClick={() => onEdit ? onEdit(employee) : onView(employee)}>Edit</Button>
-      <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => onDelete(employee)}>Delete</Button>
+      <ActionIcon label="View employee" onClick={() => onView(employee)}><Eye size={16} /></ActionIcon>
+      <ActionIcon label="Edit employee" onClick={() => onEdit ? onEdit(employee) : onView(employee)}><Edit3 size={16} /></ActionIcon>
+      <ActionIcon label="Delete employee" danger onClick={() => onDelete(employee)}><Trash2 size={16} /></ActionIcon>
     </div> },
   ]} rows={employees} empty="No employees yet." />;
+}
+
+function ActionIcon({ children, label, danger = false, ...props }) {
+  return <Button
+    type="button"
+    variant="outline"
+    className={`h-9 w-9 rounded-lg p-0 ${danger ? "text-brand-danger hover:border-red-200 hover:bg-red-50" : ""}`}
+    title={label}
+    aria-label={label}
+    {...props}
+  >
+    {children}
+  </Button>;
 }
 
 export function EmployeeProfile({ employee, documentForm, setDocumentForm, submitDocument }) {
