@@ -20,6 +20,7 @@ export default function EmployeeForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [createdPassword, setCreatedPassword] = useState(null);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -50,13 +51,20 @@ export default function EmployeeForm() {
     });
     payload.set("department_id", employeeForm.department_id || "");
     payload.set("monthly_salary", Number(employeeForm.monthly_salary || 0));
-    const saved = isEdit ? await updateEmployee(id, payload) : await createEmployee(payload);
-    if (!isEdit && employeeForm.password) {
-      setCreatedPassword({ email: employeeForm.email, password: employeeForm.password, id: saved.id || id });
-      setEmployeeForm(emptyEmployee);
-      return;
+    setSaving(true);
+    try {
+      const saved = isEdit ? await updateEmployee(id, payload) : await createEmployee(payload);
+      if (!isEdit && employeeForm.password) {
+        setCreatedPassword({ email: employeeForm.email, password: employeeForm.password, id: saved.id || id });
+        setEmployeeForm(emptyEmployee);
+        return;
+      }
+      navigate(`/hr/employees/${saved.id || id}`);
+    } catch (err) {
+      setError(apiErrorMessage(err, "Employee could not be saved."));
+    } finally {
+      setSaving(false);
     }
-    navigate(`/hr/employees/${saved.id || id}`);
   };
 
   const departmentOptions = departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>);
@@ -129,10 +137,16 @@ export default function EmployeeForm() {
         <FormField label="Emergency phone 2"><input value={employeeForm.emergency_contact_2_phone || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, emergency_contact_2_phone: e.target.value })} className={fieldInputClass} /></FormField>
         <FormField label="Notes" className="md:col-span-2"><textarea value={employeeForm.notes || ""} onChange={(e) => setEmployeeForm({ ...employeeForm, notes: e.target.value })} className={fieldInputClass} /></FormField>
         <div className="flex gap-3 md:col-span-2">
-          <Button>{isEdit ? "Update Employee" : "Save Employee"}</Button>
+          <Button disabled={saving}>{saving ? "Saving Employee..." : isEdit ? "Update Employee" : "Save Employee"}</Button>
           <Link to="/hr/employees"><Button type="button" variant="outline">Cancel</Button></Link>
         </div>
       </form>
     </Card>}
   </div>;
+}
+
+function apiErrorMessage(error, fallback) {
+  const errors = error?.response?.data?.errors;
+  const firstError = errors && Object.values(errors).flat()[0];
+  return firstError || error?.response?.data?.message || fallback;
 }

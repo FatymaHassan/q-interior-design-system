@@ -35,6 +35,8 @@ export default function ClientAdd() {
         navigate("/clients");
       }
       setForm(emptyClient);
+    } catch (err) {
+      setError(apiErrorMessage(err, "Client could not be created."));
     } finally {
       setSaving(false);
     }
@@ -73,4 +75,10 @@ export default function ClientAdd() {
       </form>
     </Card>
   </div>;
+}
+
+function apiErrorMessage(error, fallback) {
+  const errors = error?.response?.data?.errors;
+  const firstError = errors && Object.values(errors).flat()[0];
+  return firstError || error?.response?.data?.message || fallback;
 }

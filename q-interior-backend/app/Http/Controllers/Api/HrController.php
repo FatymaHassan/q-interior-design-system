@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class HrController extends Controller
@@ -91,7 +92,7 @@ class HrController extends Controller
 
     public function updateEmployee(Request $request, Employee $employee)
     {
-        $data = $this->employeeData($request, true);
+        $data = $this->employeeData($request, true, $employee);
         $this->syncEmployeePortalUser($data, $employee);
         $data['updated_by'] = $request->user()?->id;
         if ($request->hasFile('photo')) {
@@ -649,17 +650,22 @@ class HrController extends Controller
             ->get();
     }
 
-    private function employeeData(Request $request, bool $partial = false): array
+    private function employeeData(Request $request, bool $partial = false, ?Employee $employee = null): array
     {
         return $request->validate([
             'user_id' => 'nullable|exists:users,id',
             'department_id' => 'nullable|exists:departments,id',
-            'name' => ($partial ? 'sometimes|' : '') . 'required|string|max:255',
+            'name' => [
+                $partial ? 'sometimes' : 'required',
+                'string',
+                'max:255',
+                Rule::unique('employees', 'name')->ignore($employee?->id),
+            ],
             'photo' => 'nullable|file|image|max:4096',
             'position' => 'nullable|string|max:255',
             'specialty' => 'nullable|string|max:255',
             'daily_rate' => 'nullable|numeric|min:0',
-            'phone' => 'nullable|string|max:255',
+            'phone' => ['nullable', 'string', 'max:255', Rule::unique('employees', 'phone')->ignore($employee?->id)],
             'email' => 'nullable|email|max:255',
             'password' => 'nullable|string|min:6|max:255|confirmed',
             'address' => 'nullable|string',
@@ -674,6 +680,9 @@ class HrController extends Controller
             'status' => 'nullable|in:Active,Inactive',
             'notes' => 'nullable|string',
             'salary_change_reason' => 'nullable|string',
+        ], [
+            'name.unique' => 'An employee with this name already exists.',
+            'phone.unique' => 'An employee with this phone number already exists.',
         ]);
     }
 

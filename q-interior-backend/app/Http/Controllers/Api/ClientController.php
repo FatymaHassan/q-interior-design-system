@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
@@ -18,13 +19,16 @@ class ClientController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:255',
+            'name' => ['required', 'string', 'max:255', Rule::unique('clients', 'name')],
+            'phone' => ['nullable', 'string', 'max:255', Rule::unique('clients', 'phone')],
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'portal_password' => 'nullable|string|min:6|confirmed',
+        ], [
+            'name.unique' => 'A client with this name already exists.',
+            'phone.unique' => 'A client with this phone number already exists.',
         ]);
 
         if (! empty($data['portal_password'])) {
@@ -44,13 +48,16 @@ class ClientController extends Controller
     public function update(Request $request, Client $client)
     {
         $data = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'phone' => 'nullable|string|max:255',
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('clients', 'name')->ignore($client->id)],
+            'phone' => ['nullable', 'string', 'max:255', Rule::unique('clients', 'phone')->ignore($client->id)],
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'portal_password' => 'nullable|string|min:6|confirmed',
+        ], [
+            'name.unique' => 'A client with this name already exists.',
+            'phone.unique' => 'A client with this phone number already exists.',
         ]);
 
         if (! empty($data['portal_password'])) {

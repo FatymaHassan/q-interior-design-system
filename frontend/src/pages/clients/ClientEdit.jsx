@@ -50,8 +50,8 @@ export default function ClientEdit() {
     try {
       await updateClient(id, form);
       navigate("/clients");
-    } catch {
-      setError("Client could not be updated.");
+    } catch (err) {
+      setError(apiErrorMessage(err, "Client could not be updated."));
     } finally {
       setSaving(false);
     }
@@ -92,4 +92,10 @@ export default function ClientEdit() {
       </form>
     </Card>
   </div>;
+}
+
+function apiErrorMessage(error, fallback) {
+  const errors = error?.response?.data?.errors;
+  const firstError = errors && Object.values(errors).flat()[0];
+  return firstError || error?.response?.data?.message || fallback;
 }
