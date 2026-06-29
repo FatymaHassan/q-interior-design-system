@@ -2,6 +2,7 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
+import ActionButton from "../../components/ui/ActionButton";
 import { Edit3, Eye, Trash2 } from "lucide-react";
 import { getDocumentStorageUrl } from "../../services/api";
 
@@ -59,24 +60,11 @@ export function EmployeeTable({ employees, onView, onEdit, onDelete }) {
     { key: "phone", label: "Contact" },
     { key: "status", label: "Status", render: (employee) => <Badge>{employee.status}</Badge> },
     { key: "actions", label: "Actions", render: (employee) => <div className="flex flex-wrap gap-2">
-      <ActionIcon label="View employee" onClick={() => onView(employee)}><Eye size={16} /></ActionIcon>
-      <ActionIcon label="Edit employee" onClick={() => onEdit ? onEdit(employee) : onView(employee)}><Edit3 size={16} /></ActionIcon>
-      <ActionIcon label="Delete employee" danger onClick={() => onDelete(employee)}><Trash2 size={16} /></ActionIcon>
+      <ActionButton title="View employee" aria-label="View employee" onClick={() => onView(employee)}><Eye /></ActionButton>
+      <ActionButton title="Edit employee" aria-label="Edit employee" tone="edit" onClick={() => onEdit ? onEdit(employee) : onView(employee)}><Edit3 /></ActionButton>
+      <ActionButton title="Delete employee" aria-label="Delete employee" tone="delete" onClick={() => onDelete(employee)}><Trash2 /></ActionButton>
     </div> },
   ]} rows={employees} empty="No employees yet." />;
-}
-
-function ActionIcon({ children, label, danger = false, ...props }) {
-  return <Button
-    type="button"
-    variant="outline"
-    className={`h-9 w-9 rounded-lg p-0 ${danger ? "text-brand-danger hover:border-red-200 hover:bg-red-50" : ""}`}
-    title={label}
-    aria-label={label}
-    {...props}
-  >
-    {children}
-  </Button>;
 }
 
 export function EmployeeProfile({ employee, documentForm, setDocumentForm, submitDocument }) {
