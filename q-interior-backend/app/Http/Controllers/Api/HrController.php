@@ -532,7 +532,7 @@ class HrController extends Controller
             'description' => 'nullable|string',
             'target_date' => 'nullable|date',
             'status' => 'nullable|in:Not Started,In Progress,Completed,Cancelled',
-            'progress' => 'nullable|integer|min:0|max:100',
+            'progress' => 'nullable|numeric|min:0|max:100',
             'manager_comment' => 'nullable|string',
         ]));
         $this->notify('Goal assigned', $goal->employee->name . ': ' . $goal->title, 'goal_assigned', '/hr/goals');

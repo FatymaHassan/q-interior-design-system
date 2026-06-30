@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { getExpenseCategories, getProjects, getSuppliers } from "../../services/api";
+import { toNumber } from "../../utils/numberFormat";
 import { createExpense } from "./expenseApi";
 import { FinanceFormActions, FinanceHeader, FinanceMetric, FinanceNotice, FinanceSection, money } from "./financeUi";
 
@@ -65,7 +66,7 @@ export default function ExpenseAdd() {
         next.title = selected?.name || "";
       }
       if (name === "quantity" || name === "unit_cost") {
-        next.total_cost = String(Number(next.quantity || 0) * Number(next.unit_cost || 0));
+        next.total_cost = String((toNumber(next.quantity) * toNumber(next.unit_cost)).toFixed(2));
       }
       return next;
     });
@@ -81,16 +82,16 @@ export default function ExpenseAdd() {
       employee_id: null,
       category_id: form.category_id ? Number(form.category_id) : null,
       category: form.category,
-      quantity: Number(form.quantity || 0),
-      unit_cost: Number(form.unit_cost || 0),
-      total_cost: Number(form.total_cost || 0),
-      amount: Number(form.total_cost || 0),
-      is_manual_total: Number(form.total_cost || 0) !== Number(form.quantity || 0) * Number(form.unit_cost || 0),
+      quantity: toNumber(form.quantity),
+      unit_cost: toNumber(form.unit_cost),
+      total_cost: toNumber(form.total_cost),
+      amount: toNumber(form.total_cost),
+      is_manual_total: Math.abs(toNumber(form.total_cost) - (toNumber(form.quantity) * toNumber(form.unit_cost))) > 0.001,
     });
     navigate("/expenses");
   };
 
-  const totalCost = Number(form.total_cost || 0);
+  const totalCost = toNumber(form.total_cost);
 
   return <div className="space-y-6">
     <FinanceHeader
@@ -122,9 +123,9 @@ export default function ExpenseAdd() {
           </select>
         </FormField>
         <FormField label="Paid by"><input name="paid_by" value={form.paid_by} onChange={updateField} placeholder="Cashier, admin, manager..." className={fieldInputClass} /></FormField>
-        <FormField label="Quantity"><input name="quantity" type="number" min="0" value={form.quantity} onChange={updateField} className={fieldInputClass} /></FormField>
-        <FormField label="Unit cost"><input name="unit_cost" type="number" min="0" value={form.unit_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
-        <FormField label="Total cost"><input name="total_cost" type="number" min="0" value={form.total_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
+        <FormField label="Quantity"><input name="quantity" type="number" min="0" step="0.01" value={form.quantity} onChange={updateField} className={fieldInputClass} /></FormField>
+        <FormField label="Unit cost"><input name="unit_cost" type="number" min="0" step="0.01" value={form.unit_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
+        <FormField label="Total cost"><input name="total_cost" type="number" min="0" step="0.01" value={form.total_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
         <FormField label="Expense date"><input name="expense_date" type="date" value={form.expense_date} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={updateField} className={fieldInputClass}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
         <FormField label="Notes" className="lg:col-span-2"><textarea name="notes" value={form.notes} onChange={updateField} rows="3" className={fieldInputClass} /></FormField>

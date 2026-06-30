@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { addProjectMember, getClients, getEmployees, getProjectStages } from "../../services/api";
+import { toNumber } from "../../utils/numberFormat";
 import { createProject } from "./projectApi";
 
 const emptyForm = {
@@ -55,8 +56,8 @@ export default function ProjectAdd() {
     const { name, value } = event.target;
     setForm((current) => {
       const next = { ...current, [name]: value };
-      const amount = Number(name === "contract_amount" ? value : next.contract_amount || next.budget || 0);
-      const percent = Number(name === "deposit_percentage" ? value : next.deposit_percentage || 0);
+      const amount = toNumber(name === "contract_amount" ? value : next.contract_amount || next.budget);
+      const percent = toNumber(name === "deposit_percentage" ? value : next.deposit_percentage);
       if (name === "contract_amount" || name === "deposit_percentage") {
         next.deposit_amount = amount ? String(((amount * percent) / 100).toFixed(2)) : "";
       }
@@ -74,14 +75,14 @@ export default function ProjectAdd() {
         ...form,
         client_id: Number(form.client_id),
         project_stage_id: form.project_stage_id ? Number(form.project_stage_id) : null,
-        budget: Number(form.budget || 0),
-        contract_amount: Number(form.contract_amount || form.budget || 0),
+        budget: toNumber(form.budget),
+        contract_amount: toNumber(form.contract_amount || form.budget),
         payment_plan_type: form.payment_plan_type,
-        deposit_percentage: Number(form.deposit_percentage || 0),
-        deposit_amount: Number(form.deposit_amount || 0),
+        deposit_percentage: toNumber(form.deposit_percentage),
+        deposit_amount: toNumber(form.deposit_amount),
         payment_terms: form.payment_terms,
-        actual_cost: Number(form.actual_cost || 0),
-        progress: Number(form.progress || 0),
+        actual_cost: toNumber(form.actual_cost),
+        progress: toNumber(form.progress),
       });
       await Promise.all(selectedMembers.map((member) => addProjectMember(project.id, {
         employee_id: Number(member.employee_id),
@@ -117,7 +118,7 @@ export default function ProjectAdd() {
         <FormField label="Start date"><input name="start_date" type="date" value={form.start_date} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Due date"><input name="end_date" type="date" value={form.end_date} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Deadline"><input name="deadline" type="date" value={form.deadline} onChange={updateField} className={fieldInputClass} /></FormField>
-        <FormField label="Budget"><input name="budget" type="number" min="0" value={form.budget} onChange={updateField} required placeholder="5000" className={fieldInputClass} /></FormField>
+        <FormField label="Budget"><input name="budget" type="number" min="0" step="0.01" value={form.budget} onChange={updateField} required placeholder="5000" className={fieldInputClass} /></FormField>
         <div className="lg:col-span-2 rounded-2xl border border-brand-border p-4">
           <h3 className="font-bold text-brand-primary">Project Payment Plan</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -128,8 +129,8 @@ export default function ProjectAdd() {
             <FormField label="Payment terms" className="lg:col-span-2"><textarea name="payment_terms" value={form.payment_terms} onChange={updateContractField} rows="3" className={fieldInputClass} /></FormField>
           </div>
         </div>
-        <FormField label="Current cost"><input name="actual_cost" type="number" min="0" value={form.actual_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
-        <FormField label="Progress %"><input name="progress" type="number" min="0" max="100" value={form.progress} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
+        <FormField label="Current cost"><input name="actual_cost" type="number" min="0" step="0.01" value={form.actual_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
+        <FormField label="Progress %"><input name="progress" type="number" min="0" max="100" step="0.01" value={form.progress} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
         <FormField label="Status"><select name="status" value={form.status} onChange={updateField} className={fieldInputClass}><option>Active</option><option>Pending</option><option>Completed</option><option>Cancelled</option></select></FormField>
         <div className="lg:col-span-2 rounded-2xl border border-brand-border p-4">
           <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">

@@ -7,6 +7,7 @@ import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import ProgressBar from "../../components/ui/ProgressBar";
 import Table from "../../components/ui/Table";
 import { addProjectMember, createDocument, deleteDocument, downloadDocumentFile, getEmployees, getMaterials, getProjectFinanceSummary, getProjectMaterialsUsed, getProjectMembers, getProjectTimeline, removeProjectMember, stockOutMaterial, updateDocument } from "../../services/api";
+import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 import { getProject } from "./projectApi";
 
 const tabs = ["Overview", "Finance", "Tasks", "Documents", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
@@ -120,8 +121,8 @@ export default function ProjectDetails() {
     const selected = materials.find((material) => Number(material.id) === Number(materialForm.material_id));
     await stockOutMaterial(materialForm.material_id, {
       project_id: Number(id),
-      quantity: Number(materialForm.quantity || 0),
-      unit_cost: Number(materialForm.unit_cost || selected?.purchasePrice || 0),
+      quantity: toNumber(materialForm.quantity),
+      unit_cost: toNumber(materialForm.unit_cost || selected?.purchasePrice),
       notes: materialForm.notes,
     });
     setMaterialForm((current) => ({ ...current, quantity: 1, notes: "" }));
@@ -150,8 +151,8 @@ export default function ProjectDetails() {
           <Metric label="Location" value={project.location} />
           <Metric label="Start Date" value={raw.start_date || "-"} />
           <Metric label="Deadline" value={project.deadline} />
-          <Metric label="Budget" value={`$${Number(project.budget || 0).toLocaleString()}`} />
-          <Metric label="Budget Used" value={`$${Number(raw.actual_cost || 0).toLocaleString()}`} />
+          <Metric label="Budget" value={formatCurrency(project.budget)} />
+          <Metric label="Budget Used" value={formatCurrency(raw.actual_cost)} />
         </div>
       </div>
       <div className="mt-5">
@@ -254,8 +255,8 @@ export default function ProjectDetails() {
         { key: "material", label: "Material", render: (movement) => <b>{movement.material?.name || "-"}</b> },
         { key: "quantity", label: "Quantity" },
         { key: "unit", label: "Unit", render: (movement) => movement.material?.unit || "-" },
-        { key: "unit_cost", label: "Unit Cost", render: (movement) => `$${Number(movement.unit_cost || 0).toLocaleString()}` },
-        { key: "total_cost", label: "Total", render: (movement) => `$${Number(movement.total_cost || 0).toLocaleString()}` },
+        { key: "unit_cost", label: "Unit Cost", render: (movement) => formatCurrency(movement.unit_cost) },
+        { key: "total_cost", label: "Total", render: (movement) => formatCurrency(movement.total_cost) },
         { key: "movement_date", label: "Date" },
         { key: "created_by", label: "Created By", render: (movement) => movement.creator?.name || "-" },
         { key: "notes", label: "Notes" },
@@ -289,29 +290,29 @@ function InfoRows({ rows }) {
 
 function ProjectFinancePanel({ finance }) {
   const metrics = finance?.metrics || {};
-  const money = (value) => `$${Number(value || 0).toLocaleString()}`;
+  const money = (value) => formatCurrency(value);
 
   return <div className="space-y-5">
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <Metric label="Contract Amount" value={money(metrics.expected_revenue)} />
-      <Metric label="Paid Amount" value={money(metrics.received_revenue)} />
+      <Metric label="Client Payments Received" value={money(metrics.received_revenue)} />
       <Metric label="Remaining Balance" value={money(metrics.outstanding_client_balance)} />
-      <Metric label="Payment %" value={`${Number(metrics.payment_percentage || 0)}%`} />
-      <Metric label="Project Expenses" value={money(metrics.project_expenses)} />
+      <Metric label="Payment %" value={formatPercentage(metrics.payment_percentage)} />
+      <Metric label="Total Project Cost" value={money(metrics.total_project_cost)} />
       <Metric label="Design Costs" value={money(metrics.design_costs)} />
       <Metric label="Materials" value={money(metrics.materials)} />
       <Metric label="Labour Costs" value={money(metrics.labour_costs)} />
       <Metric label="Site Expenses" value={money(metrics.site_expenses)} />
-      <Metric label="Supplier Costs" value={money(metrics.supplier_costs)} />
-      <Metric label="Supplier Payables" value={money(metrics.supplier_payables)} />
-      <Metric label="Profit / Loss" value={`${money(metrics.project_profit)} (${Number(metrics.profit_margin || 0)}%)`} />
+      <Metric label="Other Costs" value={money(metrics.other_project_costs)} />
+      <Metric label="Project Profit" value={money(metrics.project_profit)} />
+      <Metric label="Profit Margin %" value={formatPercentage(metrics.profit_margin)} />
     </section>
 
     <Card className="p-5">
       <h3 className="mb-4 font-bold">Payment Stages</h3>
       <Table columns={[
         { key: "name", label: "Stage", render: (stage) => <b>{stage.name}</b> },
-        { key: "percentage", label: "%", render: (stage) => `${Number(stage.percentage || 0)}%` },
+        { key: "percentage", label: "%", render: (stage) => formatPercentage(stage.percentage) },
         { key: "amount", label: "Amount", render: (stage) => money(stage.amount) },
         { key: "paid_amount", label: "Paid", render: (stage) => money(stage.paid_amount) },
         { key: "balance", label: "Balance", render: (stage) => money(stage.balance) },

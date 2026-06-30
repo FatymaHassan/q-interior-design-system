@@ -8,7 +8,8 @@ import MetricCard from "../../components/ui/MetricCard";
 import Table from "../../components/ui/Table";
 import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
-import { getExecutiveDashboard } from "../../services/api";
+import { getDashboardSummary, getExecutiveDashboard } from "../../services/api";
+import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 
 const colors = ["#0F2747", "#2563EB", "#14B8A6", "#22C55E", "#F59E0B", "#EF4444"];
 
@@ -17,8 +18,8 @@ export default function Dashboard() {
   const [filters, setFilters] = useState({ year: new Date().getFullYear(), month: "" });
   const [status, setStatus] = useState("loading");
 
-  const load = () => getExecutiveDashboard(clean(filters))
-    .then((data) => { setDashboard(data); setStatus("connected"); })
+  const load = () => Promise.all([getDashboardSummary(clean(filters)), getExecutiveDashboard(clean(filters))])
+    .then(([summary, data]) => { setDashboard({ ...data, kpis: summary }); setStatus("connected"); })
     .catch(() => setStatus("error"));
 
   useEffect(() => {
@@ -47,8 +48,9 @@ export default function Dashboard() {
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 min-[1340px]:grid-cols-4">
       <MetricCard label="Total Revenue" value={money(kpis.total_revenue)} icon={DollarSign} />
       <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} />
+      <MetricCard label="Gross Profit" value={money(kpis.gross_profit)} icon={TrendingUp} />
       <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} />
-      <MetricCard label="Profit Margin" value={`${kpis.profit_margin ?? 0}%`} icon={TrendingUp} />
+      <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} />
       <MetricCard label="Total Clients" value={kpis.total_clients ?? "..."} icon={Users} />
       <MetricCard label="Total Projects" value={kpis.total_projects ?? "..."} icon={Briefcase} />
       <MetricCard label="Total Employees" value={kpis.total_employees ?? "..."} icon={Users} />
@@ -133,7 +135,7 @@ export default function Dashboard() {
 
       <ChartCard title="Profit Trend" subtitle="Net movement after expenses for the selected period.">
         <ResponsiveContainer width="100%" height={210}>
-          <LineChart data={(charts.monthly_revenue_expenses || []).map((row) => ({ ...row, profit: Number(row.revenue || 0) - Number(row.expenses || 0) }))}>
+          <LineChart data={(charts.monthly_revenue_expenses || []).map((row) => ({ ...row, profit: toNumber(row.revenue) - toNumber(row.expenses) }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
             <XAxis dataKey="month" fontSize={11} />
             <YAxis fontSize={11} />
@@ -189,7 +191,7 @@ function InfoRows({ rows }) {
 }
 
 function money(value) {
-  return `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  return formatCurrency(value);
 }
 
 function dateLabel(value) {

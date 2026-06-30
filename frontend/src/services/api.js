@@ -544,6 +544,11 @@ export async function getExecutiveDashboard(params = {}) {
   return response.data;
 }
 
+export async function getDashboardSummary(params = {}) {
+  const response = await api.get("/dashboard/summary", { params });
+  return response.data;
+}
+
 export async function getClients() {
   const response = await api.get("/clients");
   return response.data.map(mapClient);

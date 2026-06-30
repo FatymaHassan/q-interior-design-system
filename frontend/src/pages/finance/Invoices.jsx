@@ -4,9 +4,10 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Table from "../../components/ui/Table";
 import { createInvoice, deleteInvoice, downloadInvoicePdf, getClients, getInvoices, getProjects, getSuppliers, sendInvoiceReminder, updateInvoice } from "../../services/api";
+import { formatCurrency, toNumber } from "../../utils/numberFormat";
 import { FinanceActionButton, FinanceHeader, FinanceMetric, FinanceNotice, FinanceSection } from "./financeUi";
 
-const money = (value) => `$${Number(value || 0).toLocaleString()}`;
+const money = (value) => formatCurrency(value);
 const fieldInputClass = "w-full rounded-xl border border-brand-border bg-white px-4 py-3 text-sm outline-none focus:border-brand-gold";
 const emptyItem = { description: "Design fees", quantity: 1, unit: "Unit", unit_price: 0 };
 
@@ -50,10 +51,10 @@ export default function Invoices() {
   }, [filterStatus]);
 
   const totals = useMemo(() => {
-    const subtotal = form.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
+    const subtotal = form.items.reduce((sum, item) => sum + toNumber(item.quantity) * toNumber(item.unit_price), 0);
     return {
       subtotal,
-      total: Math.max(0, subtotal - Number(form.discount || 0) + Number(form.tax || 0)),
+      total: Math.max(0, subtotal - toNumber(form.discount) + toNumber(form.tax)),
     };
   }, [form]);
 
@@ -63,14 +64,14 @@ export default function Invoices() {
       ...form,
       client_id: form.invoice_type === "client" ? form.client_id : null,
       supplier_id: form.invoice_type === "supplier" ? form.supplier_id : null,
-      discount: Number(form.discount || 0),
-      tax: Number(form.tax || 0),
+      discount: toNumber(form.discount),
+      tax: toNumber(form.tax),
       project_id: form.project_id || null,
       items: form.items.filter((item) => item.description).map((item) => ({
         description: item.description,
-        quantity: Number(item.quantity || 0),
+        quantity: toNumber(item.quantity),
         unit: item.unit || "Unit",
-        unit_price: Number(item.unit_price || 0),
+        unit_price: toNumber(item.unit_price),
       })),
     };
 

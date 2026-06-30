@@ -4,7 +4,9 @@ import ActionButton from "../../components/ui/ActionButton";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 
-export const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+import { formatCurrency } from "../../utils/numberFormat";
+
+export const money = (value) => formatCurrency(value);
 
 export function FinanceHeader({ eyebrow = "Finance", title, description, action, backTo, backLabel }) {
   return <Card className="px-5 py-4 md:px-6 md:py-5">

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\Setting;
+use App\Services\ProjectFinanceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -29,7 +30,7 @@ class ExpenseController extends Controller
             ->get();
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ProjectFinanceService $finance)
     {
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
@@ -60,7 +61,12 @@ class ExpenseController extends Controller
         ]);
         $data = $this->normalizeExpense($data, $request);
 
-        return Expense::create($data)->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
+        $expense = Expense::create($data);
+        if ($expense->project) {
+            $finance->refreshProject($expense->project);
+        }
+
+        return $expense->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
     public function show(Expense $expense)
@@ -68,7 +74,7 @@ class ExpenseController extends Controller
         return $expense->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
-    public function update(Request $request, Expense $expense)
+    public function update(Request $request, Expense $expense, ProjectFinanceService $finance)
     {
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
@@ -99,14 +105,24 @@ class ExpenseController extends Controller
         ]);
         $data = $this->normalizeExpense($data, $request, $expense);
 
+        $oldProject = $expense->project;
         $expense->update($data);
+        foreach ([$oldProject, $expense->project] as $project) {
+            if ($project) {
+                $finance->refreshProject($project);
+            }
+        }
 
         return $expense->load(['project', 'supplier', 'employee', 'categoryModel', 'approver']);
     }
 
-    public function destroy(Expense $expense)
+    public function destroy(Expense $expense, ProjectFinanceService $finance)
     {
+        $project = $expense->project;
         $expense->delete();
+        if ($project) {
+            $finance->refreshProject($project);
+        }
 
         return response()->json(['message' => 'Expense deleted successfully']);
     }

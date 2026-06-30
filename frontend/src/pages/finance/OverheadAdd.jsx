@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { getExpenseCategories } from "../../services/api";
+import { toNumber } from "../../utils/numberFormat";
 import { FinanceFormActions, FinanceHeader, FinanceMetric, FinanceNotice, FinanceSection, money } from "./financeUi";
 import { createOverhead } from "./overheadApi";
 
@@ -33,7 +34,7 @@ export default function OverheadAdd() {
     event.preventDefault();
     setError("");
     try {
-      await createOverhead({ ...form, category_id: form.category_id ? Number(form.category_id) : null, amount: Number(form.amount || 0) });
+      await createOverhead({ ...form, category_id: form.category_id ? Number(form.category_id) : null, amount: toNumber(form.amount) });
       navigate("/overheads");
     } catch {
       setError("Backend is not reachable or the overhead could not be saved.");
@@ -62,7 +63,7 @@ export default function OverheadAdd() {
         <FormField label="Category"><select name="category_id" value={form.category_id} onChange={updateField} className={fieldInputClass}><option value="">Manual category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></FormField>
         <FormField label="Manual category"><input name="category" value={form.category} onChange={updateField} placeholder="Rent, utilities, transport..." className={fieldInputClass} /></FormField>
         <FormField label="Paid by"><input name="paid_by" value={form.paid_by} onChange={updateField} placeholder="Admin, manager..." className={fieldInputClass} /></FormField>
-        <FormField label="Amount"><input name="amount" type="number" min="0" value={form.amount} onChange={updateField} required placeholder="0" className={fieldInputClass} /></FormField>
+        <FormField label="Amount"><input name="amount" type="number" min="0" step="0.01" value={form.amount} onChange={updateField} required placeholder="0" className={fieldInputClass} /></FormField>
         <FormField label="Overhead date"><input name="overhead_date" type="date" value={form.overhead_date} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={updateField} className={fieldInputClass}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
         <FormField label="Notes" className="lg:col-span-2"><textarea name="notes" value={form.notes} onChange={updateField} rows="3" className={fieldInputClass} /></FormField>

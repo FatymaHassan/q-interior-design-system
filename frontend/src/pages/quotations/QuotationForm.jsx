@@ -4,6 +4,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { createClient, getClients, getProjects, getQuotationPreviewUrl, getQuotationPdfUrl } from "../../services/api";
+import { formatCurrency, toNumber } from "../../utils/numberFormat";
 import { createQuotation, getQuotation, updateQuotation } from "./quotationApi";
 
 const unitTypes = ["M²", "Meter", "Piece", "Unit", "Set", "Day", "Hour", "Lump Sum", "Custom"];
@@ -96,7 +97,7 @@ export default function QuotationForm() {
 
   const totals = useMemo(() => {
     const subtotal = form.sections.flatMap((section) => section.rooms).flatMap((room) => room.items).reduce((sum, item) => sum + itemTotal(item), 0);
-    const profit = subtotal * Number(form.profit_percentage || 0) / 100;
+    const profit = subtotal * toNumber(form.profit_percentage) / 100;
     return { subtotal, profit, grand: subtotal + profit };
   }, [form.sections, form.profit_percentage]);
 
@@ -110,8 +111,8 @@ export default function QuotationForm() {
   const changeUnitType = (sectionIndex, roomIndex, itemIndex, unitType) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => {
     if (iIndex !== itemIndex) return item;
     const next = { ...item, unit_type: unitType, is_manual_total: unitType === "Custom" };
-    if (unitType === "Lump Sum" && !Number(next.quantity || 0)) next.quantity = 1;
-    if (unitType === "Lump Sum" && !Number(next.total || 0)) next.total = Number(next.rate || 0);
+    if (unitType === "Lump Sum" && !toNumber(next.quantity)) next.quantity = 1;
+    if (unitType === "Lump Sum" && !toNumber(next.total)) next.total = toNumber(next.rate);
     return next;
   }) } : room) } : section) }));
 
@@ -124,7 +125,7 @@ export default function QuotationForm() {
       title: form.title || form.project_title,
       client_id: Number(form.client_id),
       project_id: form.project_id ? Number(form.project_id) : null,
-      profit_percentage: Number(form.profit_percentage || 0),
+      profit_percentage: toNumber(form.profit_percentage),
       sections: form.sections.map((section, sectionIndex) => ({
         ...section,
         sort_order: sectionIndex,
@@ -134,10 +135,10 @@ export default function QuotationForm() {
           items: room.items.map((item, itemIndex) => ({
             description: item.description,
             unit_type: item.unit_type,
-            quantity: item.unit_type === "Lump Sum" ? Number(item.quantity || 1) : Number(item.quantity || 0),
-            rate: Number(item.rate || 0),
-            discount: Number(item.discount || 0),
-            tax: Number(item.tax || 0),
+            quantity: item.unit_type === "Lump Sum" ? toNumber(item.quantity || 1) : toNumber(item.quantity),
+            rate: toNumber(item.rate),
+            discount: toNumber(item.discount),
+            tax: toNumber(item.tax),
             total: itemTotal(item),
             is_manual_total: Boolean(item.is_manual_total || item.unit_type === "Custom"),
             notes: item.notes,
@@ -216,7 +217,7 @@ export default function QuotationForm() {
                       <input value={item.tax} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "tax", event.target.value)} type="number" min="0" step="0.01" placeholder="Tax" className={fieldInputClass} />
                       {item.unit_type === "Custom" || item.unit_type === "Lump Sum"
                         ? <input value={item.total} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "total", event.target.value)} type="number" min="0" step="0.01" placeholder="Total" className={fieldInputClass} />
-                        : <div className="rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">${itemTotal(item).toLocaleString()}</div>}
+                        : <div className="rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">{formatCurrency(itemTotal(item))}</div>}
                       <input value={item.notes} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "notes", event.target.value)} placeholder="Notes" className={fieldInputClass} />
                     </div>)}
                   </div>
@@ -228,9 +229,9 @@ export default function QuotationForm() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <FormField label="Profit %"><input name="profit_percentage" value={form.profit_percentage} onChange={updateField} type="number" min="0" max="100" className={fieldInputClass} /></FormField>
-          <div className="rounded-xl bg-brand-soft p-4"><p className="text-sm text-brand-muted">Subtotal</p><b>${totals.subtotal.toLocaleString()}</b></div>
-          <div className="rounded-xl bg-brand-primary p-4 text-white"><p className="text-sm text-white/70">Grand Total</p><b>${totals.grand.toLocaleString()}</b></div>
+          <FormField label="Profit %"><input name="profit_percentage" value={form.profit_percentage} onChange={updateField} type="number" min="0" max="100" step="0.01" className={fieldInputClass} /></FormField>
+          <div className="rounded-xl bg-brand-soft p-4"><p className="text-sm text-brand-muted">Subtotal</p><b>{formatCurrency(totals.subtotal)}</b></div>
+          <div className="rounded-xl bg-brand-primary p-4 text-white"><p className="text-sm text-white/70">Grand Total</p><b>{formatCurrency(totals.grand)}</b></div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -250,9 +251,9 @@ export default function QuotationForm() {
 }
 
 function itemTotal(item) {
-  const quantity = item.unit_type === "Lump Sum" ? 1 : Number(item.quantity || 0);
-  const rate = Number(item.rate || 0);
-  if (item.unit_type === "Custom" || item.is_manual_total) return Math.max(Number(item.total || 0) - Number(item.discount || 0) + Number(item.tax || 0), 0);
-  const base = item.unit_type === "Lump Sum" ? Number(item.total || rate || 0) : quantity * rate;
-  return Math.max(base - Number(item.discount || 0) + Number(item.tax || 0), 0);
+  const quantity = item.unit_type === "Lump Sum" ? 1 : toNumber(item.quantity);
+  const rate = toNumber(item.rate);
+  if (item.unit_type === "Custom" || item.is_manual_total) return Math.max(toNumber(item.total) - toNumber(item.discount) + toNumber(item.tax), 0);
+  const base = item.unit_type === "Lump Sum" ? toNumber(item.total || rate) : quantity * rate;
+  return Math.max(base - toNumber(item.discount) + toNumber(item.tax), 0);
 }

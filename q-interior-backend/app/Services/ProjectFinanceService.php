@@ -16,11 +16,16 @@ class ProjectFinanceService
     {
         $contract = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: 0);
         $paid = (float) $project->payments()->clientRevenue()->where('status', '!=', 'cancelled')->sum('amount');
+        $projectCost = (float) $project->expenses()
+            ->where('approval_status', '!=', 'Rejected')
+            ->where(fn ($query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'))
+            ->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
         $remaining = max(0, $contract - $paid);
 
         $project->forceFill([
             'contract_amount' => $contract,
             'deposit_amount' => round($contract * ((float) ($project->deposit_percentage ?: 0)) / 100, 2),
+            'actual_cost' => round($projectCost, 2),
             'paid_amount' => round($paid, 2),
             'remaining_balance' => round($remaining, 2),
             'payment_percentage' => $contract > 0 ? round(($paid / $contract) * 100, 2) : 0,
@@ -127,15 +132,16 @@ class ProjectFinanceService
         $supplierPayables = (float) $supplierInvoices->sum('balance_due');
         $received = (float) $clientPayments->sum('amount');
         $expected = (float) $project->contract_amount;
+        $projectRevenue = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: $received);
         $cost = $projectExpenses + $supplierCosts;
-        $profit = $received - $projectExpenses - $supplierCosts;
+        $profit = $projectRevenue - $cost;
 
         return [
             'project' => $project->load('client'),
             'metrics' => [
-                'expected_revenue' => round($expected, 2),
+                'expected_revenue' => round($projectRevenue, 2),
                 'received_revenue' => round($received, 2),
-                'outstanding_client_balance' => round(max(0, $expected - $received), 2),
+                'outstanding_client_balance' => round(max(0, $projectRevenue - $received), 2),
                 'payment_percentage' => (float) $project->payment_percentage,
                 'total_project_cost' => round($cost, 2),
                 'design_costs' => $expenseBreakdown['Design Costs'],
@@ -147,7 +153,7 @@ class ProjectFinanceService
                 'supplier_costs' => round($supplierCosts, 2),
                 'supplier_payables' => round($supplierPayables, 2),
                 'project_profit' => round($profit, 2),
-                'profit_margin' => $expected > 0 ? round(($profit / $expected) * 100, 2) : 0,
+                'profit_margin' => $projectRevenue > 0 ? round(($profit / $projectRevenue) * 100, 2) : 0,
             ],
             'payment_stages' => $project->paymentStages()->with('invoice')->orderBy('id')->get(),
             'expense_breakdown' => $expenseBreakdown,

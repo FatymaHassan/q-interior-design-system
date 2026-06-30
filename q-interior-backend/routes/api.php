@@ -158,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/performance-reviews', [EmployeePortalController::class, 'performanceReviews']);
 
     Route::get('/dashboard/phase-one', PhaseOneDashboardController::class);
+    Route::get('/dashboard/summary', [ReportsController::class, 'dashboardSummary']);
     Route::get('/dashboard/executive', [ReportsController::class, 'executiveDashboard']);
     Route::get('/reports', [ReportsController::class, 'index'])->middleware('role:admin,manager,finance');
     Route::get('/backups', [BackupController::class, 'index'])->middleware('role:admin');

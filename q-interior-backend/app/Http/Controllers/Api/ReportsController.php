@@ -18,6 +18,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\Supplier;
 use App\Models\Task;
+use App\Services\DashboardSummaryService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -83,43 +84,17 @@ class ReportsController extends Controller
         ];
     }
 
-    public function executiveDashboard(Request $request)
+    public function dashboardSummary(Request $request, DashboardSummaryService $summaryService)
     {
-        [$start, $end] = $this->period($request);
+        return response()->json($summaryService->summary($request));
+    }
 
-        $revenue = Payment::clientRevenue()->when($start, fn ($q) => $q->whereBetween('payment_date', [$start, $end]))->sum('amount');
-        $expenses = Expense::when($start, fn ($q) => $q->whereBetween('expense_date', [$start, $end]))->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
-        $overheads = DB::table('overheads')->when($start, fn ($q) => $q->whereBetween('overhead_date', [$start, $end]))->sum('amount');
-        $payroll = Payroll::when($request->filled('year'), fn ($q) => $q->where('year', $request->integer('year')))->sum('net_salary');
-        $grossProfit = $revenue - $expenses;
-        $netProfit = $grossProfit - $overheads - $payroll;
+    public function executiveDashboard(Request $request, DashboardSummaryService $summaryService)
+    {
+        $kpis = $summaryService->summary($request);
 
         return [
-            'kpis' => [
-                'total_revenue' => round($revenue, 2),
-                'total_expenses' => round($expenses + $overheads + $payroll, 2),
-                'gross_profit' => round($grossProfit, 2),
-                'net_profit' => round($netProfit, 2),
-                'profit_margin' => $revenue > 0 ? round(($netProfit / $revenue) * 100, 2) : 0,
-                'active_projects' => Project::where('status', 'In Progress')->count(),
-                'total_clients' => Client::count(),
-                'total_projects' => Project::count(),
-                'total_employees' => Employee::count(),
-                'total_documents' => Document::count(),
-                'completed_projects' => Project::where('status', 'Completed')->count(),
-                'pending_quotations' => Quotation::whereIn('status', ['Draft', 'Sent', 'Pending', 'Revision Requested'])->count(),
-                'approved_quotations' => Quotation::where('status', 'Approved')->count(),
-                'outstanding_invoices' => Invoice::whereNotIn('status', ['Paid', 'Cancelled'])->count(),
-                'overdue_payments' => Invoice::whereDate('due_date', '<', now())->whereNotIn('status', ['Paid', 'Cancelled'])->count(),
-                'pending_tasks' => Task::whereNotIn('status', ['Done', 'Completed'])->count(),
-                'overdue_tasks' => Task::whereDate('deadline', '<', now())->whereNotIn('status', ['Done', 'Completed'])->count(),
-                'low_stock_materials' => Material::get()->filter(fn ($material) => $material->stock_status !== 'In Stock')->count(),
-                'pending_purchase_orders' => PurchaseOrder::whereIn('status', ['Draft', 'Ordered', 'Partially Received'])->count(),
-                'active_employees' => Employee::where('status', 'Active')->count(),
-                'pending_leave_requests' => LeaveRequest::where('status', 'Pending')->count(),
-                'payroll_pending_approval' => Payroll::where('approval_status', 'Pending')->count(),
-                'supplier_outstanding_balance' => Supplier::sum(DB::raw('COALESCE(current_balance, balance, 0)')),
-            ],
+            'kpis' => [...$kpis, 'total_documents' => Document::count()],
             'charts' => [
                 'monthly_revenue_expenses' => $this->monthlyRevenueExpenses(),
                 'project_status_breakdown' => Project::select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->get(),
