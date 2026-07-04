@@ -935,9 +935,6 @@ class HrController extends Controller
         $required = $partial ? 'sometimes|' : '';
         return $request->validate([
             'name' => $required . 'required|string|max:255',
-            'map_code' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'map_url' => 'nullable|string|max:2048',
             'latitude' => $required . 'required|numeric',
             'longitude' => $required . 'required|numeric',
             'allowed_radius_meters' => $required . 'required|integer|min:10|max:5000',

@@ -8,9 +8,6 @@ class OfficeLocation extends Model
 {
     protected $fillable = [
         'name',
-        'map_code',
-        'address',
-        'map_url',
         'latitude',
         'longitude',
         'allowed_radius_meters',
