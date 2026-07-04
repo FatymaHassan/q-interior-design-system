@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-bg: #F5F7FB;
+  --color-brand-bg: #F7F8F5;
   --color-brand-surface: #FFFFFF;
-  --color-brand-soft: #EEF2F7;
+  --color-brand-soft: #F0F4F1;
 
-  --color-brand-primary: #0F2747;
-  --color-brand-primaryLight: #1E5A92;
-  --color-brand-primaryDark: #081827;
+  --color-brand-primary: #18342F;
+  --color-brand-primaryLight: #25685E;
+  --color-brand-primaryDark: #0D211D;
 
-  --color-brand-gold: #2563EB;
-  --color-brand-goldSoft: #DBEAFE;
+  --color-brand-gold: #0F766E;
+  --color-brand-goldSoft: #D9F3EE;
 
   --color-brand-text: #111827;
   --color-brand-muted: #667085;
-  --color-brand-border: #E2E8F0;
+  --color-brand-border: #DFE7E2;
 
   --color-brand-success: #15803D;
   --color-brand-warning: #B45309;
   --color-brand-danger: #B42318;
 
-  --shadow-card: 0 14px 36px rgba(15, 23, 42, 0.07);
+  --shadow-card: 0 12px 32px rgba(17, 24, 39, 0.07);
   --font-display: Inter, system-ui, sans-serif;
 }
 
@@ -37,8 +37,8 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34rem),
-    linear-gradient(180deg, #F8FAFC 0%, #F5F7FB 46%, #EEF2F7 100%);
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 32rem),
+    linear-gradient(180deg, #FBFCFA 0%, #F7F8F5 48%, #EEF4F1 100%);
   color: #111827;
   font-family: Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -60,8 +60,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  border-color: #0F766E;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
   outline: none;
 }
 
@@ -83,5 +83,5 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
+  background: rgba(15, 118, 110, 0.18);
 }

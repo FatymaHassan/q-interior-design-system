@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Boxes, Briefcase, CheckCircle, DollarSign, FileText, TrendingUp, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Boxes, Briefcase, CheckCircle, DollarSign, FileText, Plus, TrendingUp, Users, Wallet } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -8,10 +8,11 @@ import MetricCard from "../../components/ui/MetricCard";
 import Table from "../../components/ui/Table";
 import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
+import LoadingState from "../../components/ui/LoadingState";
 import { getDashboardSummary, getExecutiveDashboard } from "../../services/api";
 import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 
-const colors = ["#0F2747", "#2563EB", "#14B8A6", "#22C55E", "#F59E0B", "#EF4444"];
+const colors = ["#18342F", "#0F766E", "#25685E", "#15803D", "#B45309", "#B42318"];
 
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
@@ -30,11 +31,18 @@ export default function Dashboard() {
   const charts = dashboard?.charts || {};
   const recent = dashboard?.recent || {};
 
-  return <div className="space-y-4">
+  const alertRows = [
+    { label: "Overdue payments", value: kpis.overdue_payments, tone: "danger", to: "/invoices" },
+    { label: "Pending tasks", value: kpis.pending_tasks, tone: "warning", to: "/daily-tasks" },
+    { label: "Low stock materials", value: kpis.low_stock_materials, tone: "warning", to: "/inventory" },
+    { label: "Pending leave requests", value: kpis.pending_leave_requests, tone: "default", to: "/hr/leave" },
+  ];
+
+  return <div className="space-y-5">
     <PageHeader
       eyebrow="Executive Dashboard"
       title="Management Overview"
-      description="Finance, projects, quotations, HR, inventory, and daily operations in one clear workspace."
+      description="Live finance, delivery, client, inventory, and HR signals for daily management decisions."
       action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <select value={filters.month} onChange={(event) => setFilters({ ...filters, month: event.target.value })} className="h-10 rounded-lg border border-brand-border bg-white px-3 text-sm"><option value="">All months</option>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select>
           <input type="number" value={filters.year} onChange={(event) => setFilters({ ...filters, year: event.target.value })} className="h-10 w-full rounded-lg border border-brand-border bg-white px-3 text-sm sm:w-24" />
@@ -43,26 +51,70 @@ export default function Dashboard() {
         </div>}
     />
 
+    {status === "loading" && <LoadingState label="Loading live dashboard data..." />}
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">Dashboard could not be loaded. Please check the backend connection.</Card>}
 
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 min-[1340px]:grid-cols-4">
-      <MetricCard label="Total Revenue" value={money(kpis.total_revenue)} icon={DollarSign} />
-      <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} />
-      <MetricCard label="Gross Profit" value={money(kpis.gross_profit)} icon={TrendingUp} />
-      <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} />
-      <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} />
-      <MetricCard label="Total Clients" value={kpis.total_clients ?? "..."} icon={Users} />
-      <MetricCard label="Total Projects" value={kpis.total_projects ?? "..."} icon={Briefcase} />
-      <MetricCard label="Total Employees" value={kpis.total_employees ?? "..."} icon={Users} />
-      <MetricCard label="Documents" value={kpis.total_documents ?? "..."} icon={FileText} />
-      <MetricCard label="Active Projects" value={kpis.active_projects ?? "..."} icon={Briefcase} />
-      <MetricCard label="Completed Projects" value={kpis.completed_projects ?? "..."} icon={CheckCircle} />
-      <MetricCard label="Pending Quotations" value={kpis.pending_quotations ?? "..."} icon={FileText} />
-      <MetricCard label="Approved Quotations" value={kpis.approved_quotations ?? "..."} icon={FileText} />
-      <MetricCard label="Outstanding Invoices" value={kpis.outstanding_invoices ?? "..."} icon={AlertTriangle} />
-      <MetricCard label="Overdue Tasks" value={kpis.overdue_tasks ?? "..."} icon={AlertTriangle} />
-      <MetricCard label="Low Stock Materials" value={kpis.low_stock_materials ?? "..."} icon={Boxes} />
-      <MetricCard label="Active Employees" value={kpis.active_employees ?? "..."} icon={Users} />
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard label="Total Revenue" value={money(kpis.total_revenue)} icon={DollarSign} helper="Client payments collected" />
+      <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} helper="Project, payroll, and overhead costs" />
+      <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} tone={toNumber(kpis.net_profit) >= 0 ? "success" : "danger"} helper="After recorded company costs" />
+      <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} tone="success" helper="Business margin for this view" />
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-[1fr_360px]">
+      <Card className="p-4 md:p-5">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-black text-brand-primary">Business Health</h2>
+            <p className="mt-1 text-sm text-brand-muted">A quick read of the areas managers check most often.</p>
+          </div>
+          <Link to="/reports" className="inline-flex items-center gap-2 text-sm font-bold text-brand-gold">Open reports <ArrowRight size={16} /></Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <HealthTile label="Active projects" value={kpis.active_projects} icon={Briefcase} />
+          <HealthTile label="Clients" value={kpis.total_clients} icon={Users} />
+          <HealthTile label="Pending quotes" value={kpis.pending_quotations} icon={FileText} />
+          <HealthTile label="Employees" value={kpis.active_employees ?? kpis.total_employees} icon={Users} />
+          <HealthTile label="Documents" value={kpis.total_documents} icon={FileText} />
+          <HealthTile label="Outstanding invoices" value={kpis.outstanding_invoices} icon={AlertTriangle} />
+          <HealthTile label="Completed projects" value={kpis.completed_projects} icon={CheckCircle} />
+          <HealthTile label="Purchase orders" value={kpis.pending_purchase_orders} icon={Boxes} />
+        </div>
+      </Card>
+
+      <SectionCard title="Quick Actions" subtitle="Create the records teams use every day.">
+        <div className="grid grid-cols-1 gap-2">
+          <QuickLink to="/projects/add" label="New project" />
+          <QuickLink to="/payments/add" label="Record payment" />
+          <QuickLink to="/expenses/add" label="Add expense" />
+          <QuickLink to="/quotations/add" label="Create quotation" />
+        </div>
+      </SectionCard>
+    </section>
+
+    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+      <ChartCard title="Monthly Profit / Loss" subtitle="Revenue, expenses, and profit movement for the selected year.">
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={(charts.monthly_revenue_expenses || []).map((row) => ({ ...row, profit: toNumber(row.revenue) - toNumber(row.expenses) }))}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#DFE7E2" />
+            <XAxis dataKey="month" fontSize={11} />
+            <YAxis fontSize={11} />
+            <Tooltip formatter={(value) => money(value)} />
+            <Line type="monotone" dataKey="revenue" stroke="#18342F" strokeWidth={3} dot={false} />
+            <Line type="monotone" dataKey="expenses" stroke="#B42318" strokeWidth={3} dot={false} />
+            <Line type="monotone" dataKey="profit" stroke="#0F766E" strokeWidth={3} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
+
+      <SectionCard title="Notifications & Alerts" subtitle="Items that need attention.">
+        <div className="space-y-2">
+          {alertRows.map((row) => <Link key={row.label} to={row.to} className="flex items-center justify-between gap-3 rounded-lg border border-brand-border bg-brand-soft/55 p-3 text-sm transition hover:border-teal-200 hover:bg-white">
+            <span className="flex items-center gap-2 font-semibold text-brand-primary"><AlertTriangle size={16} className={row.tone === "danger" ? "text-brand-danger" : "text-brand-warning"} />{row.label}</span>
+            <b className="text-brand-primary">{row.value ?? 0}</b>
+          </Link>)}
+        </div>
+      </SectionCard>
     </section>
 
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
@@ -120,28 +172,16 @@ export default function Dashboard() {
     </section>
 
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-2">
-      <ChartCard title="Monthly Revenue vs Expenses" subtitle="Compare income and spending performance by month.">
+      <ChartCard title="Revenue vs Expenses" subtitle="Compare income and spending performance by month.">
         <ResponsiveContainer width="100%" height={210}>
           <BarChart data={charts.monthly_revenue_expenses || []}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#DFE7E2" />
             <XAxis dataKey="month" fontSize={11} />
             <YAxis fontSize={11} />
-            <Tooltip />
-            <Bar dataKey="revenue" fill="#0F2747" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="expenses" fill="#2563EB" radius={[8, 8, 0, 0]} />
+            <Tooltip formatter={(value) => money(value)} />
+            <Bar dataKey="revenue" fill="#18342F" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="expenses" fill="#0F766E" radius={[6, 6, 0, 0]} />
           </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
-
-      <ChartCard title="Profit Trend" subtitle="Net movement after expenses for the selected period.">
-        <ResponsiveContainer width="100%" height={210}>
-          <LineChart data={(charts.monthly_revenue_expenses || []).map((row) => ({ ...row, profit: toNumber(row.revenue) - toNumber(row.expenses) }))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-            <XAxis dataKey="month" fontSize={11} />
-            <YAxis fontSize={11} />
-            <Tooltip />
-            <Line type="monotone" dataKey="profit" stroke="#14b8a6" strokeWidth={3} dot={false} />
-          </LineChart>
         </ResponsiveContainer>
       </ChartCard>
 
@@ -162,7 +202,7 @@ export default function Dashboard() {
     </section>
 
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-3">
-      <SectionCard title="Operational Alerts" subtitle="Items that need management attention."><InfoRows rows={[
+      <SectionCard title="Operational Summary" subtitle="Secondary management numbers."><InfoRows rows={[
         ["Overdue Payments", kpis.overdue_payments],
         ["Pending Tasks", kpis.pending_tasks],
         ["Pending Purchase Orders", kpis.pending_purchase_orders],
@@ -179,15 +219,25 @@ function ChartCard({ title, subtitle, children }) {
   return <SectionCard title={title} subtitle={subtitle}>{children}</SectionCard>;
 }
 
-function SectionHeading({ title, subtitle }) {
-  return <div className="mb-4">
-    <h2 className="font-black text-brand-primary">{title}</h2>
-    {subtitle && <p className="mt-1 text-sm text-brand-muted">{subtitle}</p>}
+function InfoRows({ rows }) {
+  return <div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="flex justify-between gap-3 rounded-lg border border-brand-border bg-brand-soft/70 p-3 text-sm"><span className="text-brand-muted">{label}</span><b className="text-right text-brand-primary">{value ?? 0}</b></div>)}</div>;
+}
+
+function HealthTile({ label, value, icon: Icon }) {
+  return <div className="rounded-lg border border-brand-border bg-brand-soft/60 p-3">
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs font-bold uppercase tracking-wide text-brand-muted">{label}</span>
+      <Icon size={16} className="shrink-0 text-brand-gold" />
+    </div>
+    <b className="mt-2 block text-xl text-brand-primary">{value ?? "..."}</b>
   </div>;
 }
 
-function InfoRows({ rows }) {
-  return <div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="flex justify-between gap-3 rounded-xl border border-brand-border bg-brand-soft/70 p-3 text-sm"><span className="text-brand-muted">{label}</span><b className="text-right text-brand-primary">{value ?? 0}</b></div>)}</div>;
+function QuickLink({ to, label }) {
+  return <Link to={to} className="flex items-center justify-between gap-3 rounded-lg border border-brand-border bg-white px-3 py-3 text-sm font-bold text-brand-primary transition hover:border-teal-200 hover:bg-brand-goldSoft">
+    <span className="flex items-center gap-2"><Plus size={16} className="text-brand-gold" />{label}</span>
+    <ArrowRight size={16} />
+  </Link>;
 }
 
 function money(value) {
