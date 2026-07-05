@@ -6,6 +6,7 @@ import ProjectAdd from "../pages/projects/ProjectAdd";
 import ProjectEdit from "../pages/projects/ProjectEdit";
 import ProjectDetails from "../pages/projects/ProjectDetails";
 import ProjectPlans from "../pages/projects/ProjectPlans";
+import ProjectPlanForm from "../pages/projects/ProjectPlanForm";
 import ProjectClientPayments from "../pages/projects/ProjectClientPayments";
 import ProjectExpensesWorkspace from "../pages/projects/ProjectExpensesWorkspace";
 import ProjectBoard from "../pages/project-board/ProjectBoard";
@@ -99,6 +100,8 @@ export default function AppRoutes() {
         <Route path="/clients/:id/edit" element={<ClientEdit />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/project-plans" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProjectPlans /></RoleRoute>} />
+        <Route path="/project-plans/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProjectPlanForm /></RoleRoute>} />
+        <Route path="/project-plans/:projectId/edit" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProjectPlanForm /></RoleRoute>} />
         <Route path="/project-client-payments" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProjectClientPayments /></RoleRoute>} />
         <Route path="/project-expenses" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProjectExpensesWorkspace /></RoleRoute>} />
         <Route path="/project-board" element={<ProjectBoard />} />
