@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
+import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
 import { userHasRole } from "../../services/api";
 
 const sections = [
@@ -91,54 +91,57 @@ function SidebarContent({ onNavigate }) {
   }, [activeSection]);
 
   return <>
-    <div className="mb-3 flex items-center gap-3 px-2">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-black text-brand-primary shadow-sm">Q</div>
+    <div className="mb-3 flex items-center justify-between border-b border-white/10 px-1 pb-4 pt-1">
       <div className="min-w-0">
-        <h1 className="text-xl font-black leading-tight text-white">Q Interior</h1>
-        <p className="mt-0.5 text-xs font-medium text-white/55">Company management</p>
+        <h1 className="text-xl font-semibold leading-tight text-white">Q Interior</h1>
+        <p className="mt-1 text-xs font-medium text-white/45">Company management</p>
       </div>
+      <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/12 bg-white/10 text-white/70 shadow-sm transition hover:bg-white/16 hover:text-white" aria-label="Collapse sidebar">
+        <ChevronLeft size={16} />
+      </button>
     </div>
 
-    <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 scrollbar-soft">
+    <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 scrollbar-soft">
       {visibleSections.map((section) => {
         const isOpen = openSection === section.label;
         const hasActiveItem = section.items.some((item) => isItemActive(location.pathname, item));
-        const SectionIcon = section.items[0]?.icon || LayoutDashboard;
 
-        return <div key={section.label} className="rounded-xl border border-white/8 bg-white/[0.035] p-1">
+        return <div key={section.label} className="py-0.5">
           <button
             type="button"
             onClick={() => setOpenSection((current) => current === section.label ? "" : section.label)}
-            className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition ${hasActiveItem || isOpen ? "bg-white/12 text-white" : "text-white/70 hover:bg-white/8 hover:text-white"}`}
+            className={`flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[15px] transition ${
+              hasActiveItem || isOpen
+                ? "bg-white/17 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                : "text-white/62 hover:bg-white/8 hover:text-white"
+            }`}
             aria-expanded={isOpen}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
-              <SectionIcon size={16} />
-            </span>
-            <span className="min-w-0 flex-1 truncate font-bold">{section.label}</span>
-            <ChevronDown size={16} className={`shrink-0 transition ${isOpen ? "rotate-180" : ""}`} />
+            <span className="min-w-0 flex-1 truncate font-medium">{section.label}</span>
+            <ChevronDown size={15} className={`shrink-0 text-white/55 transition ${isOpen ? "rotate-180 text-white" : ""}`} />
           </button>
 
           <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
             <div className="overflow-hidden">
-              <div className="space-y-1 pb-1 pt-1.5">
+              <div className="ml-3 mt-1 space-y-0.5 border-l border-white/14 py-1 pl-3">
                 {section.items.map((item) => {
-              const Icon = item.icon;
-              return <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/hr" || item.to === "/finance" || item.to === "/dashboard"}
-                onClick={onNavigate}
-                className={({ isActive }) => `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
-                  isActive ? "bg-white text-brand-primary shadow-sm" : "text-white/68 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/10 group-hover:bg-white/15">
-                  <Icon size={16} />
-                </span>
-                <span className="truncate font-semibold">{item.label}</span>
-              </NavLink>;
-            })}
+                  const Icon = item.icon;
+                  return <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/hr" || item.to === "/finance" || item.to === "/dashboard"}
+                    onClick={onNavigate}
+                    className={({ isActive }) => `group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition ${
+                      isActive ? "text-white" : "text-white/56 hover:bg-white/7 hover:text-white"
+                    }`}
+                  >
+                    {({ isActive }) => <>
+                      <span className={`absolute -left-[13px] top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full transition ${isActive ? "bg-brand-gold" : "bg-transparent"}`} />
+                      <Icon size={15} className={`shrink-0 transition ${isActive ? "text-brand-gold" : "text-white/42 group-hover:text-white/72"}`} />
+                      <span className={`truncate ${isActive ? "font-semibold" : "font-medium"}`}>{item.label}</span>
+                    </>}
+                  </NavLink>;
+                })}
               </div>
             </div>
           </div>
@@ -150,7 +153,7 @@ function SidebarContent({ onNavigate }) {
 
 export default function Sidebar({ open = false, onClose }) {
   return <>
-    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-white/10 bg-brand-primaryDark p-3 text-brand-bg shadow-2xl lg:flex">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-white/10 bg-brand-primaryDark p-4 text-brand-bg shadow-2xl lg:flex">
       <SidebarContent />
     </aside>
 
