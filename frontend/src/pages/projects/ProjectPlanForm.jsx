@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Save } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import LoadingState from "../../components/ui/LoadingState";
 import {
   createProjectPaymentStage,
-  deleteProjectPaymentStage,
   getProjectFinanceSummary,
   getProjects,
   getProjectStages,
   updateProject,
-  updateProjectPaymentStage,
 } from "../../services/api";
 import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 
@@ -54,14 +52,22 @@ export default function ProjectPlanForm() {
   const [projects, setProjects] = useState([]);
   const [stages, setStages] = useState([]);
   const [plan, setPlan] = useState(createEmptyPlan());
-  const [items, setItems] = useState([createEmptyItem()]);
+  const [item, setItem] = useState(createEmptyItem());
+  const [existingItems, setExistingItems] = useState([]);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
   const [status, setStatus] = useState("loading");
 
   const selectedProject = useMemo(() => projects.find((project) => String(project.id) === String(plan.project_id)), [projects, plan.project_id]);
   const contractAmount = toNumber(plan.contract_amount);
-  const totalPlanned = items.reduce((sum, item) => sum + expectedAmount(item, contractAmount), 0);
-  const totalPercentage = items.reduce((sum, item) => item.payment_type === "percentage" ? sum + toNumber(item.percentage) : sum, 0);
+  const existingPlanned = existingItems.reduce((sum, row) => sum + toNumber(row.amount), 0);
+  const existingPercentage = existingItems.reduce((sum, row) => sum + toNumber(row.percentage), 0);
+  const newItemAmount = expectedAmount(item, contractAmount);
+  const newItemPercentage = item.payment_type === "percentage" ? toNumber(item.percentage) : 0;
+  const totalPlanned = existingPlanned + newItemAmount;
+  const totalPercentage = existingPercentage + newItemPercentage;
+  const remainingPercentage = Math.max(0, 100 - existingPercentage);
+  const planIsFull = existingPercentage >= 100;
   const depositAmount = plan.deposit_amount !== "" ? toNumber(plan.deposit_amount) : Number(((contractAmount * toNumber(plan.deposit_percentage)) / 100).toFixed(2));
   const remainingBalance = Math.max(0, contractAmount - toNumber(selectedProject?.paidAmount));
 
@@ -85,7 +91,6 @@ export default function ProjectPlanForm() {
   }, [plan.project_id, projects]);
 
   const loadProjectPlan = async (project) => {
-    setNotice("");
     const raw = project.raw || {};
     try {
       const summary = await getProjectFinanceSummary(project.id);
@@ -113,10 +118,12 @@ export default function ProjectPlanForm() {
         remaining_balance: metrics.balance_receivable ?? project.remainingBalance ?? "",
         progress: raw.progress ?? project.progress ?? "",
       });
-      setItems((summary?.payment_stages || []).length ? summary.payment_stages.map(mapStageToItem) : [createEmptyItem()]);
+      setExistingItems(summary?.payment_stages || []);
+      setItem(createEmptyItem());
     } catch {
       setPlan((current) => ({ ...current, project_id: project.id }));
-      setItems([createEmptyItem()]);
+      setExistingItems([]);
+      setItem(createEmptyItem());
     }
   };
 
@@ -137,23 +144,23 @@ export default function ProjectPlanForm() {
     });
   };
 
-  const updateItem = (index, field, value) => setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
-  const addItem = () => setItems((current) => [...current, createEmptyItem()]);
-
-  const removeItem = async (index) => {
-    const item = items[index];
-    if (item.id && !window.confirm("Delete this payment plan row?")) return;
-    if (item.id) await deleteProjectPaymentStage(item.id);
-    setItems((current) => {
-      const next = current.filter((_, itemIndex) => itemIndex !== index);
-      return next.length ? next : [createEmptyItem()];
-    });
-  };
+  const updateItem = (field, value) => setItem((current) => ({ ...current, [field]: value }));
 
   const savePlan = async (event) => {
     event.preventDefault();
     setNotice("");
+    setError("");
     if (!plan.project_id) return;
+
+    const hasNewPlanItem = item.name || item.amount || item.percentage || item.due_date || item.due_condition;
+    if (hasNewPlanItem && planIsFull) {
+      setError("This project plan is already full. You cannot add more plan items because it already reached 100%.");
+      return;
+    }
+    if (hasNewPlanItem && item.payment_type === "percentage" && totalPercentage > 100) {
+      setError(`This project plan is already full enough. Remaining percentage: ${remainingPercentage.toFixed(2)}%.`);
+      return;
+    }
 
     await updateProject(plan.project_id, {
       location: plan.location,
@@ -172,22 +179,23 @@ export default function ProjectPlanForm() {
       progress: toNumber(plan.progress),
     });
 
-    await Promise.all(items.filter((item) => item.name || item.amount || item.percentage || item.due_date || item.due_condition).map((item) => {
-      const payload = {
+    if (hasNewPlanItem) {
+      await createProjectPaymentStage(plan.project_id, {
         name: item.name || "Payment stage",
         payment_type: item.payment_type,
         percentage: item.payment_type === "percentage" ? toNumber(item.percentage) : 0,
-        amount: expectedAmount(item, contractAmount),
+        amount: newItemAmount,
         due_date: item.due_date || null,
         due_condition: item.due_condition,
         status: item.status || "Pending",
         notes: item.notes,
-      };
-      return item.id ? updateProjectPaymentStage(item.id, payload) : createProjectPaymentStage(plan.project_id, payload);
-    }));
+      });
+    }
 
-    setNotice("Project plan saved.");
     navigate(`/project-plans/${plan.project_id}/edit`, { replace: true });
+    const project = projects.find((row) => String(row.id) === String(plan.project_id));
+    if (project) await loadProjectPlan(project);
+    setNotice(hasNewPlanItem ? "Project plan item saved." : "Project plan details saved.");
   };
 
   if (status === "loading") return <LoadingState label="Loading project plan..." />;
@@ -197,13 +205,15 @@ export default function ProjectPlanForm() {
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div>
         <h1 className="font-display text-3xl font-bold text-brand-primary">{projectId ? "Edit Project Plan" : "Add Project Plan"}</h1>
-        <p className="mt-1 text-sm text-brand-muted">Enter the project plan in the same order as the Excel sheet, then add payment rows below.</p>
+        <p className="mt-1 text-sm text-brand-muted">Choose the project, then add one flexible plan item at a time.</p>
       </div>
       <Link to="/project-plans"><Button variant="outline">Back to List</Button></Link>
     </div>
 
     {notice && <p className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{notice}</p>}
-    {totalPercentage > 100 && <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">Warning: planned percentage is above 100%.</p>}
+    {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-brand-danger">{error}</p>}
+    {planIsFull && <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">This project plan is already full at 100%. You cannot add more plan items.</p>}
+    {!planIsFull && totalPercentage > 100 && <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">This new plan item is above the remaining percentage. Remaining percentage: {remainingPercentage.toFixed(2)}%.</p>}
     {totalPlanned > contractAmount && contractAmount > 0 && <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">Warning: planned amount is higher than the contract amount.</p>}
 
     <form onSubmit={savePlan} className="space-y-5">
@@ -256,7 +266,12 @@ export default function ProjectPlanForm() {
             <input type="number" min="0" step="0.01" value={plan.contract_amount} onChange={(event) => updatePlan("contract_amount", event.target.value)} className={fieldInputClass} />
           </FormField>
           <FormField label="Payment Plan Type">
-            <input value={plan.payment_plan_type} onChange={(event) => updatePlan("payment_plan_type", event.target.value)} className={fieldInputClass} />
+            <select value={plan.payment_plan_type} onChange={(event) => updatePlan("payment_plan_type", event.target.value)} className={fieldInputClass}>
+              <option>Deposit + Final Payment</option>
+              <option>Milestone Payment</option>
+              <option>Monthly Payment</option>
+              <option>Custom Payment Plan</option>
+            </select>
           </FormField>
           <FormField label="Deposit %">
             <input type="number" min="0" max="100" step="0.01" value={plan.deposit_percentage} onChange={(event) => updatePlan("deposit_percentage", event.target.value)} className={fieldInputClass} />
@@ -282,30 +297,71 @@ export default function ProjectPlanForm() {
       <Card className="p-5">
         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-brand-primary">Payment Plan Rows</h2>
-            <p className="mt-1 text-sm text-brand-muted">The form starts with one blank row. Add more rows only when you need them.</p>
+            <h2 className="text-lg font-bold text-brand-primary">Add One Plan Item</h2>
+            <p className="mt-1 text-sm text-brand-muted">Save one plan item, then add another only if the project plan is not full.</p>
           </div>
-          <Button type="button" variant="outline" className="gap-2" onClick={addItem}><Plus size={16} />Add Row</Button>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <ReadonlyField label="Existing %" value={formatPercentage(existingPercentage)} />
+            <ReadonlyField label="Remaining %" value={formatPercentage(remainingPercentage)} />
+            <ReadonlyField label="New Amount" value={formatCurrency(newItemAmount)} />
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-[1080px] w-full text-left text-sm">
-            <thead className="text-xs uppercase text-brand-muted">
-              <tr><th className="p-2">Payment Title</th><th className="p-2">Type</th><th className="p-2">%</th><th className="p-2">Expected Amount</th><th className="p-2">Due Date</th><th className="p-2">Due Stage</th><th className="p-2">Status</th><th className="p-2">Notes</th><th className="p-2"></th></tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => <tr key={item.id || index} className="border-t border-brand-border">
-                <td className="p-2"><input value={item.name} onChange={(event) => updateItem(index, "name", event.target.value)} className={fieldInputClass} placeholder="Deposit, Design approval..." /></td>
-                <td className="p-2"><select value={item.payment_type} onChange={(event) => updateItem(index, "payment_type", event.target.value)} className={fieldInputClass}><option value="percentage">Percentage</option><option value="fixed">Fixed Amount</option></select></td>
-                <td className="p-2"><input type="number" min="0" max="100" step="0.01" value={item.percentage} onChange={(event) => updateItem(index, "percentage", event.target.value)} disabled={item.payment_type !== "percentage"} className={fieldInputClass} /></td>
-                <td className="p-2"><input type="number" min="0" step="0.01" value={item.payment_type === "percentage" ? expectedAmount(item, contractAmount).toFixed(2) : item.amount} onChange={(event) => updateItem(index, "amount", event.target.value)} disabled={item.payment_type === "percentage"} className={fieldInputClass} /></td>
-                <td className="p-2"><input type="date" value={item.due_date} onChange={(event) => updateItem(index, "due_date", event.target.value)} className={fieldInputClass} /></td>
-                <td className="p-2"><input value={item.due_condition} onChange={(event) => updateItem(index, "due_condition", event.target.value)} className={fieldInputClass} /></td>
-                <td className="p-2"><select value={item.status} onChange={(event) => updateItem(index, "status", event.target.value)} className={fieldInputClass}><option>Pending</option><option>Due</option><option>Partially Paid</option><option>Paid</option><option>Overdue</option><option>Cancelled</option></select></td>
-                <td className="p-2"><input value={item.notes} onChange={(event) => updateItem(index, "notes", event.target.value)} className={fieldInputClass} /></td>
-                <td className="p-2"><Button type="button" variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeItem(index)}><Trash2 size={14} /></Button></td>
-              </tr>)}
-            </tbody>
-          </table>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <FormField label="Plan Item">
+            <input value={item.name} onChange={(event) => updateItem("name", event.target.value)} disabled={planIsFull} className={fieldInputClass} placeholder="Deposit, Design approval..." />
+          </FormField>
+          <FormField label="Amount Type">
+            <select value={item.payment_type} onChange={(event) => updateItem("payment_type", event.target.value)} disabled={planIsFull} className={fieldInputClass}>
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed Amount</option>
+            </select>
+          </FormField>
+          <FormField label="Percentage">
+            <input type="number" min="0" max={remainingPercentage} step="0.01" value={item.percentage} onChange={(event) => updateItem("percentage", event.target.value)} disabled={planIsFull || item.payment_type !== "percentage"} className={fieldInputClass} />
+          </FormField>
+          <FormField label="Expected Amount">
+            <input type="number" min="0" step="0.01" value={item.payment_type === "percentage" ? newItemAmount.toFixed(2) : item.amount} onChange={(event) => updateItem("amount", event.target.value)} disabled={planIsFull || item.payment_type === "percentage"} className={fieldInputClass} />
+          </FormField>
+          <FormField label="Due Date">
+            <input type="date" value={item.due_date} onChange={(event) => updateItem("due_date", event.target.value)} disabled={planIsFull} className={fieldInputClass} />
+          </FormField>
+          <FormField label="Due Stage">
+            <input value={item.due_condition} onChange={(event) => updateItem("due_condition", event.target.value)} disabled={planIsFull} className={fieldInputClass} placeholder="Design approval, Completion..." />
+          </FormField>
+          <FormField label="Status">
+            <select value={item.status} onChange={(event) => updateItem("status", event.target.value)} disabled={planIsFull} className={fieldInputClass}>
+              <option>Pending</option>
+              <option>Due</option>
+              <option>Partially Paid</option>
+              <option>Paid</option>
+              <option>Overdue</option>
+              <option>Cancelled</option>
+            </select>
+          </FormField>
+          <FormField label="Notes">
+            <input value={item.notes} onChange={(event) => updateItem("notes", event.target.value)} disabled={planIsFull} className={fieldInputClass} />
+          </FormField>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="text-lg font-bold text-brand-primary">Existing Plan Items</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {existingItems.length === 0 && <p className="text-sm text-brand-muted">No plan items saved yet.</p>}
+          {existingItems.map((row) => <div key={row.id} className="rounded-lg border border-brand-border bg-brand-soft p-4">
+            <div className="flex items-start justify-between gap-3">
+              <b className="text-brand-primary">{row.name}</b>
+              <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-brand-muted">{row.status || "Pending"}</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <Info label="Type" value={row.payment_type || "percentage"} />
+              <Info label="Percent" value={formatPercentage(row.percentage)} />
+              <Info label="Amount" value={formatCurrency(row.amount)} />
+              <Info label="Due Date" value={dateOnly(row.due_date) || "-"} />
+            </div>
+            {row.due_condition && <p className="mt-3 text-sm text-brand-muted">{row.due_condition}</p>}
+          </div>)}
         </div>
       </Card>
 
@@ -317,20 +373,6 @@ export default function ProjectPlanForm() {
   </div>;
 }
 
-function mapStageToItem(stage) {
-  return {
-    id: stage.id,
-    name: stage.name || "",
-    payment_type: stage.payment_type || (Number(stage.percentage || 0) > 0 ? "percentage" : "fixed"),
-    percentage: stage.percentage || "",
-    amount: stage.amount || "",
-    due_date: dateOnly(stage.due_date),
-    due_condition: stage.due_condition || "",
-    notes: stage.notes || "",
-    status: stage.status || "Pending",
-  };
-}
-
 function expectedAmount(item, contractAmount) {
   return item.payment_type === "percentage" ? Number(((contractAmount * toNumber(item.percentage)) / 100).toFixed(2)) : toNumber(item.amount);
 }
@@ -339,6 +381,13 @@ function ReadonlyField({ label, value }) {
   return <div>
     <span className="mb-1 block text-sm font-semibold text-brand-primary">{label}</span>
     <div className="flex min-h-11 items-center rounded-lg border border-brand-border bg-brand-soft px-3 text-sm font-semibold text-brand-primary">{value || "-"}</div>
+  </div>;
+}
+
+function Info({ label, value }) {
+  return <div>
+    <span className="block text-xs font-semibold uppercase text-brand-muted">{label}</span>
+    <b className="text-brand-primary">{value || "-"}</b>
   </div>;
 }
 
