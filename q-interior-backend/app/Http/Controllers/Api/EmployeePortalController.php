@@ -16,6 +16,7 @@ use App\Models\Notification;
 use App\Models\OfficeLocation;
 use App\Models\Payroll;
 use App\Models\PerformanceReview;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -87,6 +88,7 @@ class EmployeePortalController extends Controller
             'scan_type' => 'required|in:check_in,check_out',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
+            'gps_accuracy_meters' => 'nullable|numeric|min:0',
         ]);
 
         $qr = AttendanceQrCode::with('officeLocation')->where('status', 'Active')->where('valid_until', '>=', now())->latest()->get()->first(fn ($item) => Hash::check($data['qr_token'], $item->token_hash));
@@ -97,7 +99,7 @@ class EmployeePortalController extends Controller
         $office = $qr->officeLocation;
         $distance = $this->distanceMeters((float) $office->latitude, (float) $office->longitude, (float) $data['latitude'], (float) $data['longitude']);
         if ($distance > (int) $office->allowed_radius_meters) {
-            return $this->scanFailure($employee, $office, $qr, $data, 'You are outside the allowed office location.', $request, $distance);
+            return $this->scanFailure($employee, $office, $qr, $data, $this->outsideOfficeMessage($distance, (int) $office->allowed_radius_meters), $request, $distance);
         }
 
         $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'date' => today()->toDateString()]);
@@ -116,10 +118,11 @@ class EmployeePortalController extends Controller
                 'check_in_latitude' => $data['latitude'],
                 'check_in_longitude' => $data['longitude'],
                 'check_in_distance_meters' => $distance,
+                ...$this->attendanceLocationFields('check_in', $office, $data),
                 'late_minutes' => $lateMinutes,
                 'device_info' => $request->userAgent(),
             ])->save();
-            $message = 'Checked in successfully.';
+            $message = 'Attendance accepted.';
         } else {
             if (! $attendance->exists || ! $attendance->check_in) {
                 return $this->scanFailure($employee, $office, $qr, $data, 'You must check in before check out.', $request, $distance);
@@ -141,15 +144,16 @@ class EmployeePortalController extends Controller
                 'check_out_latitude' => $data['latitude'],
                 'check_out_longitude' => $data['longitude'],
                 'check_out_distance_meters' => $distance,
+                ...$this->attendanceLocationFields('check_out', $office, $data),
                 'device_info' => $request->userAgent(),
             ])->save();
-            $message = $earlyOut ? 'Checked out before the work end time.' : 'Checked out successfully.';
+            $message = 'Attendance accepted.';
         }
 
         AttendanceScanLog::create($this->scanLog($employee, $office, $qr, $data, true, null, $request, $distance));
         Notification::create(['title' => $message, 'message' => $employee->name . ' ' . str_replace('_', ' ', $data['scan_type']), 'type' => 'attendance', 'module' => 'hr', 'is_read' => false]);
 
-        return response()->json(['message' => $message, 'attendance' => $attendance->fresh(['employee', 'officeLocation'])]);
+        return response()->json(['message' => $message, 'attendance' => $attendance->fresh(['employee', 'officeLocation']), 'debug' => $this->locationDebug($office, $data, $distance)]);
     }
 
     public function checkIn(Request $request)
@@ -257,20 +261,21 @@ class EmployeePortalController extends Controller
         $data = $request->validate([
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
+            'gps_accuracy_meters' => 'nullable|numeric|min:0',
         ]);
 
         if ($employee->status !== 'Active') {
             return $this->attemptFailure($employee, null, $type, $data, 'Your account is inactive.', $request);
         }
 
-        $office = OfficeLocation::where('status', 'Active')->first();
+        $office = $this->attendanceOfficeLocation();
         if (! $office) {
             return $this->attemptFailure($employee, null, $type, $data, 'Office location is not configured.', $request);
         }
 
         $distance = $this->distanceMeters((float) $office->latitude, (float) $office->longitude, (float) $data['latitude'], (float) $data['longitude']);
         if ($distance > (int) $office->allowed_radius_meters) {
-            return $this->attemptFailure($employee, $office, $type, $data, 'You are outside the allowed office location.', $request, $distance);
+            return $this->attemptFailure($employee, $office, $type, $data, $this->outsideOfficeMessage($distance, (int) $office->allowed_radius_meters), $request, $distance);
         }
 
         $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'date' => today()->toDateString()]);
@@ -295,10 +300,11 @@ class EmployeePortalController extends Controller
                 'check_in_latitude' => $data['latitude'],
                 'check_in_longitude' => $data['longitude'],
                 'check_in_distance_meters' => $distance,
+                ...$this->attendanceLocationFields('check_in', $office, $data),
                 'late_minutes' => $lateMinutes,
                 'device_info' => $request->userAgent(),
             ])->save();
-            $message = 'Checked in successfully.';
+            $message = 'Attendance accepted.';
         } else {
             if (! $attendance->exists || ! $attendance->check_in) {
                 return $this->attemptFailure($employee, $office, $type, $data, 'You must check in before check out.', $request, $distance);
@@ -320,22 +326,23 @@ class EmployeePortalController extends Controller
                 'check_out_latitude' => $data['latitude'],
                 'check_out_longitude' => $data['longitude'],
                 'check_out_distance_meters' => $distance,
+                ...$this->attendanceLocationFields('check_out', $office, $data),
                 'device_info' => $request->userAgent(),
             ])->save();
-            $message = $earlyOut ? 'Checked out before the work end time.' : 'Checked out successfully.';
+            $message = 'Attendance accepted.';
         }
 
         AttendanceAttemptLog::create($this->attemptLog($employee, $office, $type, $data, true, null, $request, $distance));
         Notification::create(['title' => $message, 'message' => $employee->name . ' ' . str_replace('_', ' ', $type), 'type' => 'attendance', 'module' => 'hr', 'is_read' => false]);
 
-        return response()->json(['message' => $message, 'attendance' => $attendance->fresh(['employee', 'officeLocation'])]);
+        return response()->json(['message' => $message, 'attendance' => $attendance->fresh(['employee', 'officeLocation']), 'debug' => $this->locationDebug($office, $data, $distance)]);
     }
 
     private function attemptFailure(Employee $employee, ?OfficeLocation $office, string $type, array $data, string $reason, Request $request, ?float $distance = null)
     {
         AttendanceAttemptLog::create($this->attemptLog($employee, $office, $type, $data, false, $reason, $request, $distance));
 
-        return response()->json(['message' => $reason], 422);
+        return response()->json(['message' => $reason, 'debug' => $this->locationDebug($office, $data, $distance)], 422);
     }
 
     private function checkoutStatus(?string $currentStatus, bool $earlyOut): string
@@ -356,9 +363,14 @@ class EmployeePortalController extends Controller
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'distance_meters' => $distance,
+            'gps_accuracy_meters' => $data['gps_accuracy_meters'] ?? null,
+            'office_latitude' => $office?->latitude,
+            'office_longitude' => $office?->longitude,
+            'allowed_radius_meters' => $office?->allowed_radius_meters,
             'is_location_valid' => $success,
             'success' => $success,
             'failure_reason' => $reason,
+            'rejection_reason' => $success ? null : $reason,
             'device_info' => $request->userAgent(),
             'ip_address' => $request->ip(),
         ];
@@ -368,7 +380,7 @@ class EmployeePortalController extends Controller
     {
         AttendanceScanLog::create($this->scanLog($employee, $office, $qr, $data, false, $reason, $request, $distance));
 
-        return response()->json(['message' => $reason], 422);
+        return response()->json(['message' => $reason, 'debug' => $this->locationDebug($office, $data, $distance)], 422);
     }
 
     private function scanLog(Employee $employee, ?OfficeLocation $office, ?AttendanceQrCode $qr, array $data, bool $success, ?string $reason, Request $request, ?float $distance): array
@@ -442,16 +454,8 @@ class EmployeePortalController extends Controller
 
     public static function makeQrCode(?int $userId = null): array
     {
-        $office = OfficeLocation::where('status', 'Active')->first() ?: OfficeLocation::create([
-            'name' => 'SOMOIL CAR WASH',
-            'latitude' => 2.0314625,
-            'longitude' => 45.3122031,
-            'allowed_radius_meters' => 100,
-            'work_start_time' => '08:00:00',
-            'work_end_time' => '17:00:00',
-            'late_threshold_time' => '08:15:00',
-            'status' => 'Active',
-        ]);
+        $controller = app(self::class);
+        $office = $controller->attendanceOfficeLocation();
         AttendanceQrCode::where('office_location_id', $office->id)->where('status', 'Active')->update(['status' => 'Revoked']);
         $token = Str::random(48);
         $qr = AttendanceQrCode::create([
@@ -464,5 +468,75 @@ class EmployeePortalController extends Controller
         ]);
 
         return ['qr' => $qr->load('officeLocation'), 'token' => $token];
+    }
+
+    private function outsideOfficeMessage(float $distance, int $radius): string
+    {
+        return 'You are outside the allowed office location. Distance: ' . round($distance) . ' meters. Allowed radius: ' . $radius . ' meters.';
+    }
+
+    private function attendanceLocationFields(string $prefix, OfficeLocation $office, array $data): array
+    {
+        return [
+            "{$prefix}_office_latitude" => $office->latitude,
+            "{$prefix}_office_longitude" => $office->longitude,
+            "{$prefix}_allowed_radius_meters" => $office->allowed_radius_meters,
+            "{$prefix}_gps_accuracy_meters" => $data['gps_accuracy_meters'] ?? null,
+        ];
+    }
+
+    private function locationDebug(?OfficeLocation $office, array $data, ?float $distance): array
+    {
+        return [
+            'office_name' => $office?->name,
+            'office_latitude' => $office?->latitude,
+            'office_longitude' => $office?->longitude,
+            'user_latitude' => $data['latitude'] ?? null,
+            'user_longitude' => $data['longitude'] ?? null,
+            'distance_meters' => $distance,
+            'allowed_radius_meters' => $office?->allowed_radius_meters,
+            'gps_accuracy_meters' => $data['gps_accuracy_meters'] ?? null,
+        ];
+    }
+
+    private function attendanceOfficeLocation(): OfficeLocation
+    {
+        $settings = $this->attendanceLocationSettings();
+
+        return OfficeLocation::updateOrCreate(
+            ['name' => $settings['name']],
+            [
+                'latitude' => $settings['latitude'],
+                'longitude' => $settings['longitude'],
+                'allowed_radius_meters' => $settings['allowed_radius_meters'],
+                'work_start_time' => Setting::where('key', 'working_hours_start')->value('value') ?: '08:00',
+                'work_end_time' => Setting::where('key', 'working_hours_end')->value('value') ?: '17:00',
+                'late_threshold_time' => Setting::where('key', 'hr_start_time')->value('value') ?: '08:15',
+                'status' => 'Active',
+            ]
+        );
+    }
+
+    private function attendanceLocationSettings(): array
+    {
+        $defaults = [
+            'attendance_office_name' => ['value' => 'Orfano Tower', 'type' => 'string'],
+            'attendance_office_latitude' => ['value' => '2.0334707', 'type' => 'number'],
+            'attendance_office_longitude' => ['value' => '45.3122083', 'type' => 'number'],
+            'attendance_allowed_radius_meters' => ['value' => '150', 'type' => 'number'],
+        ];
+
+        foreach ($defaults as $key => $setting) {
+            Setting::firstOrCreate(['key' => $key], ['value' => $setting['value'], 'type' => $setting['type']]);
+        }
+
+        $values = Setting::whereIn('key', array_keys($defaults))->pluck('value', 'key');
+
+        return [
+            'name' => $values['attendance_office_name'] ?: 'Orfano Tower',
+            'latitude' => (float) ($values['attendance_office_latitude'] ?: 2.0334707),
+            'longitude' => (float) ($values['attendance_office_longitude'] ?: 45.3122083),
+            'allowed_radius_meters' => max(10, (int) ($values['attendance_allowed_radius_meters'] ?: 150)),
+        ];
     }
 }

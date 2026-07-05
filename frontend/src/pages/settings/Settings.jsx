@@ -7,6 +7,7 @@ import { createBackup, getBackups, getSettings, saveSetting } from "../../servic
 
 const sections = {
   "Company Profile": ["company_name", "company_email", "company_phone", "company_address", "currency"],
+  "Attendance Location": ["attendance_office_name", "attendance_office_latitude", "attendance_office_longitude", "attendance_allowed_radius_meters"],
   "Document Prefixes": ["invoice_prefix", "quotation_prefix", "purchase_order_prefix", "default_tax_rate"],
   "Approval & Working Hours": ["expense_approval_threshold", "working_hours_start", "working_hours_end"],
   "Backup Settings": ["backup_enabled", "backup_type", "backup_time"],
@@ -20,11 +21,17 @@ export default function Settings() {
   const [status, setStatus] = useState("loading");
 
   const editableKeys = useMemo(() => Object.values(sections).flat(), []);
+  const defaultValues = {
+    attendance_office_name: "Orfano Tower",
+    attendance_office_latitude: "2.0334707",
+    attendance_office_longitude: "45.3122083",
+    attendance_allowed_radius_meters: "150",
+  };
 
   const load = () => Promise.all([getSettings(), getBackups()]).then(([settingsData, backupsData]) => {
     setSettings(settingsData);
     setBackups(backupsData);
-    setForm(Object.fromEntries(settingsData.map((setting) => [setting.key, setting.value])));
+    setForm({ ...defaultValues, ...Object.fromEntries(settingsData.map((setting) => [setting.key, setting.value])) });
     setStatus("connected");
   }).catch(() => setStatus("error"));
 
@@ -36,7 +43,7 @@ export default function Settings() {
 
   const submit = async (event) => {
     event.preventDefault();
-    await Promise.all(editableKeys.map((key) => saveSetting({ key, value: form[key] || "", type: key.includes("threshold") || key.includes("tax") ? "number" : "string" })));
+    await Promise.all(editableKeys.map((key) => saveSetting({ key, value: form[key] || defaultValues[key] || "", type: isNumberSetting(key) ? "number" : "string" })));
     load();
   };
 
@@ -58,7 +65,7 @@ export default function Settings() {
         <h2 className="mb-4 text-xl font-bold">{title}</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {keys.map((key) => <FormField key={key} label={label(key)}>
-            {key.includes("enabled") ? <select name={key} value={form[key] || "true"} onChange={updateField} className={fieldInputClass}><option value="true">Enabled</option><option value="false">Disabled</option></select> : key.includes("address") ? <textarea name={key} value={form[key] || ""} onChange={updateField} className={fieldInputClass} /> : <input name={key} value={form[key] || ""} onChange={updateField} className={fieldInputClass} />}
+            {key.includes("enabled") ? <select name={key} value={form[key] || "true"} onChange={updateField} className={fieldInputClass}><option value="true">Enabled</option><option value="false">Disabled</option></select> : key.includes("address") ? <textarea name={key} value={form[key] || ""} onChange={updateField} className={fieldInputClass} /> : <input name={key} type={isNumberSetting(key) ? "number" : "text"} step={key.includes("latitude") || key.includes("longitude") ? "0.0000001" : "1"} min={key.includes("radius") ? "10" : undefined} value={form[key] || ""} onChange={updateField} className={fieldInputClass} />}
           </FormField>)}
         </div>
       </Card>)}
@@ -86,4 +93,8 @@ export default function Settings() {
 
 function label(key) {
   return key.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isNumberSetting(key) {
+  return key.includes("threshold") || key.includes("tax") || key.includes("latitude") || key.includes("longitude") || key.includes("radius");
 }

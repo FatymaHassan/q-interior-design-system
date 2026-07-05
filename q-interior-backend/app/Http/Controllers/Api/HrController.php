@@ -614,17 +614,24 @@ class HrController extends Controller
 
     public function officeLocations()
     {
+        $this->syncAttendanceOfficeFromSettings();
+
         return OfficeLocation::latest()->get();
     }
 
     public function storeOfficeLocation(Request $request)
     {
-        return OfficeLocation::create($this->officeLocationData($request));
+        $data = $this->officeLocationData($request);
+        $this->saveAttendanceLocationSettings($data);
+
+        return OfficeLocation::create($data);
     }
 
     public function updateOfficeLocation(Request $request, OfficeLocation $officeLocation)
     {
-        $officeLocation->update($this->officeLocationData($request, true));
+        $data = $this->officeLocationData($request, true);
+        $this->saveAttendanceLocationSettings(array_merge($officeLocation->toArray(), $data));
+        $officeLocation->update($data);
         return $officeLocation;
     }
 
@@ -935,14 +942,67 @@ class HrController extends Controller
         $required = $partial ? 'sometimes|' : '';
         return $request->validate([
             'name' => $required . 'required|string|max:255',
-            'latitude' => $required . 'required|numeric',
-            'longitude' => $required . 'required|numeric',
+            'latitude' => $required . 'required|numeric|between:-90,90',
+            'longitude' => $required . 'required|numeric|between:-180,180',
             'allowed_radius_meters' => $required . 'required|integer|min:10|max:5000',
             'work_start_time' => $required . 'required|date_format:H:i',
             'work_end_time' => $required . 'required|date_format:H:i',
             'late_threshold_time' => $required . 'required|date_format:H:i',
             'status' => 'nullable|in:Active,Inactive',
         ]);
+    }
+
+    private function syncAttendanceOfficeFromSettings(): OfficeLocation
+    {
+        $data = $this->attendanceLocationSettings();
+
+        return OfficeLocation::updateOrCreate(
+            ['name' => $data['name']],
+            [
+                'latitude' => $data['latitude'],
+                'longitude' => $data['longitude'],
+                'allowed_radius_meters' => $data['allowed_radius_meters'],
+                'work_start_time' => Setting::where('key', 'working_hours_start')->value('value') ?: '09:00',
+                'work_end_time' => Setting::where('key', 'working_hours_end')->value('value') ?: '17:00',
+                'late_threshold_time' => Setting::where('key', 'hr_start_time')->value('value') ?: '09:15',
+                'status' => 'Active',
+            ]
+        );
+    }
+
+    private function saveAttendanceLocationSettings(array $data): void
+    {
+        foreach ([
+            'attendance_office_name' => ['value' => $data['name'] ?? 'Orfano Tower', 'type' => 'string'],
+            'attendance_office_latitude' => ['value' => (string) ($data['latitude'] ?? 2.0334707), 'type' => 'number'],
+            'attendance_office_longitude' => ['value' => (string) ($data['longitude'] ?? 45.3122083), 'type' => 'number'],
+            'attendance_allowed_radius_meters' => ['value' => (string) ($data['allowed_radius_meters'] ?? 150), 'type' => 'number'],
+        ] as $key => $setting) {
+            Setting::updateOrCreate(['key' => $key], ['value' => $setting['value'], 'type' => $setting['type']]);
+        }
+    }
+
+    private function attendanceLocationSettings(): array
+    {
+        $defaults = [
+            'attendance_office_name' => ['value' => 'Orfano Tower', 'type' => 'string'],
+            'attendance_office_latitude' => ['value' => '2.0334707', 'type' => 'number'],
+            'attendance_office_longitude' => ['value' => '45.3122083', 'type' => 'number'],
+            'attendance_allowed_radius_meters' => ['value' => '150', 'type' => 'number'],
+        ];
+
+        foreach ($defaults as $key => $setting) {
+            Setting::firstOrCreate(['key' => $key], ['value' => $setting['value'], 'type' => $setting['type']]);
+        }
+
+        $values = Setting::whereIn('key', array_keys($defaults))->pluck('value', 'key');
+
+        return [
+            'name' => $values['attendance_office_name'] ?: 'Orfano Tower',
+            'latitude' => (float) ($values['attendance_office_latitude'] ?: 2.0334707),
+            'longitude' => (float) ($values['attendance_office_longitude'] ?: 45.3122083),
+            'allowed_radius_meters' => max(10, (int) ($values['attendance_allowed_radius_meters'] ?: 150)),
+        ];
     }
 
     private function analyticsRequest(int $month, int $year): Request

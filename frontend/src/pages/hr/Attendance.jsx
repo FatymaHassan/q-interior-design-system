@@ -65,12 +65,33 @@ export default function Attendance() {
         { key: "office", label: "Location", render: (row) => row.office_location?.name || row.officeLocation?.name || "-" },
         { key: "check_in_location", label: "Entry GPS", render: (row) => formatGps(row.check_in_latitude, row.check_in_longitude, row.check_in_distance_meters) },
         { key: "check_out_location", label: "Leave GPS", render: (row) => formatGps(row.check_out_latitude, row.check_out_longitude, row.check_out_distance_meters) },
+        { key: "location_debug", label: "Location Debug", render: (row) => <DebugLocation row={row} /> },
         { key: "total_hours", label: "Hours" },
         { key: "method", label: "Method" },
         { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
       ]} rows={attendances} empty="No attendance records yet." />
     </SectionCard>
   </div>;
+}
+
+function DebugLocation({ row }) {
+  const officeLatitude = row.check_in_office_latitude || row.check_out_office_latitude || row.office_location?.latitude || row.officeLocation?.latitude;
+  const officeLongitude = row.check_in_office_longitude || row.check_out_office_longitude || row.office_location?.longitude || row.officeLocation?.longitude;
+  const radius = row.check_in_allowed_radius_meters || row.check_out_allowed_radius_meters || row.office_location?.allowed_radius_meters || row.officeLocation?.allowed_radius_meters;
+  const accuracy = row.check_in_gps_accuracy_meters || row.check_out_gps_accuracy_meters;
+  const distance = row.check_in_distance_meters || row.check_out_distance_meters;
+
+  return <div className="min-w-44 text-xs leading-5 text-brand-muted">
+    <div>Office: {formatPair(officeLatitude, officeLongitude)}</div>
+    <div>Distance: {distance !== null && distance !== undefined ? `${Number(distance).toFixed(0)}m` : "-"}</div>
+    <div>Radius: {radius ? `${radius}m` : "-"}</div>
+    <div>Accuracy: {accuracy ? `${Number(accuracy).toFixed(0)}m` : "-"}</div>
+  </div>;
+}
+
+function formatPair(latitude, longitude) {
+  if (!latitude || !longitude) return "-";
+  return `${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`;
 }
 
 function formatGps(latitude, longitude, distance) {

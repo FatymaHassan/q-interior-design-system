@@ -136,25 +136,43 @@ function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
 function CheckInPanel({ today, employee, onDone }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
+  const [debug, setDebug] = useState(null);
 
   const submit = async (type) => {
+    if (!navigator.geolocation) {
+      setMessage("Please allow location permission to mark attendance.");
+      return;
+    }
     setBusy(type);
     setMessage("Checking your location...");
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
-        const payload = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        const payload = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          gps_accuracy_meters: position.coords.accuracy,
+        };
+        if (position.coords.accuracy > 100) {
+          setMessage("Your GPS accuracy is low. Please move to an open area or try again.");
+        }
         const result = type === "check_in" ? await employeeCheckIn(payload) : await employeeCheckOut(payload);
         setMessage(result.message);
+        setDebug(result.debug || {
+          user_latitude: payload.latitude,
+          user_longitude: payload.longitude,
+          gps_accuracy_meters: payload.gps_accuracy_meters,
+        });
         onDone();
       } catch (error) {
         setMessage(error.response?.data?.message || "Something went wrong while saving attendance.");
+        setDebug(error.response?.data?.debug || null);
       } finally {
         setBusy("");
       }
     }, () => {
-      setMessage("Location permission is required.");
+      setMessage("Please allow location permission to mark attendance.");
       setBusy("");
-    }, { enableHighAccuracy: true, timeout: 12000 });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   };
 
   return <div className="space-y-5">
@@ -179,6 +197,14 @@ function CheckInPanel({ today, employee, onDone }) {
             <Button onClick={() => submit("check_in")} disabled={Boolean(busy)} className="min-h-12 flex-1 gap-2"><CheckCircle2 size={18} />{busy === "check_in" ? "Checking..." : "Check In"}</Button>
             <Button variant="outline" onClick={() => submit("check_out")} disabled={Boolean(busy)} className="min-h-12 flex-1 gap-2"><Clock size={18} />{busy === "check_out" ? "Checking..." : "Check Out"}</Button>
           </div>
+          {debug && <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <InfoTile label="Office GPS" value={debug.office_latitude && debug.office_longitude ? `${Number(debug.office_latitude).toFixed(7)}, ${Number(debug.office_longitude).toFixed(7)}` : "-"} />
+            <InfoTile label="Your GPS" value={debug.user_latitude && debug.user_longitude ? `${Number(debug.user_latitude).toFixed(7)}, ${Number(debug.user_longitude).toFixed(7)}` : "-"} />
+            <InfoTile label="Distance" value={debug.distance_meters !== null && debug.distance_meters !== undefined ? `${Number(debug.distance_meters).toFixed(0)} m` : "-"} />
+            <InfoTile label="Allowed Radius" value={debug.allowed_radius_meters ? `${debug.allowed_radius_meters} m` : "-"} />
+            <InfoTile label="GPS Accuracy" value={debug.gps_accuracy_meters ? `${Number(debug.gps_accuracy_meters).toFixed(0)} m` : "-"} />
+            <InfoTile label="Office" value={debug.office_name || "-"} />
+          </div>}
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-black uppercase tracking-wide text-slate-500">Employee</p>

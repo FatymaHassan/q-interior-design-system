@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { Crosshair, ShieldCheck } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { fieldInputClass, HRPageHeader, SectionCard } from "./hrShared";
 import { getOfficeLocations, saveOfficeLocation } from "../../services/api";
 
 const emptyOffice = {
-  name: "Q INTERIOR DESIGN STUDIO",
-  latitude: "",
-  longitude: "",
-  allowed_radius_meters: "100",
+  name: "Orfano Tower",
+  latitude: "2.0334707",
+  longitude: "45.3122083",
+  allowed_radius_meters: "150",
   work_start_time: "09:00",
   work_end_time: "17:00",
   late_threshold_time: "09:15",
@@ -19,6 +19,7 @@ export default function AttendanceSettings() {
   const [office, setOffice] = useState(emptyOffice);
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState("");
+  const [debug, setDebug] = useState(null);
 
   const load = () => getOfficeLocations()
     .then((locations) => {
@@ -66,6 +67,29 @@ export default function AttendanceSettings() {
   };
 
   const updateField = (field, value) => setOffice((current) => ({ ...current, [field]: value }));
+  const testLocation = () => {
+    setNotice("");
+    if (!navigator.geolocation) {
+      setNotice("This browser does not support location checking.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((position) => {
+      const userLatitude = position.coords.latitude;
+      const userLongitude = position.coords.longitude;
+      const distance = distanceMeters(Number(office.latitude), Number(office.longitude), userLatitude, userLongitude);
+      setDebug({
+        userLatitude,
+        userLongitude,
+        distance,
+        accuracy: position.coords.accuracy,
+        allowedRadius: Number(office.allowed_radius_meters),
+      });
+    }, () => setNotice("Please allow location permission to test attendance distance."), {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    });
+  };
 
   return <div className="space-y-4">
     <HRPageHeader title="Attendance Schedule & Location" description="Set the office GPS point, allowed radius, start time, late threshold, and leave time used by employee portal attendance." />
@@ -82,7 +106,7 @@ export default function AttendanceSettings() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <label className="text-sm font-semibold text-brand-primary">Latitude<input value={office.latitude} onChange={(event) => updateField("latitude", event.target.value)} className={`${fieldInputClass} mt-1`} placeholder="Enter office latitude" required /></label>
             <label className="text-sm font-semibold text-brand-primary">Longitude<input value={office.longitude} onChange={(event) => updateField("longitude", event.target.value)} className={`${fieldInputClass} mt-1`} placeholder="Enter office longitude" required /></label>
-            <label className="text-sm font-semibold text-brand-primary">Allowed radius meters<input type="number" min="10" value={office.allowed_radius_meters} onChange={(event) => updateField("allowed_radius_meters", event.target.value)} className={`${fieldInputClass} mt-1`} placeholder="100" required /></label>
+            <label className="text-sm font-semibold text-brand-primary">Allowed radius meters<input type="number" min="10" step="1" value={office.allowed_radius_meters} onChange={(event) => updateField("allowed_radius_meters", event.target.value)} className={`${fieldInputClass} mt-1`} placeholder="150" required /></label>
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -95,9 +119,45 @@ export default function AttendanceSettings() {
             <div className="flex gap-2"><ShieldCheck size={18} className="shrink-0" /><span>Employees can check in only when their phone GPS is inside the allowed radius around this latitude and longitude.</span></div>
           </div>
 
-          <div><Button>Save Schedule & Location</Button></div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button>Save Schedule & Location</Button>
+            <Button type="button" variant="outline" className="gap-2" onClick={testLocation}><Crosshair size={16} />Test Current GPS</Button>
+          </div>
         </form>
+      </SectionCard>
+      <SectionCard title="Attendance Location Debug">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <DebugTile label="Office latitude" value={office.latitude || "-"} />
+          <DebugTile label="Office longitude" value={office.longitude || "-"} />
+          <DebugTile label="Allowed radius" value={`${office.allowed_radius_meters || 0} m`} />
+          <DebugTile label="User latitude" value={debug ? debug.userLatitude.toFixed(7) : "-"} />
+          <DebugTile label="User longitude" value={debug ? debug.userLongitude.toFixed(7) : "-"} />
+          <DebugTile label="Distance" value={debug ? `${debug.distance.toFixed(0)} m` : "-"} />
+          <DebugTile label="GPS accuracy" value={debug ? `${debug.accuracy.toFixed(0)} m` : "-"} />
+          <DebugTile label="Result" value={debug ? (debug.distance <= debug.allowedRadius ? "Inside radius" : "Outside radius") : "Not tested"} />
+        </div>
+        {debug?.accuracy > 100 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">Your GPS accuracy is low. Please move to an open area or try again.</p>}
       </SectionCard>
     </section>
   </div>;
+}
+
+function DebugTile({ label, value }) {
+  return <div className="rounded-lg border border-brand-border bg-white p-3">
+    <p className="text-xs font-bold uppercase tracking-wide text-brand-muted">{label}</p>
+    <b className="mt-1 block text-brand-primary">{value}</b>
+  </div>;
+}
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return 0;
+  const earth = 6371000;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRadians(value) {
+  return value * (Math.PI / 180);
 }
