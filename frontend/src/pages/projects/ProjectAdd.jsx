@@ -17,15 +17,21 @@ const emptyForm = {
   deadline: "",
   budget: "",
   contract_amount: "",
-  payment_plan_type: "Progress Payments",
-  deposit_percentage: "50",
+  payment_plan_type: "Deposit + Progress Payments",
+  deposit_percentage: "30",
   deposit_amount: "",
-  payment_terms: "50% advance, 30% at 30% progress, 20% on completion",
+  payment_terms: "30% deposit, 50% after project start, 20% after completion.",
   actual_cost: "0",
   progress: "0",
   status: "Active",
   description: "",
 };
+
+const initialPaymentStages = [
+  { name: "Deposit", percentage: "30", amount: "", due_condition: "Before project starts", due_date: "", status: "Pending", notes: "" },
+  { name: "Second Payment", percentage: "50", amount: "", due_condition: "After project start", due_date: "", status: "Pending", notes: "" },
+  { name: "Final Payment", percentage: "20", amount: "", due_condition: "On completion", due_date: "", status: "Pending", notes: "" },
+];
 
 export default function ProjectAdd() {
   const navigate = useNavigate();
@@ -34,6 +40,7 @@ export default function ProjectAdd() {
   const [employees, setEmployees] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [form, setForm] = useState(emptyForm);
+  const [paymentStages, setPaymentStages] = useState(initialPaymentStages);
   const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
@@ -65,12 +72,31 @@ export default function ProjectAdd() {
       return next;
     });
   };
+  const contractAmount = toNumber(form.contract_amount || form.budget);
+  const paymentPlanTotal = paymentStages.reduce((sum, stage) => sum + toNumber(stage.percentage), 0);
+  const paymentPlanWarning = paymentPlanTotal !== 100;
+  const updatePaymentStage = (index, field, value) => {
+    setPaymentStages((current) => current.map((stage, stageIndex) => {
+      if (stageIndex !== index) return stage;
+      const next = { ...stage, [field]: value };
+      if (field === "percentage") {
+        next.amount = contractAmount ? String(((contractAmount * toNumber(value)) / 100).toFixed(2)) : "";
+      }
+      return next;
+    }));
+  };
+  const addPaymentStage = () => setPaymentStages((current) => [...current, { name: "", percentage: "", amount: "", due_condition: "", due_date: "", status: "Pending", notes: "" }]);
+  const removePaymentStage = (index) => setPaymentStages((current) => current.filter((_, stageIndex) => stageIndex !== index));
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setNotice("");
     try {
+      if (paymentPlanTotal > 100 && !window.confirm("The payment plan total is above 100%. Save this project anyway?")) {
+        setSaving(false);
+        return;
+      }
       const project = await createProject({
         ...form,
         client_id: Number(form.client_id),
@@ -83,6 +109,12 @@ export default function ProjectAdd() {
         payment_terms: form.payment_terms,
         actual_cost: toNumber(form.actual_cost),
         progress: toNumber(form.progress),
+        allow_over_plan: paymentPlanTotal > 100,
+        payment_stages: paymentStages.map((stage) => ({
+          ...stage,
+          percentage: toNumber(stage.percentage),
+          amount: stage.amount ? toNumber(stage.amount) : Number(((toNumber(form.contract_amount || form.budget) * toNumber(stage.percentage)) / 100).toFixed(2)),
+        })),
       });
       await Promise.all(selectedMembers.map((member) => addProjectMember(project.id, {
         employee_id: Number(member.employee_id),
@@ -120,14 +152,41 @@ export default function ProjectAdd() {
         <FormField label="Deadline"><input name="deadline" type="date" value={form.deadline} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Budget"><input name="budget" type="number" min="0" step="0.01" value={form.budget} onChange={updateField} required placeholder="5000" className={fieldInputClass} /></FormField>
         <div className="lg:col-span-2 rounded-2xl border border-brand-border p-4">
-          <h3 className="font-bold text-brand-primary">Project Payment Plan</h3>
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h3 className="font-bold text-brand-primary">Project Payment Plan</h3>
+              <p className="mt-1 text-sm text-brand-muted">Plan client installments from the contract amount. Actual payments are recorded later as revenue.</p>
+            </div>
+            <div className={`rounded-lg px-3 py-2 text-sm font-bold ${paymentPlanWarning ? "bg-amber-50 text-brand-warning" : "bg-emerald-50 text-emerald-700"}`}>Total {paymentPlanTotal.toFixed(2)}%</div>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <FormField label="Contract amount"><input name="contract_amount" type="number" min="0" step="0.01" value={form.contract_amount} onChange={updateContractField} required placeholder="10000" className={fieldInputClass} /></FormField>
-            <FormField label="Payment plan type"><select name="payment_plan_type" value={form.payment_plan_type} onChange={updateContractField} className={fieldInputClass}><option>Full Payment</option><option>Deposit + Final Payment</option><option>Milestone Payments</option><option>Progress Payments</option><option>Custom Payment Plan</option></select></FormField>
+            <FormField label="Payment plan type"><select name="payment_plan_type" value={form.payment_plan_type} onChange={updateContractField} className={fieldInputClass}><option>Deposit + Progress Payments</option><option>Deposit + Final Payment</option><option>Milestone Payments</option><option>Full Payment</option><option>Custom Payment Plan</option></select></FormField>
             <FormField label="Deposit %"><input name="deposit_percentage" type="number" min="0" max="100" step="0.01" value={form.deposit_percentage} onChange={updateContractField} className={fieldInputClass} /></FormField>
             <FormField label="Deposit amount"><input name="deposit_amount" type="number" min="0" step="0.01" value={form.deposit_amount} onChange={updateContractField} className={fieldInputClass} /></FormField>
             <FormField label="Payment terms" className="lg:col-span-2"><textarea name="payment_terms" value={form.payment_terms} onChange={updateContractField} rows="3" className={fieldInputClass} /></FormField>
           </div>
+          {paymentPlanWarning && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">Payment plan total should be 100%. You can still save if this is intentional.</p>}
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-[980px] w-full text-left text-sm">
+              <thead className="text-xs uppercase text-brand-muted">
+                <tr><th className="p-2">Payment title</th><th className="p-2">%</th><th className="p-2">Expected amount</th><th className="p-2">Due stage</th><th className="p-2">Due date</th><th className="p-2">Status</th><th className="p-2">Notes</th><th className="p-2"></th></tr>
+              </thead>
+              <tbody>
+                {paymentStages.map((stage, index) => <tr key={index} className="border-t border-brand-border">
+                  <td className="p-2"><input value={stage.name} onChange={(event) => updatePaymentStage(index, "name", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><input type="number" min="0" max="100" step="0.01" value={stage.percentage} onChange={(event) => updatePaymentStage(index, "percentage", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><input type="number" min="0" step="0.01" value={stage.amount || (contractAmount ? ((contractAmount * toNumber(stage.percentage)) / 100).toFixed(2) : "")} onChange={(event) => updatePaymentStage(index, "amount", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><input value={stage.due_condition} onChange={(event) => updatePaymentStage(index, "due_condition", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><input type="date" value={stage.due_date} onChange={(event) => updatePaymentStage(index, "due_date", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><select value={stage.status} onChange={(event) => updatePaymentStage(index, "status", event.target.value)} className={fieldInputClass}><option>Pending</option><option>Partially Paid</option><option>Paid</option></select></td>
+                  <td className="p-2"><input value={stage.notes} onChange={(event) => updatePaymentStage(index, "notes", event.target.value)} className={fieldInputClass} /></td>
+                  <td className="p-2"><Button type="button" variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removePaymentStage(index)}>Remove</Button></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+          <Button type="button" variant="outline" className="mt-3" onClick={addPaymentStage}>Add Installment</Button>
         </div>
         <FormField label="Current cost"><input name="actual_cost" type="number" min="0" step="0.01" value={form.actual_cost} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>
         <FormField label="Progress %"><input name="progress" type="number" min="0" max="100" step="0.01" value={form.progress} onChange={updateField} placeholder="0" className={fieldInputClass} /></FormField>

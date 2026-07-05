@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Boxes, Briefcase, CheckCircle, DollarSign, FileText, Plus, TrendingUp, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, CheckCircle, DollarSign, FileText, Plus, TrendingUp, Users, Wallet } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -55,9 +55,13 @@ export default function Dashboard() {
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">Dashboard could not be loaded. Please check the backend connection.</Card>}
 
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="Total Revenue" value={money(kpis.total_revenue)} icon={DollarSign} helper="Client payments collected" />
-      <MetricCard label="Total Expenses" value={money(kpis.total_expenses)} icon={Wallet} helper="Project, payroll, and overhead costs" />
+      <MetricCard label="Contract Amount" value={money(kpis.total_contract_amount)} icon={Briefcase} helper="Expected value from all projects" />
+      <MetricCard label="Revenue Received" value={money(kpis.total_revenue_received ?? kpis.total_revenue)} icon={DollarSign} helper="Actual client payments collected" />
+      <MetricCard label="Balance Receivable" value={money(kpis.total_balance_receivable)} icon={Wallet} helper="Contract value still unpaid" />
       <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} tone={toNumber(kpis.net_profit) >= 0 ? "success" : "danger"} helper="After recorded company costs" />
+      <MetricCard label="Project Expenses" value={money(kpis.total_project_expenses ?? kpis.total_project_costs)} icon={Wallet} helper="Direct project costs" />
+      <MetricCard label="Gross Profit" value={money(kpis.gross_profit)} icon={TrendingUp} tone={toNumber(kpis.gross_profit) >= 0 ? "success" : "danger"} helper="Received revenue minus project expenses" />
+      <MetricCard label="Company Expenses" value={money(toNumber(kpis.overhead_expenses ?? kpis.company_overhead) + toNumber(kpis.payroll_expenses) + toNumber(kpis.other_company_expenses))} icon={Wallet} helper="Overhead, payroll, and other costs" />
       <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} tone="success" helper="Business margin for this view" />
     </section>
 
@@ -78,7 +82,7 @@ export default function Dashboard() {
           <HealthTile label="Documents" value={kpis.total_documents} icon={FileText} />
           <HealthTile label="Outstanding invoices" value={kpis.outstanding_invoices} icon={AlertTriangle} />
           <HealthTile label="Completed projects" value={kpis.completed_projects} icon={CheckCircle} />
-          <HealthTile label="Purchase orders" value={kpis.pending_purchase_orders} icon={Boxes} />
+          <HealthTile label="Pending client payments" value={kpis.pending_client_payments} icon={DollarSign} />
         </div>
       </Card>
 
@@ -204,6 +208,10 @@ export default function Dashboard() {
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-3">
       <SectionCard title="Operational Summary" subtitle="Secondary management numbers."><InfoRows rows={[
         ["Overdue Payments", kpis.overdue_payments],
+        ["Pending Client Payments", kpis.pending_client_payments],
+        ["Overhead Expenses", money(kpis.overhead_expenses ?? kpis.company_overhead)],
+        ["Payroll Expenses", money(kpis.payroll_expenses)],
+        ["Other Company Expenses", money(kpis.other_company_expenses)],
         ["Pending Tasks", kpis.pending_tasks],
         ["Pending Purchase Orders", kpis.pending_purchase_orders],
         ["Pending Leave Requests", kpis.pending_leave_requests],

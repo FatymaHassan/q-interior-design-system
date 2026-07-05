@@ -47,13 +47,17 @@ class ProjectController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
             'payment_terms' => 'nullable|string',
             'payment_stages' => 'nullable|array',
-            'payment_stages.*.name' => 'required_with:payment_stages|string|max:255',
+            'payment_stages.*.name' => 'nullable|string|max:255',
+            'payment_stages.*.title' => 'nullable|string|max:255',
             'payment_stages.*.percentage' => 'nullable|numeric|min:0|max:100',
             'payment_stages.*.amount' => 'nullable|numeric|min:0',
+            'payment_stages.*.expected_amount' => 'nullable|numeric|min:0',
             'payment_stages.*.due_condition' => 'nullable|string|max:255',
+            'payment_stages.*.due_stage' => 'nullable|string|max:255',
             'payment_stages.*.due_date' => 'nullable|date',
             'payment_stages.*.status' => 'nullable|string|max:255',
             'payment_stages.*.notes' => 'nullable|string',
+            'allow_over_plan' => 'nullable|boolean',
             'revenue' => 'nullable|numeric|min:0',
             'actual_cost' => 'nullable|numeric|min:0',
             'progress' => 'nullable|numeric|min:0|max:100',
@@ -63,7 +67,10 @@ class ProjectController extends Controller
             'created_by' => 'nullable|exists:users,id',
         ]);
         $stages = $data['payment_stages'] ?? [];
+        $this->assertPaymentPlanTotal($stages, (bool) ($data['allow_over_plan'] ?? false));
+        $stages = $this->normalizePaymentStages($stages);
         unset($data['payment_stages']);
+        unset($data['allow_over_plan']);
         $data['project_name'] = $data['name'];
         $data['contract_amount'] = $data['contract_amount'] ?? $data['revenue'] ?? $data['budget'] ?? 0;
         $data['budget'] = $data['budget'] ?? $data['contract_amount'];
@@ -102,13 +109,17 @@ class ProjectController extends Controller
             'deposit_amount' => 'nullable|numeric|min:0',
             'payment_terms' => 'nullable|string',
             'payment_stages' => 'nullable|array',
-            'payment_stages.*.name' => 'required_with:payment_stages|string|max:255',
+            'payment_stages.*.name' => 'nullable|string|max:255',
+            'payment_stages.*.title' => 'nullable|string|max:255',
             'payment_stages.*.percentage' => 'nullable|numeric|min:0|max:100',
             'payment_stages.*.amount' => 'nullable|numeric|min:0',
+            'payment_stages.*.expected_amount' => 'nullable|numeric|min:0',
             'payment_stages.*.due_condition' => 'nullable|string|max:255',
+            'payment_stages.*.due_stage' => 'nullable|string|max:255',
             'payment_stages.*.due_date' => 'nullable|date',
             'payment_stages.*.status' => 'nullable|string|max:255',
             'payment_stages.*.notes' => 'nullable|string',
+            'allow_over_plan' => 'nullable|boolean',
             'revenue' => 'nullable|numeric|min:0',
             'actual_cost' => 'nullable|numeric|min:0',
             'progress' => 'nullable|numeric|min:0|max:100',
@@ -118,7 +129,12 @@ class ProjectController extends Controller
             'created_by' => 'nullable|exists:users,id',
         ]);
         $stages = $data['payment_stages'] ?? null;
+        if (is_array($stages)) {
+            $this->assertPaymentPlanTotal($stages, (bool) ($data['allow_over_plan'] ?? false));
+            $stages = $this->normalizePaymentStages($stages);
+        }
         unset($data['payment_stages']);
+        unset($data['allow_over_plan']);
         if (isset($data['name'])) {
             $data['project_name'] = $data['name'];
         }
@@ -232,7 +248,12 @@ class ProjectController extends Controller
             'reference_number' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
+            'receipt_file' => 'nullable|string|max:255',
+            'receipt' => 'nullable|file|max:10240',
         ]);
+        if ($request->hasFile('receipt')) {
+            $data['receipt_file'] = $request->file('receipt')->store('receipts', 'public');
+        }
 
         $payment = Payment::create(array_merge($data, [
             'project_id' => $project->id,
@@ -246,6 +267,33 @@ class ProjectController extends Controller
         $finance->refreshProject($project);
 
         return $payment->load(['project', 'client', 'invoice', 'paymentStage']);
+    }
+
+    private function assertPaymentPlanTotal(array $stages, bool $allowOverPlan = false): void
+    {
+        $total = collect($stages)->sum(fn (array $stage) => (float) ($stage['percentage'] ?? 0));
+
+        if ($total > 100 && ! $allowOverPlan) {
+            abort(422, 'Total planned payment percentage cannot be above 100% unless confirmed.');
+        }
+    }
+
+    private function normalizePaymentStages(array $stages): array
+    {
+        return collect($stages)
+            ->filter(fn (array $stage) => trim((string) ($stage['name'] ?? $stage['title'] ?? '')) !== '')
+            ->map(fn (array $stage) => [
+                'name' => $stage['name'] ?? $stage['title'],
+                'description' => $stage['description'] ?? null,
+                'percentage' => (float) ($stage['percentage'] ?? 0),
+                'amount' => (float) ($stage['amount'] ?? $stage['expected_amount'] ?? 0),
+                'due_condition' => $stage['due_condition'] ?? $stage['due_stage'] ?? null,
+                'due_date' => $stage['due_date'] ?? null,
+                'status' => $stage['status'] ?? 'Pending',
+                'notes' => $stage['notes'] ?? null,
+            ])
+            ->values()
+            ->all();
     }
 
 }

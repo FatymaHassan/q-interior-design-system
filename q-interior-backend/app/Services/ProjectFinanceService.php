@@ -47,8 +47,6 @@ class ProjectFinanceService
             $status = 'Paid';
         } elseif ($paid > 0) {
             $status = 'Partially Paid';
-        } elseif ($stage->due_date && $stage->due_date->isPast()) {
-            $status = 'Overdue';
         } elseif (in_array($stage->status, ['Due', 'Pending'], true)) {
             $status = $stage->status;
         }
@@ -134,15 +132,21 @@ class ProjectFinanceService
         $expected = (float) $project->contract_amount;
         $projectRevenue = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: $received);
         $cost = $projectExpenses + $supplierCosts;
-        $profit = $projectRevenue - $cost;
+        $profit = $projectRevenue - $projectExpenses;
 
         return [
             'project' => $project->load('client'),
             'metrics' => [
+                'contract_amount' => round($projectRevenue, 2),
                 'expected_revenue' => round($projectRevenue, 2),
                 'received_revenue' => round($received, 2),
+                'balance_receivable' => round(max(0, $projectRevenue - $received), 2),
                 'outstanding_client_balance' => round(max(0, $projectRevenue - $received), 2),
+                'deposit_amount' => round((float) $project->deposit_amount, 2),
                 'payment_percentage' => (float) $project->payment_percentage,
+                'payment_progress' => $projectRevenue > 0 ? round(($received / $projectRevenue) * 100, 2) : 0,
+                'total_project_expenses' => round($projectExpenses, 2),
+                'cash_left' => round($received - $projectExpenses, 2),
                 'total_project_cost' => round($cost, 2),
                 'design_costs' => $expenseBreakdown['Design Costs'],
                 'materials' => $expenseBreakdown['Materials'],
@@ -154,6 +158,7 @@ class ProjectFinanceService
                 'supplier_payables' => round($supplierPayables, 2),
                 'project_profit' => round($profit, 2),
                 'profit_margin' => $projectRevenue > 0 ? round(($profit / $projectRevenue) * 100, 2) : 0,
+                'expense_usage' => $projectRevenue > 0 ? round(($projectExpenses / $projectRevenue) * 100, 2) : 0,
             ],
             'payment_stages' => $project->paymentStages()->with('invoice')->orderBy('id')->get(),
             'expense_breakdown' => $expenseBreakdown,

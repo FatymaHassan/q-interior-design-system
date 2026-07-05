@@ -6,11 +6,12 @@ import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import ProgressBar from "../../components/ui/ProgressBar";
 import Table from "../../components/ui/Table";
-import { addProjectMember, createDocument, deleteDocument, downloadDocumentFile, getEmployees, getMaterials, getProjectFinanceSummary, getProjectMaterialsUsed, getProjectMembers, getProjectTimeline, removeProjectMember, stockOutMaterial, updateDocument } from "../../services/api";
+import { addProjectMember, createDocument, createExpense, createPayment, deleteDocument, downloadDocumentFile, getEmployees, getExpenseCategories, getMaterials, getProjectFinanceSummary, getProjectMaterialsUsed, getProjectMembers, getProjectTimeline, getSuppliers, removeProjectMember, stockOutMaterial, updateDocument } from "../../services/api";
 import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 import { getProject } from "./projectApi";
 
-const tabs = ["Overview", "Finance", "Tasks", "Documents", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
+const tabs = ["Overview", "Payment Plan", "Client Payments / Revenue", "Expenses", "Financial Summary", "Documents", "Tasks", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
+const paymentMethods = ["cash", "bank transfer", "EVC Plus", "card", "other"];
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -19,6 +20,8 @@ export default function ProjectDetails() {
   const [employees, setEmployees] = useState([]);
   const [projectMembers, setProjectMembers] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [expenseItems, setExpenseItems] = useState([]);
   const [materialsUsed, setMaterialsUsed] = useState([]);
   const [finance, setFinance] = useState(null);
   const [activeTab, setActiveTab] = useState("Overview");
@@ -26,10 +29,12 @@ export default function ProjectDetails() {
   const [docForm, setDocForm] = useState({ title: "", document_category: "Photo", visibility: "internal", file: null });
   const [editingDocument, setEditingDocument] = useState(null);
   const [materialForm, setMaterialForm] = useState({ material_id: "", quantity: 1, unit_cost: "", notes: "" });
+  const [paymentForm, setPaymentForm] = useState({ payment_stage_id: "", amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
+  const [expenseForm, setExpenseForm] = useState({ supplier_id: "", category_id: "", category: "", title: "", paid_by: "", quantity: "1", unit_cost: "", total_cost: "", expense_date: new Date().toISOString().slice(0, 10), payment_method: "cash", notes: "" });
   const [status, setStatus] = useState("loading");
 
-  const loadProject = () => Promise.all([getProject(id), getEmployees({ status: "Active" }), getProjectMembers(id), getProjectTimeline(id), getMaterials(), getProjectMaterialsUsed(id), getProjectFinanceSummary(id)])
-    .then(([data, employeeData, projectMemberData, timelineData, materialData, materialsUsedData, financeData]) => {
+  const loadProject = () => Promise.all([getProject(id), getEmployees({ status: "Active" }), getProjectMembers(id), getProjectTimeline(id), getMaterials(), getProjectMaterialsUsed(id), getProjectFinanceSummary(id), getSuppliers(), getExpenseCategories({ expense_type: "project", status: "Active" })])
+    .then(([data, employeeData, projectMemberData, timelineData, materialData, materialsUsedData, financeData, supplierData, categoryData]) => {
       setProject(data);
       setEmployees(employeeData);
       setProjectMembers(projectMemberData);
@@ -37,11 +42,20 @@ export default function ProjectDetails() {
       setMaterials(materialData);
       setMaterialsUsed(materialsUsedData.movements || []);
       setFinance(financeData);
+      setSuppliers(supplierData);
+      setExpenseItems(categoryData);
       setMemberForm((current) => ({ ...current, employee_id: current.employee_id || employeeData[0]?.id || "" }));
       setMaterialForm((current) => ({
         ...current,
         material_id: current.material_id || materialData[0]?.id || "",
         unit_cost: current.unit_cost || materialData[0]?.purchasePrice || "",
+      }));
+      setExpenseForm((current) => ({
+        ...current,
+        supplier_id: current.supplier_id || supplierData[0]?.id || "",
+        category_id: current.category_id || categoryData[0]?.id || "",
+        category: current.category || categoryData[0]?.groupName || "",
+        title: current.title || categoryData[0]?.name || "",
       }));
       setStatus("connected");
     })
@@ -129,6 +143,63 @@ export default function ProjectDetails() {
     loadProject();
   };
 
+  const updatePaymentForm = (event) => setPaymentForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const addClientPayment = async (event) => {
+    event.preventDefault();
+    await createPayment({
+      type: "client",
+      project_id: Number(id),
+      client_id: raw.client_id || raw.client?.id || null,
+      payment_stage_id: paymentForm.payment_stage_id ? Number(paymentForm.payment_stage_id) : null,
+      amount: toNumber(paymentForm.amount),
+      payment_date: paymentForm.payment_date,
+      payment_method: paymentForm.payment_method,
+      reference_number: paymentForm.reference_number,
+      status: "paid",
+      notes: paymentForm.notes,
+    });
+    setPaymentForm({ payment_stage_id: "", amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
+    loadProject();
+  };
+
+  const updateExpenseForm = (event) => {
+    const { name, value } = event.target;
+    setExpenseForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === "category_id") {
+        const selected = expenseItems.find((item) => String(item.id) === String(value));
+        next.category = selected?.groupName || "";
+        next.title = selected?.name || "";
+      }
+      if (name === "quantity" || name === "unit_cost") {
+        next.total_cost = String((toNumber(next.quantity) * toNumber(next.unit_cost)).toFixed(2));
+      }
+      return next;
+    });
+  };
+  const addProjectExpense = async (event) => {
+    event.preventDefault();
+    await createExpense({
+      expense_type: "project",
+      project_id: Number(id),
+      supplier_id: expenseForm.supplier_id ? Number(expenseForm.supplier_id) : null,
+      category_id: expenseForm.category_id ? Number(expenseForm.category_id) : null,
+      category: expenseForm.category,
+      title: expenseForm.title || "Project expense",
+      paid_by: expenseForm.paid_by,
+      quantity: toNumber(expenseForm.quantity),
+      unit_cost: toNumber(expenseForm.unit_cost),
+      total_cost: toNumber(expenseForm.total_cost),
+      amount: toNumber(expenseForm.total_cost),
+      expense_date: expenseForm.expense_date,
+      payment_method: expenseForm.payment_method,
+      notes: expenseForm.notes,
+      is_manual_total: Math.abs(toNumber(expenseForm.total_cost) - (toNumber(expenseForm.quantity) * toNumber(expenseForm.unit_cost))) > 0.001,
+    });
+    setExpenseForm((current) => ({ ...current, paid_by: "", quantity: "1", unit_cost: "", total_cost: "", notes: "" }));
+    loadProject();
+  };
+
   if (status === "loading") return <Card className="p-5 text-sm text-brand-muted">Loading project...</Card>;
   if (status === "error" || !project) return <Card className="p-5 text-sm text-brand-danger">Project could not be loaded.</Card>;
 
@@ -170,7 +241,25 @@ export default function ProjectDetails() {
       <Card className="p-5"><h3 className="mb-4 font-bold">Notes</h3><p className="text-sm text-brand-muted">{raw.notes || raw.description || "No notes added."}</p></Card>
     </section>}
 
-    {activeTab === "Finance" && <ProjectFinancePanel finance={finance} />}
+    {activeTab === "Payment Plan" && <PaymentPlanTab finance={finance} />}
+
+    {activeTab === "Client Payments / Revenue" && <ClientPaymentsTab
+      finance={finance}
+      form={paymentForm}
+      onChange={updatePaymentForm}
+      onSubmit={addClientPayment}
+    />}
+
+    {activeTab === "Expenses" && <ProjectExpensesTab
+      finance={finance}
+      form={expenseForm}
+      suppliers={suppliers}
+      expenseItems={expenseItems}
+      onChange={updateExpenseForm}
+      onSubmit={addProjectExpense}
+    />}
+
+    {activeTab === "Financial Summary" && <ProjectFinancePanel finance={finance} />}
 
     {activeTab === "Tasks" && <Card className="p-5">
       <Table columns={[
@@ -288,24 +377,100 @@ function InfoRows({ rows }) {
   return <div className="space-y-3 text-sm">{rows.map(([label, value]) => <div key={label} className="flex justify-between rounded-xl bg-brand-soft p-3"><span>{label}</span><b>{value || "-"}</b></div>)}</div>;
 }
 
+function PaymentPlanTab({ finance }) {
+  const money = (value) => formatCurrency(value);
+  return <Card className="p-5">
+    <h3 className="mb-4 font-bold">Payment Plan</h3>
+    <Table columns={[
+      { key: "name", label: "Payment Title", render: (stage) => <b>{stage.name}</b> },
+      { key: "percentage", label: "Percentage", render: (stage) => formatPercentage(stage.percentage) },
+      { key: "amount", label: "Expected Amount", render: (stage) => money(stage.amount) },
+      { key: "paid_amount", label: "Paid Amount", render: (stage) => money(stage.paid_amount) },
+      { key: "balance", label: "Remaining", render: (stage) => money(stage.balance) },
+      { key: "due", label: "Due Date/Stage", render: (stage) => stage.due_date || stage.due_condition || "-" },
+      { key: "status", label: "Status", render: (stage) => <Badge>{stage.status}</Badge> },
+      { key: "action", label: "Action", render: () => <span className="text-sm font-semibold text-brand-muted">Link payment when recording revenue</span> },
+    ]} rows={finance?.payment_stages || []} empty="No payment plan rows yet." />
+  </Card>;
+}
+
+function ClientPaymentsTab({ finance, form, onChange, onSubmit }) {
+  const money = (value) => formatCurrency(value);
+  return <div className="space-y-5">
+    <Card className="p-5">
+      <h3 className="font-bold">Add Client Payment</h3>
+      <form onSubmit={onSubmit} className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <FormField label="Related installment"><select name="payment_stage_id" value={form.payment_stage_id} onChange={onChange} className={fieldInputClass}><option value="">No installment</option>{(finance?.payment_stages || []).map((stage) => <option key={stage.id} value={stage.id}>{stage.name} - {money(stage.balance || stage.amount)}</option>)}</select></FormField>
+        <FormField label="Amount paid"><input name="amount" type="number" min="0.01" step="0.01" required value={form.amount} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Payment date"><input name="payment_date" type="date" value={form.payment_date} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={onChange} className={fieldInputClass}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
+        <FormField label="Reference number"><input name="reference_number" value={form.reference_number} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Notes"><input name="notes" value={form.notes} onChange={onChange} className={fieldInputClass} /></FormField>
+        <div className="lg:col-span-3"><Button disabled={!form.amount}>Add Payment</Button></div>
+      </form>
+    </Card>
+    <FinanceTable title="Recent Client Payments" rows={finance?.client_payments || []} columns={[
+      { key: "payment_date", label: "Date" },
+      { key: "amount", label: "Amount", render: (row) => money(row.amount) },
+      { key: "payment_stage", label: "Installment", render: (row) => row.payment_stage?.name || "-" },
+      { key: "payment_method", label: "Method" },
+      { key: "reference_number", label: "Reference" },
+      { key: "notes", label: "Notes" },
+    ]} />
+  </div>;
+}
+
+function ProjectExpensesTab({ finance, form, suppliers, expenseItems, onChange, onSubmit }) {
+  const money = (value) => formatCurrency(value);
+  return <div className="space-y-5">
+    <Card className="p-5">
+      <h3 className="font-bold">Add Project Expense</h3>
+      <form onSubmit={onSubmit} className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <FormField label="Category"><select name="category_id" value={form.category_id} onChange={onChange} className={fieldInputClass}><option value="">Select category</option>{expenseItems.map((item) => <option key={item.id} value={item.id}>{item.groupName ? `${item.groupName} - ` : ""}{item.name}</option>)}</select></FormField>
+        <FormField label="Supplier / paid to"><select name="supplier_id" value={form.supplier_id} onChange={onChange} className={fieldInputClass}><option value="">No supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></FormField>
+        <FormField label="Paid by"><input name="paid_by" value={form.paid_by} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Quantity"><input name="quantity" type="number" min="0" step="0.01" value={form.quantity} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Unit cost"><input name="unit_cost" type="number" min="0" step="0.01" value={form.unit_cost} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Amount"><input name="total_cost" type="number" min="0" step="0.01" required value={form.total_cost} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Expense date"><input name="expense_date" type="date" value={form.expense_date} onChange={onChange} className={fieldInputClass} /></FormField>
+        <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={onChange} className={fieldInputClass}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
+        <FormField label="Notes"><input name="notes" value={form.notes} onChange={onChange} className={fieldInputClass} /></FormField>
+        <div className="lg:col-span-3"><Button disabled={!form.total_cost}>Add Expense</Button></div>
+      </form>
+    </Card>
+    <FinanceTable title="Recent Project Expenses" rows={finance?.project_expenses || []} columns={[
+      { key: "expense_date", label: "Date" },
+      { key: "title", label: "Expense", render: (row) => <b>{row.title || row.item_name}</b> },
+      { key: "category", label: "Category", render: (row) => row.category_model?.group_name || row.category_model?.name || row.category || "-" },
+      { key: "paid_to", label: "Paid To", render: (row) => row.supplier?.name || row.paid_by || "-" },
+      { key: "payment_method", label: "Method" },
+      { key: "amount", label: "Amount", render: (row) => money(row.total_cost || row.amount) },
+    ]} />
+  </div>;
+}
+
 function ProjectFinancePanel({ finance }) {
   const metrics = finance?.metrics || {};
   const money = (value) => formatCurrency(value);
 
   return <div className="space-y-5">
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Contract Amount" value={money(metrics.expected_revenue)} />
-      <Metric label="Client Payments Received" value={money(metrics.received_revenue)} />
-      <Metric label="Remaining Balance" value={money(metrics.outstanding_client_balance)} />
-      <Metric label="Payment %" value={formatPercentage(metrics.payment_percentage)} />
-      <Metric label="Total Project Cost" value={money(metrics.total_project_cost)} />
+      <Metric label="Contract Amount" value={money(metrics.contract_amount ?? metrics.expected_revenue)} />
+      <Metric label="Revenue Received" value={money(metrics.received_revenue)} />
+      <Metric label="Balance Receivable" value={money(metrics.balance_receivable ?? metrics.outstanding_client_balance)} />
+      <Metric label="Deposit Amount" value={money(metrics.deposit_amount)} />
+      <Metric label="Total Expenses" value={money(metrics.total_project_expenses ?? metrics.project_expenses)} />
+      <Metric label="Cash Left" value={money(metrics.cash_left)} />
+      <Metric label="Project Profit" value={money(metrics.project_profit)} />
+      <Metric label="Profit Margin" value={formatPercentage(metrics.profit_margin)} />
+      <Metric label="Payment Progress" value={formatPercentage(metrics.payment_progress ?? metrics.payment_percentage)} />
+      <Metric label="Expense Usage" value={formatPercentage(metrics.expense_usage)} />
       <Metric label="Design Costs" value={money(metrics.design_costs)} />
       <Metric label="Materials" value={money(metrics.materials)} />
       <Metric label="Labour Costs" value={money(metrics.labour_costs)} />
       <Metric label="Site Expenses" value={money(metrics.site_expenses)} />
       <Metric label="Other Costs" value={money(metrics.other_project_costs)} />
-      <Metric label="Project Profit" value={money(metrics.project_profit)} />
-      <Metric label="Profit Margin %" value={formatPercentage(metrics.profit_margin)} />
+      <Metric label="Supplier Payables" value={money(metrics.supplier_payables)} />
     </section>
 
     <Card className="p-5">

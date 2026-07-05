@@ -30,6 +30,10 @@ class DashboardSummaryService
             ->when($start, fn (Builder $query) => $query->whereBetween('payment_date', [$start, $end]))
             ->sum('amount');
 
+        $contractAmount = (float) Project::query()
+            ->when($start, fn (Builder $query) => $query->whereBetween('created_at', [$start, $end]))
+            ->sum(DB::raw('COALESCE(NULLIF(contract_amount, 0), NULLIF(revenue, 0), NULLIF(budget, 0), 0)'));
+
         $projectCosts = (float) Expense::where('approval_status', '!=', 'Rejected')
             ->where(fn (Builder $query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'))
             ->when($start, fn (Builder $query) => $query->whereBetween('expense_date', [$start, $end]))
@@ -54,20 +58,34 @@ class DashboardSummaryService
             ->when($request->filled('month'), fn (Builder $query) => $query->where('month', $request->integer('month')))
             ->sum('net_salary') + $expensePayroll;
 
+        $otherCompanyExpenses = (float) Expense::where('approval_status', '!=', 'Rejected')
+            ->whereNotIn('expense_type', ['project', 'overhead', 'payroll'])
+            ->when($start, fn (Builder $query) => $query->whereBetween('expense_date', [$start, $end]))
+            ->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
+
         $grossProfit = $revenue - $projectCosts;
-        $netProfit = $grossProfit - $overheads - $payroll;
+        $netProfit = $grossProfit - $overheads - $payroll - $otherCompanyExpenses;
 
         return [
+            'total_contract_amount' => round($contractAmount, 2),
             'total_revenue' => round($revenue, 2),
+            'total_revenue_received' => round($revenue, 2),
+            'total_balance_receivable' => round(max(0, $contractAmount - $revenue), 2),
             'total_project_costs' => round($projectCosts, 2),
-            'total_expenses' => round($projectCosts + $overheads + $payroll, 2),
+            'total_project_expenses' => round($projectCosts, 2),
+            'total_expenses' => round($projectCosts + $overheads + $payroll + $otherCompanyExpenses, 2),
             'gross_profit' => round($grossProfit, 2),
             'company_overhead' => round($overheads, 2),
+            'overhead_expenses' => round($overheads, 2),
             'payroll_expenses' => round($payroll, 2),
+            'other_company_expenses' => round($otherCompanyExpenses, 2),
             'net_profit' => round($netProfit, 2),
             'profit_margin' => $revenue > 0 ? round(($netProfit / $revenue) * 100, 2) : 0,
             'active_projects' => Project::whereIn('status', ['Active', 'In Progress', 'active'])->count(),
             'completed_projects' => Project::whereIn('status', ['Completed', 'completed'])->count(),
+            'pending_client_payments' => Project::query()
+                ->whereRaw('COALESCE(NULLIF(contract_amount, 0), NULLIF(revenue, 0), NULLIF(budget, 0), 0) > COALESCE(paid_amount, 0)')
+                ->count(),
             'total_projects' => Project::count(),
             'total_clients' => Client::count(),
             'pending_quotations' => Quotation::whereIn('status', ['Draft', 'Sent', 'Pending', 'Revision Requested'])->count(),
