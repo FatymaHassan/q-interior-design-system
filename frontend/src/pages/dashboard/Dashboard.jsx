@@ -32,7 +32,8 @@ export default function Dashboard() {
   const recent = dashboard?.recent || {};
 
   const alertRows = [
-    { label: "Overdue payments", value: kpis.overdue_payments, tone: "danger", to: "/invoices" },
+    { label: "Overdue invoices", value: kpis.overdue_payments, tone: "danger", to: "/invoices" },
+    { label: "Overdue payment plans", value: kpis.overdue_payment_plans, tone: "danger", to: "/project-plans" },
     { label: "Pending tasks", value: kpis.pending_tasks, tone: "warning", to: "/daily-tasks" },
     { label: "Low stock materials", value: kpis.low_stock_materials, tone: "warning", to: "/inventory" },
     { label: "Pending leave requests", value: kpis.pending_leave_requests, tone: "default", to: "/hr/leave" },
@@ -60,8 +61,8 @@ export default function Dashboard() {
       <MetricCard label="Balance Receivable" value={money(kpis.total_balance_receivable)} icon={Wallet} helper="Contract value still unpaid" />
       <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} tone={toNumber(kpis.net_profit) >= 0 ? "success" : "danger"} helper="After recorded company costs" />
       <MetricCard label="Project Expenses" value={money(kpis.total_project_expenses ?? kpis.total_project_costs)} icon={Wallet} helper="Direct project costs" />
-      <MetricCard label="Gross Profit" value={money(kpis.gross_profit)} icon={TrendingUp} tone={toNumber(kpis.gross_profit) >= 0 ? "success" : "danger"} helper="Received revenue minus project expenses" />
-      <MetricCard label="Company Expenses" value={money(toNumber(kpis.overhead_expenses ?? kpis.company_overhead) + toNumber(kpis.payroll_expenses) + toNumber(kpis.other_company_expenses))} icon={Wallet} helper="Overhead, payroll, and other costs" />
+      <MetricCard label="Cash Left" value={money(kpis.cash_left ?? kpis.gross_profit)} icon={TrendingUp} tone={toNumber(kpis.cash_left ?? kpis.gross_profit) >= 0 ? "success" : "danger"} helper="Received revenue minus project expenses" />
+      <MetricCard label="Expected Profit" value={money(kpis.expected_profit)} icon={TrendingUp} tone={toNumber(kpis.expected_profit) >= 0 ? "success" : "danger"} helper="Contract amount minus project expenses" />
       <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} tone="success" helper="Business margin for this view" />
     </section>
 
@@ -82,7 +83,8 @@ export default function Dashboard() {
           <HealthTile label="Documents" value={kpis.total_documents} icon={FileText} />
           <HealthTile label="Outstanding invoices" value={kpis.outstanding_invoices} icon={AlertTriangle} />
           <HealthTile label="Completed projects" value={kpis.completed_projects} icon={CheckCircle} />
-          <HealthTile label="Pending client payments" value={kpis.pending_client_payments} icon={DollarSign} />
+          <HealthTile label="Pending plans" value={kpis.pending_payment_plans} icon={DollarSign} />
+          <HealthTile label="Overdue plans" value={kpis.overdue_payment_plans} icon={AlertTriangle} />
         </div>
       </Card>
 
@@ -209,6 +211,10 @@ export default function Dashboard() {
       <SectionCard title="Operational Summary" subtitle="Secondary management numbers."><InfoRows rows={[
         ["Overdue Payments", kpis.overdue_payments],
         ["Pending Client Payments", kpis.pending_client_payments],
+        ["Pending Payment Plans", kpis.pending_payment_plans],
+        ["Overdue Payment Plan Rows", kpis.overdue_payment_plans],
+        ["Cash Left", money(kpis.cash_left)],
+        ["Expected Profit", money(kpis.expected_profit)],
         ["Overhead Expenses", money(kpis.overhead_expenses ?? kpis.company_overhead)],
         ["Payroll Expenses", money(kpis.payroll_expenses)],
         ["Other Company Expenses", money(kpis.other_company_expenses)],

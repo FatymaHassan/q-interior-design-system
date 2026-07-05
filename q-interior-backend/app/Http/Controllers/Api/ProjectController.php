@@ -78,7 +78,9 @@ class ProjectController extends Controller
         $data['deposit_amount'] = $data['deposit_amount'] ?? round(((float) $data['contract_amount'] * (float) ($data['deposit_percentage'] ?? 0)) / 100, 2);
 
         $project = Project::create($data);
-        $paymentPlanService->syncDefaultStages($project, $stages);
+        if (! empty($stages)) {
+            $paymentPlanService->syncDefaultStages($project, $stages);
+        }
         $finance->refreshProject($project);
 
         return $project->load(['client', 'stage', 'paymentStages']);

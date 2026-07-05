@@ -10,6 +10,7 @@ class ProjectPaymentStage extends Model
         'project_id',
         'name',
         'description',
+        'payment_type',
         'percentage',
         'amount',
         'due_condition',

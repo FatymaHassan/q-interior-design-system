@@ -53,6 +53,7 @@ class ProjectPaymentStageController extends Controller
         return $request->validate([
             'name' => [$partial ? 'sometimes' : 'required', 'string', 'max:255'],
             'description' => 'nullable|string',
+            'payment_type' => 'nullable|in:percentage,fixed',
             'percentage' => 'nullable|numeric|min:0|max:100',
             'amount' => [$partial ? 'sometimes' : 'required', 'numeric', 'min:0'],
             'due_condition' => 'nullable|string|max:255',

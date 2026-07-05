@@ -10,6 +10,7 @@ use App\Models\Material;
 use App\Models\Payment;
 use App\Models\Payroll;
 use App\Models\Project;
+use App\Models\ProjectPaymentStage;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\Supplier;
@@ -65,6 +66,8 @@ class DashboardSummaryService
 
         $grossProfit = $revenue - $projectCosts;
         $netProfit = $grossProfit - $overheads - $payroll - $otherCompanyExpenses;
+        $cashLeft = $revenue - $projectCosts;
+        $expectedProfit = $contractAmount - $projectCosts;
 
         return [
             'total_contract_amount' => round($contractAmount, 2),
@@ -73,6 +76,8 @@ class DashboardSummaryService
             'total_balance_receivable' => round(max(0, $contractAmount - $revenue), 2),
             'total_project_costs' => round($projectCosts, 2),
             'total_project_expenses' => round($projectCosts, 2),
+            'cash_left' => round($cashLeft, 2),
+            'expected_profit' => round($expectedProfit, 2),
             'total_expenses' => round($projectCosts + $overheads + $payroll + $otherCompanyExpenses, 2),
             'gross_profit' => round($grossProfit, 2),
             'company_overhead' => round($overheads, 2),
@@ -86,6 +91,8 @@ class DashboardSummaryService
             'pending_client_payments' => Project::query()
                 ->whereRaw('COALESCE(NULLIF(contract_amount, 0), NULLIF(revenue, 0), NULLIF(budget, 0), 0) > COALESCE(paid_amount, 0)')
                 ->count(),
+            'pending_payment_plans' => ProjectPaymentStage::whereIn('status', ['Pending', 'Due', 'Partially Paid'])->count(),
+            'overdue_payment_plans' => ProjectPaymentStage::whereDate('due_date', '<', now())->whereNotIn('status', ['Paid', 'Cancelled'])->count(),
             'total_projects' => Project::count(),
             'total_clients' => Client::count(),
             'pending_quotations' => Quotation::whereIn('status', ['Draft', 'Sent', 'Pending', 'Revision Requested'])->count(),

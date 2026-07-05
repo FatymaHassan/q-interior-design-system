@@ -710,8 +710,8 @@ export async function rejectExpense(id) {
   return mapExpense(response.data);
 }
 
-export async function getPayments() {
-  const response = await api.get("/payments");
+export async function getPayments(params = {}) {
+  const response = await api.get("/payments", { params });
   return response.data.map(mapPayment);
 }
 

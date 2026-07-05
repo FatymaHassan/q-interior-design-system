@@ -26,6 +26,7 @@ class ProjectPaymentPlanService
             $project->paymentStages()->create([
                 'name' => $stage['name'] ?? $stage['title'] ?? 'Payment Stage',
                 'description' => $stage['description'] ?? null,
+                'payment_type' => $stage['payment_type'] ?? ((float) ($stage['percentage'] ?? 0) > 0 ? 'percentage' : 'fixed'),
                 'percentage' => (float) ($stage['percentage'] ?? 0),
                 'amount' => $amount,
                 'due_condition' => $stage['due_condition'] ?? $stage['due_stage'] ?? null,

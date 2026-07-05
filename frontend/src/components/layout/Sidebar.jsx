@@ -15,6 +15,9 @@ const sections = [
     label: "Project & Daily Work",
     items: [
       { label: "Projects", icon: Briefcase, to: "/projects" },
+      { label: "Project Plans", icon: ClipboardList, to: "/project-plans", roles: ["admin", "manager", "finance"] },
+      { label: "Client Payments", icon: Wallet, to: "/project-client-payments", roles: ["admin", "manager", "finance"] },
+      { label: "Project Expenses", icon: Receipt, to: "/project-expenses", roles: ["admin", "manager", "finance"] },
       { label: "Project Board", icon: Columns3, to: "/project-board" },
       { label: "Daily Tasks", icon: CheckSquare, to: "/daily-tasks" },
       { label: "Photos", icon: Image, to: "/photos" },
