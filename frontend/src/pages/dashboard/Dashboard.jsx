@@ -33,7 +33,7 @@ export default function Dashboard() {
 
   const alertRows = [
     { label: "Overdue invoices", value: kpis.overdue_payments, tone: "danger", to: "/invoices" },
-    { label: "Overdue payment plans", value: kpis.overdue_payment_plans, tone: "danger", to: "/project-plans" },
+    { label: "Overdue payment plans", value: kpis.overdue_payment_plans, tone: "danger", to: "/projects" },
     { label: "Pending tasks", value: kpis.pending_tasks, tone: "warning", to: "/daily-tasks" },
     { label: "Low stock materials", value: kpis.low_stock_materials, tone: "warning", to: "/inventory" },
     { label: "Pending leave requests", value: kpis.pending_leave_requests, tone: "default", to: "/hr/leave" },
