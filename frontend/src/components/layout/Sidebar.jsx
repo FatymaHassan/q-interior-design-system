@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, Tags, UserRoundCog, Users, Wallet, X } from "lucide-react";
+import { Bell, Boxes, Briefcase, CalendarDays, CheckSquare, ChevronDown, ChevronLeft, ClipboardList, Clock, Columns3, FileText, Image, Inbox, LayoutDashboard, Lock, Plane, Receipt, ScrollText, Settings, UserRoundCog, Users, Wallet, X } from "lucide-react";
 import { userHasRole } from "../../services/api";
 
 const sections = [
@@ -30,10 +30,7 @@ const sections = [
     items: [
       { label: "Reports", icon: ClipboardList, to: "/finance", roles: ["admin", "manager", "finance"] },
       { label: "Invoices", icon: ScrollText, to: "/invoices", roles: ["admin", "manager", "finance"] },
-      { label: "Expenses", icon: Receipt, to: "/expenses", roles: ["admin", "manager", "finance"] },
-      { label: "Expense Categories", icon: Tags, to: "/expense-categories", roles: ["admin", "manager", "finance"] },
       { label: "Suppliers", icon: Users, to: "/suppliers", roles: ["admin", "manager", "finance"] },
-      { label: "Payments", icon: Wallet, to: "/payments", roles: ["admin", "manager", "finance"] },
       { label: "Office Expenses", icon: FileText, to: "/overheads", roles: ["admin", "manager", "finance"] },
       { label: "Payroll", icon: Wallet, to: "/finance/payroll", roles: ["admin", "manager", "finance"] },
       { label: "Quotations", icon: ScrollText, to: "/quotations", roles: ["admin", "manager", "designer"] },
