@@ -4,7 +4,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { createPayment, getClients, getPayments, getProjectPaymentStages, getProjects } from "../../services/api";
+import { createPayment, getClients, getPayments, getProjects } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
 
 const methods = ["cash", "bank transfer", "EVC Plus", "card", "other"];
@@ -13,8 +13,7 @@ export default function ProjectClientPayments() {
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [stages, setStages] = useState([]);
-  const [form, setForm] = useState({ project_id: "", client_id: "", payment_stage_id: "", payment_date: new Date().toISOString().slice(0, 10), amount: "", payment_method: "cash", reference_number: "", notes: "" });
+  const [form, setForm] = useState({ project_id: "", client_id: "", payment_date: new Date().toISOString().slice(0, 10), amount: "", payment_method: "cash", reference_number: "", notes: "" });
   const selectedProject = useMemo(() => projects.find((project) => String(project.id) === String(form.project_id)), [projects, form.project_id]);
 
   const load = () => Promise.all([getProjects(), getClients(), getPayments()]).then(([projectRows, clientRows, paymentRows]) => {
@@ -27,9 +26,8 @@ export default function ProjectClientPayments() {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!form.project_id) return;
-    getProjectPaymentStages(form.project_id).then(setStages).catch(() => setStages([]));
     const project = projects.find((item) => String(item.id) === String(form.project_id));
-    if (project) setForm((current) => ({ ...current, client_id: project.raw?.client_id || project.raw?.client?.id || current.client_id, payment_stage_id: "" }));
+    if (project) setForm((current) => ({ ...current, client_id: project.raw?.client_id || project.raw?.client?.id || current.client_id }));
   }, [form.project_id, projects]);
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -39,7 +37,6 @@ export default function ProjectClientPayments() {
       type: "client",
       project_id: Number(form.project_id),
       client_id: form.client_id ? Number(form.client_id) : null,
-      payment_stage_id: form.payment_stage_id ? Number(form.payment_stage_id) : null,
       amount: toNumber(form.amount),
       payment_date: form.payment_date,
       payment_method: form.payment_method,
@@ -61,7 +58,6 @@ export default function ProjectClientPayments() {
       <form onSubmit={submit} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <FormField label="Project"><select name="project_id" value={form.project_id} onChange={updateField} required className={fieldInputClass}>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></FormField>
         <FormField label="Client"><select name="client_id" value={form.client_id} onChange={updateField} className={fieldInputClass}>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></FormField>
-        <FormField label="Linked plan row"><select name="payment_stage_id" value={form.payment_stage_id} onChange={updateField} className={fieldInputClass}><option value="">No linked row</option>{stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name} - {formatCurrency(stage.balance || stage.amount)}</option>)}</select></FormField>
         <FormField label="Amount paid"><input name="amount" type="number" min="0.01" step="0.01" value={form.amount} onChange={updateField} required className={fieldInputClass} /></FormField>
         <FormField label="Payment date"><input name="payment_date" type="date" value={form.payment_date} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={updateField} className={fieldInputClass}>{methods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
@@ -77,7 +73,6 @@ export default function ProjectClientPayments() {
         { key: "project", label: "Project" },
         { key: "client", label: "Client" },
         { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
-        { key: "stage", label: "Plan Row", render: (row) => row.paymentStage || "-" },
         { key: "method", label: "Method" },
         { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
       ]} rows={payments} empty="No client payments yet." />

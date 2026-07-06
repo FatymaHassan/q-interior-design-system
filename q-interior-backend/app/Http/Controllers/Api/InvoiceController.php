@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Notification;
-use App\Models\ProjectPaymentStage;
 use App\Models\Setting;
 use App\Services\ProjectFinanceService;
 use Illuminate\Http\Request;
@@ -17,12 +16,11 @@ class InvoiceController extends Controller
     {
         $invoiceType = $request->query('invoice_type') ?? $request->route('invoice_type');
 
-        return Invoice::with(['client', 'supplier', 'project', 'paymentStage', 'items'])
+        return Invoice::with(['client', 'supplier', 'project', 'items'])
             ->when($invoiceType, fn ($query, $value) => $query->where('invoice_type', $value))
             ->when($request->query('client_id'), fn ($query, $value) => $query->where('client_id', $value))
             ->when($request->query('supplier_id'), fn ($query, $value) => $query->where('supplier_id', $value))
             ->when($request->query('project_id'), fn ($query, $value) => $query->where('project_id', $value))
-            ->when($request->query('payment_stage_id'), fn ($query, $value) => $query->where('payment_stage_id', $value))
             ->when($request->query('status'), fn ($query, $value) => $query->where('status', $value))
             ->when($request->query('overdue'), fn ($query) => $query->whereDate('due_date', '<', now())->where('status', '!=', 'Paid'))
             ->latest()
@@ -50,13 +48,13 @@ class InvoiceController extends Controller
             $this->syncItems($invoice, $items);
             $finance->refreshInvoice($invoice->refresh());
 
-            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
         });
     }
 
     public function show(Invoice $invoice)
     {
-        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
     }
 
     public function update(Request $request, Invoice $invoice, ProjectFinanceService $finance)
@@ -77,7 +75,7 @@ class InvoiceController extends Controller
             }
             $finance->refreshInvoice($invoice->refresh());
 
-            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+            return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
         });
     }
 
@@ -101,14 +99,14 @@ class InvoiceController extends Controller
             'is_read' => false,
         ]);
 
-        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
     }
 
     public function markSent(Invoice $invoice)
     {
         $invoice->update(['status' => $invoice->invoice_type === 'supplier' ? 'Received' : 'Sent']);
 
-        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
     }
 
     public function uploadFile(Request $request, Invoice $invoice)
@@ -116,7 +114,7 @@ class InvoiceController extends Controller
         $data = $request->validate(['attachment_file' => 'required|string|max:255']);
         $invoice->update($data);
 
-        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'paymentStage', 'items']));
+        return $this->withComputedStatus($invoice->load(['client', 'supplier', 'project', 'items']));
     }
 
     public function pdf(Invoice $invoice)
@@ -137,7 +135,6 @@ class InvoiceController extends Controller
             'client_id' => 'nullable|exists:clients,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'project_id' => 'nullable|exists:projects,id',
-            'payment_stage_id' => 'nullable|exists:project_payment_stages,id',
             'purchase_order_id' => 'nullable|exists:purchase_orders,id',
             'quotation_id' => 'nullable|exists:quotations,id',
             'issue_date' => 'nullable|date',

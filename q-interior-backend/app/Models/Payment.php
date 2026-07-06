@@ -14,7 +14,6 @@ class Payment extends Model
         'project_id',
         'client_id',
         'supplier_id',
-        'payment_stage_id',
         'invoice_id',
         'type',
         'amount',
@@ -41,11 +40,6 @@ class Payment extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
-    }
-
-    public function paymentStage()
-    {
-        return $this->belongsTo(ProjectPaymentStage::class, 'payment_stage_id');
     }
 
     public function invoice()

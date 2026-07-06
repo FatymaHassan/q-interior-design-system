@@ -6,7 +6,6 @@ use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Project;
-use App\Models\ProjectPaymentStage;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 
@@ -31,33 +30,9 @@ class ProjectFinanceService
             'payment_percentage' => $contract > 0 ? round(($paid / $contract) * 100, 2) : 0,
         ])->save();
 
-        $project->paymentStages()->get()->each(fn (ProjectPaymentStage $stage) => $this->refreshStage($stage));
         $project->invoices()->get()->each(fn (Invoice $invoice) => $this->refreshInvoice($invoice));
 
         return $project->refresh();
-    }
-
-    public function refreshStage(ProjectPaymentStage $stage): ProjectPaymentStage
-    {
-        $paid = (float) $stage->payments()->where('status', '!=', 'cancelled')->sum('amount');
-        $balance = max(0, (float) $stage->amount - $paid);
-        $status = $stage->status;
-
-        if ($balance <= 0 && (float) $stage->amount > 0) {
-            $status = 'Paid';
-        } elseif ($paid > 0) {
-            $status = 'Partially Paid';
-        } elseif (in_array($stage->status, ['Due', 'Pending'], true)) {
-            $status = $stage->status;
-        }
-
-        $stage->forceFill([
-            'paid_amount' => round($paid, 2),
-            'balance' => round($balance, 2),
-            'status' => $status,
-        ])->save();
-
-        return $stage->refresh();
     }
 
     public function refreshInvoice(Invoice $invoice): Invoice
@@ -82,9 +57,6 @@ class ProjectFinanceService
             'status' => $status,
         ])->save();
 
-        if ($invoice->paymentStage) {
-            $this->refreshStage($invoice->paymentStage);
-        }
         if ($invoice->project) {
             $this->refreshProjectTotalsOnly($invoice->project);
         }
@@ -114,9 +86,9 @@ class ProjectFinanceService
     {
         $project = $this->refreshProject($project);
 
-        $clientPayments = $project->payments()->clientRevenue()->with(['client', 'invoice', 'paymentStage'])->latest()->get();
+        $clientPayments = $project->payments()->clientRevenue()->with(['client', 'invoice'])->latest()->get();
         $supplierPayments = $project->payments()->supplierPayment()->with(['supplier', 'invoice'])->latest()->get();
-        $clientInvoices = $project->invoices()->where('invoice_type', 'client')->with(['client', 'items', 'paymentStage'])->latest()->get();
+        $clientInvoices = $project->invoices()->where('invoice_type', 'client')->with(['client', 'items'])->latest()->get();
         $supplierInvoices = $project->invoices()->where('invoice_type', 'supplier')->with(['supplier', 'items'])->latest()->get();
         $expenses = $project->expenses()
             ->where(fn ($query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'))
@@ -160,7 +132,6 @@ class ProjectFinanceService
                 'profit_margin' => $projectRevenue > 0 ? round(($profit / $projectRevenue) * 100, 2) : 0,
                 'expense_usage' => $projectRevenue > 0 ? round(($projectExpenses / $projectRevenue) * 100, 2) : 0,
             ],
-            'payment_stages' => $project->paymentStages()->with('invoice')->orderBy('id')->get(),
             'expense_breakdown' => $expenseBreakdown,
             'client_payments' => $clientPayments,
             'supplier_payments' => $supplierPayments,

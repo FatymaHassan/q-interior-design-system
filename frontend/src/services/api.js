@@ -263,8 +263,6 @@ export function mapPayment(payment) {
     supplier: payment.supplier?.name || "-",
     supplierId: payment.supplier_id || payment.supplier?.id || "",
     invoiceId: payment.invoice_id || payment.invoice?.id || "",
-    paymentStageId: payment.payment_stage_id || payment.payment_stage?.id || "",
-    paymentStage: payment.payment_stage?.name || "-",
     amount: money(payment.amount),
     date: payment.payment_date || "-",
     method: payment.payment_method || payment.method || "-",
@@ -286,8 +284,6 @@ export function mapInvoice(invoice) {
     supplierId: invoice.supplier_id || "",
     project: invoice.project?.name || invoice.project?.project_name || "-",
     projectId: invoice.project_id || "",
-    paymentStageId: invoice.payment_stage_id || invoice.payment_stage?.id || "",
-    paymentStage: invoice.payment_stage?.name || "-",
     issueDate: invoice.issue_date || invoice.invoice_date || "",
     invoiceDate: invoice.invoice_date || "",
     dueDate: invoice.due_date || "",
@@ -810,25 +806,6 @@ export async function getProjects() {
 export async function getProjectFinanceSummary(id) {
   const response = await api.get(`/projects/${id}/finance-summary`);
   return response.data;
-}
-
-export async function getProjectPaymentStages(id) {
-  const response = await api.get(`/projects/${id}/payment-stages`);
-  return response.data;
-}
-
-export async function createProjectPaymentStage(id, payload) {
-  const response = await api.post(`/projects/${id}/payment-stages`, payload);
-  return response.data;
-}
-
-export async function updateProjectPaymentStage(id, payload) {
-  const response = await api.put(`/project-payment-stages/${id}`, payload);
-  return response.data;
-}
-
-export async function deleteProjectPaymentStage(id) {
-  await api.delete(`/project-payment-stages/${id}`);
 }
 
 export async function getSuppliers() {

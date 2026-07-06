@@ -7,7 +7,6 @@ use App\Models\Notification;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Services\ProjectFinanceService;
-use App\Services\ProjectPaymentPlanService;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -29,7 +28,7 @@ class ProjectController extends Controller
             ->get();
     }
 
-    public function store(Request $request, ProjectPaymentPlanService $paymentPlanService, ProjectFinanceService $finance)
+    public function store(Request $request, ProjectFinanceService $finance)
     {
         $data = $request->validate([
             'client_id' => 'required|exists:clients,id',
@@ -46,18 +45,6 @@ class ProjectController extends Controller
             'deposit_percentage' => 'nullable|numeric|min:0|max:100',
             'deposit_amount' => 'nullable|numeric|min:0',
             'payment_terms' => 'nullable|string',
-            'payment_stages' => 'nullable|array',
-            'payment_stages.*.name' => 'nullable|string|max:255',
-            'payment_stages.*.title' => 'nullable|string|max:255',
-            'payment_stages.*.percentage' => 'nullable|numeric|min:0|max:100',
-            'payment_stages.*.amount' => 'nullable|numeric|min:0',
-            'payment_stages.*.expected_amount' => 'nullable|numeric|min:0',
-            'payment_stages.*.due_condition' => 'nullable|string|max:255',
-            'payment_stages.*.due_stage' => 'nullable|string|max:255',
-            'payment_stages.*.due_date' => 'nullable|date',
-            'payment_stages.*.status' => 'nullable|string|max:255',
-            'payment_stages.*.notes' => 'nullable|string',
-            'allow_over_plan' => 'nullable|boolean',
             'revenue' => 'nullable|numeric|min:0',
             'actual_cost' => 'nullable|numeric|min:0',
             'progress' => 'nullable|numeric|min:0|max:100',
@@ -66,11 +53,6 @@ class ProjectController extends Controller
             'notes' => 'nullable|string',
             'created_by' => 'nullable|exists:users,id',
         ]);
-        $stages = $data['payment_stages'] ?? [];
-        $this->assertPaymentPlanTotal($stages, (bool) ($data['allow_over_plan'] ?? false));
-        $stages = $this->normalizePaymentStages($stages);
-        unset($data['payment_stages']);
-        unset($data['allow_over_plan']);
         $data['project_name'] = $data['name'];
         $data['contract_amount'] = $data['contract_amount'] ?? $data['revenue'] ?? $data['budget'] ?? 0;
         $data['budget'] = $data['budget'] ?? $data['contract_amount'];
@@ -78,22 +60,19 @@ class ProjectController extends Controller
         $data['deposit_amount'] = $data['deposit_amount'] ?? round(((float) $data['contract_amount'] * (float) ($data['deposit_percentage'] ?? 0)) / 100, 2);
 
         $project = Project::create($data);
-        if (! empty($stages)) {
-            $paymentPlanService->syncDefaultStages($project, $stages);
-        }
         $finance->refreshProject($project);
 
-        return $project->load(['client', 'stage', 'paymentStages']);
+        return $project->load(['client', 'stage']);
     }
 
     public function show(Project $project)
     {
-        $project->load(['client', 'stage', 'paymentStages.invoice', 'invoices.client', 'invoices.supplier', 'payments.client', 'payments.supplier', 'members.user.roles', 'members.employee.department', 'documents.uploader', 'tasks.assignee', 'tasks.assigneeEmployee.department', 'tasks.assigner', 'tasks.statusHistories.changer', 'tasks.attachments.uploader', 'clientMessages.client', 'clientMessages.user', 'approvals.signature']);
+        $project->load(['client', 'stage', 'invoices.client', 'invoices.supplier', 'payments.client', 'payments.supplier', 'members.user.roles', 'members.employee.department', 'documents.uploader', 'tasks.assignee', 'tasks.assigneeEmployee.department', 'tasks.assigner', 'tasks.statusHistories.changer', 'tasks.attachments.uploader', 'clientMessages.client', 'clientMessages.user', 'approvals.signature']);
 
         return $project;
     }
 
-    public function update(Request $request, Project $project, ProjectPaymentPlanService $paymentPlanService, ProjectFinanceService $finance)
+    public function update(Request $request, Project $project, ProjectFinanceService $finance)
     {
         $data = $request->validate([
             'client_id' => 'sometimes|required|exists:clients,id',
@@ -110,18 +89,6 @@ class ProjectController extends Controller
             'deposit_percentage' => 'nullable|numeric|min:0|max:100',
             'deposit_amount' => 'nullable|numeric|min:0',
             'payment_terms' => 'nullable|string',
-            'payment_stages' => 'nullable|array',
-            'payment_stages.*.name' => 'nullable|string|max:255',
-            'payment_stages.*.title' => 'nullable|string|max:255',
-            'payment_stages.*.percentage' => 'nullable|numeric|min:0|max:100',
-            'payment_stages.*.amount' => 'nullable|numeric|min:0',
-            'payment_stages.*.expected_amount' => 'nullable|numeric|min:0',
-            'payment_stages.*.due_condition' => 'nullable|string|max:255',
-            'payment_stages.*.due_stage' => 'nullable|string|max:255',
-            'payment_stages.*.due_date' => 'nullable|date',
-            'payment_stages.*.status' => 'nullable|string|max:255',
-            'payment_stages.*.notes' => 'nullable|string',
-            'allow_over_plan' => 'nullable|boolean',
             'revenue' => 'nullable|numeric|min:0',
             'actual_cost' => 'nullable|numeric|min:0',
             'progress' => 'nullable|numeric|min:0|max:100',
@@ -130,13 +97,6 @@ class ProjectController extends Controller
             'notes' => 'nullable|string',
             'created_by' => 'nullable|exists:users,id',
         ]);
-        $stages = $data['payment_stages'] ?? null;
-        if (is_array($stages)) {
-            $this->assertPaymentPlanTotal($stages, (bool) ($data['allow_over_plan'] ?? false));
-            $stages = $this->normalizePaymentStages($stages);
-        }
-        unset($data['payment_stages']);
-        unset($data['allow_over_plan']);
         if (isset($data['name'])) {
             $data['project_name'] = $data['name'];
         }
@@ -145,12 +105,9 @@ class ProjectController extends Controller
         }
 
         $project->update($data);
-        if (is_array($stages)) {
-            $paymentPlanService->syncDefaultStages($project, $stages);
-        }
         $finance->refreshProject($project);
 
-        return $project->load(['client', 'stage', 'paymentStages']);
+        return $project->load(['client', 'stage']);
     }
 
     public function destroy(Project $project)
@@ -233,7 +190,7 @@ class ProjectController extends Controller
     {
         return $project->payments()
             ->clientRevenue()
-            ->with(['client', 'invoice', 'paymentStage'])
+            ->with(['client', 'invoice'])
             ->latest()
             ->get();
     }
@@ -242,7 +199,6 @@ class ProjectController extends Controller
     {
         $data = $request->validate([
             'client_id' => 'nullable|exists:clients,id',
-            'payment_stage_id' => 'nullable|exists:project_payment_stages,id',
             'invoice_id' => 'nullable|exists:invoices,id',
             'amount' => 'required|numeric|min:0.01',
             'payment_date' => 'nullable|date',
@@ -268,34 +224,7 @@ class ProjectController extends Controller
 
         $finance->refreshProject($project);
 
-        return $payment->load(['project', 'client', 'invoice', 'paymentStage']);
-    }
-
-    private function assertPaymentPlanTotal(array $stages, bool $allowOverPlan = false): void
-    {
-        $total = collect($stages)->sum(fn (array $stage) => (float) ($stage['percentage'] ?? 0));
-
-        if ($total > 100 && ! $allowOverPlan) {
-            abort(422, 'Total planned payment percentage cannot be above 100% unless confirmed.');
-        }
-    }
-
-    private function normalizePaymentStages(array $stages): array
-    {
-        return collect($stages)
-            ->filter(fn (array $stage) => trim((string) ($stage['name'] ?? $stage['title'] ?? '')) !== '')
-            ->map(fn (array $stage) => [
-                'name' => $stage['name'] ?? $stage['title'],
-                'description' => $stage['description'] ?? null,
-                'percentage' => (float) ($stage['percentage'] ?? 0),
-                'amount' => (float) ($stage['amount'] ?? $stage['expected_amount'] ?? 0),
-                'due_condition' => $stage['due_condition'] ?? $stage['due_stage'] ?? null,
-                'due_date' => $stage['due_date'] ?? null,
-                'status' => $stage['status'] ?? 'Pending',
-                'notes' => $stage['notes'] ?? null,
-            ])
-            ->values()
-            ->all();
+        return $payment->load(['project', 'client', 'invoice']);
     }
 
 }

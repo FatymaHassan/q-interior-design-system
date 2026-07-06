@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Briefcase, CheckCircle, DollarSign, FileText, Plus, TrendingUp, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Briefcase, CheckCircle, FileText, Plus, TrendingUp, Users, Wallet } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -33,7 +33,6 @@ export default function Dashboard() {
 
   const alertRows = [
     { label: "Overdue invoices", value: kpis.overdue_payments, tone: "danger", to: "/invoices" },
-    { label: "Overdue payment plans", value: kpis.overdue_payment_plans, tone: "danger", to: "/projects" },
     { label: "Pending tasks", value: kpis.pending_tasks, tone: "warning", to: "/daily-tasks" },
     { label: "Low stock materials", value: kpis.low_stock_materials, tone: "warning", to: "/inventory" },
     { label: "Pending leave requests", value: kpis.pending_leave_requests, tone: "default", to: "/hr/leave" },
@@ -83,8 +82,6 @@ export default function Dashboard() {
           <HealthTile label="Documents" value={kpis.total_documents} icon={FileText} />
           <HealthTile label="Outstanding invoices" value={kpis.outstanding_invoices} icon={AlertTriangle} />
           <HealthTile label="Completed projects" value={kpis.completed_projects} icon={CheckCircle} />
-          <HealthTile label="Pending plans" value={kpis.pending_payment_plans} icon={DollarSign} />
-          <HealthTile label="Overdue plans" value={kpis.overdue_payment_plans} icon={AlertTriangle} />
         </div>
       </Card>
 
@@ -211,8 +208,6 @@ export default function Dashboard() {
       <SectionCard title="Operational Summary" subtitle="Secondary management numbers."><InfoRows rows={[
         ["Overdue Payments", kpis.overdue_payments],
         ["Pending Client Payments", kpis.pending_client_payments],
-        ["Pending Payment Plans", kpis.pending_payment_plans],
-        ["Overdue Payment Plan Rows", kpis.overdue_payment_plans],
         ["Cash Left", money(kpis.cash_left)],
         ["Expected Profit", money(kpis.expected_profit)],
         ["Overhead Expenses", money(kpis.overhead_expenses ?? kpis.company_overhead)],

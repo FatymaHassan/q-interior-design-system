@@ -53,11 +53,6 @@ class Project extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function paymentStages()
-    {
-        return $this->hasMany(ProjectPaymentStage::class);
-    }
-
     public function invoices()
     {
         return $this->hasMany(Invoice::class);

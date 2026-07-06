@@ -10,7 +10,6 @@ use App\Models\Material;
 use App\Models\Payment;
 use App\Models\Payroll;
 use App\Models\Project;
-use App\Models\ProjectPaymentStage;
 use App\Models\PurchaseOrder;
 use App\Models\Quotation;
 use App\Models\Supplier;
@@ -91,8 +90,6 @@ class DashboardSummaryService
             'pending_client_payments' => Project::query()
                 ->whereRaw('COALESCE(NULLIF(contract_amount, 0), NULLIF(revenue, 0), NULLIF(budget, 0), 0) > COALESCE(paid_amount, 0)')
                 ->count(),
-            'pending_payment_plans' => ProjectPaymentStage::whereIn('status', ['Pending', 'Due', 'Partially Paid'])->count(),
-            'overdue_payment_plans' => ProjectPaymentStage::whereDate('due_date', '<', now())->whereNotIn('status', ['Paid', 'Cancelled'])->count(),
             'total_projects' => Project::count(),
             'total_clients' => Client::count(),
             'pending_quotations' => Quotation::whereIn('status', ['Draft', 'Sent', 'Pending', 'Revision Requested'])->count(),

@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { addProjectMember, getClients, getEmployees, getProjectStages } from "../../services/api";
-import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
+import { toNumber } from "../../utils/numberFormat";
 import { createProject } from "./projectApi";
 
 const emptyForm = {
@@ -29,33 +28,18 @@ const emptyForm = {
   notes: "",
 };
 
-const emptyPlanItem = () => ({
-  name: "",
-  payment_type: "percentage",
-  percentage: "",
-  amount: "",
-  due_date: "",
-  due_condition: "",
-  status: "Pending",
-  notes: "",
-});
-
 export default function ProjectAdd() {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [stages, setStages] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
-  const [planItems, setPlanItems] = useState([emptyPlanItem()]);
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
 
   const contractAmount = toNumber(form.contract_amount || form.total_quotation || form.budget);
-  const plannedAmount = useMemo(() => planItems.reduce((sum, item) => sum + expectedAmount(item, contractAmount), 0), [planItems, contractAmount]);
-  const plannedPercentage = useMemo(() => planItems.reduce((sum, item) => sum + (item.payment_type === "percentage" ? toNumber(item.percentage) : 0), 0), [planItems]);
-  const hasPlanItems = planItems.some((item) => item.name || item.amount || item.percentage || item.due_date || item.due_condition);
 
   useEffect(() => {
     Promise.all([getClients(), getProjectStages(), getEmployees({ status: "Active" })]).then(([clientData, stageData, employeeData]) => {
@@ -88,35 +72,11 @@ export default function ProjectAdd() {
     });
   };
 
-  const updatePlanItem = (index, field, value) => {
-    setPlanItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
-  };
-
-  const addPlanItem = () => setPlanItems((current) => [...current, emptyPlanItem()]);
-  const removePlanItem = (index) => setPlanItems((current) => current.length === 1 ? [emptyPlanItem()] : current.filter((_, itemIndex) => itemIndex !== index));
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setNotice("");
-    if (plannedPercentage > 100) {
-      setSaving(false);
-      setNotice("Total planned payment percentage cannot be above 100%.");
-      return;
-    }
     try {
-      const cleanPlanItems = planItems
-        .filter((item) => item.name || item.amount || item.percentage || item.due_date || item.due_condition)
-        .map((item) => ({
-          name: item.name || "Payment stage",
-          payment_type: item.payment_type,
-          percentage: item.payment_type === "percentage" ? toNumber(item.percentage) : 0,
-          amount: expectedAmount(item, contractAmount),
-          due_date: item.due_date || null,
-          due_condition: item.due_condition,
-          status: item.status || "Pending",
-          notes: item.notes,
-        }));
       const project = await createProject({
         ...form,
         client_id: Number(form.client_id),
@@ -130,7 +90,6 @@ export default function ProjectAdd() {
         deposit_amount: form.deposit_amount !== "" ? toNumber(form.deposit_amount) : Number(((contractAmount * toNumber(form.deposit_percentage)) / 100).toFixed(2)),
         payment_terms: form.payment_terms,
         progress: toNumber(form.progress),
-        payment_stages: cleanPlanItems,
         notes: form.notes,
       });
       await Promise.all(selectedMembers.map((member) => addProjectMember(project.id, {
@@ -157,7 +116,7 @@ export default function ProjectAdd() {
     <div><Link to="/projects"><Button variant="outline">Back to Projects</Button></Link></div>
     <Card className="p-5 md:p-6">
       <h2 className="text-xl font-bold text-brand-primary">Add Project</h2>
-      <p className="mt-1 text-sm text-brand-muted">Create the project, contract, payment plan, and employee assignment in one form.</p>
+      <p className="mt-1 text-sm text-brand-muted">Create the project, contract details, and employee assignment in one form.</p>
       {notice && <p className="mt-4 rounded-xl bg-brand-soft p-3 text-sm text-brand-primary">{notice}</p>}
       {status === "fallback" && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice || "Could not load project form data."}</p>}
       <form onSubmit={handleSubmit} className="mt-5 space-y-5">
@@ -174,8 +133,8 @@ export default function ProjectAdd() {
 
         <section className="rounded-2xl border border-brand-border p-4">
           <div className="mb-4">
-            <h3 className="font-bold text-brand-primary">Contract & Project Plan</h3>
-            <p className="text-sm text-brand-muted">Payment plan details are saved with the project immediately.</p>
+            <h3 className="font-bold text-brand-primary">Contract Details</h3>
+            <p className="text-sm text-brand-muted">Save the contract value, deposit, and payment terms directly on the project.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <FormField label="Budget"><input name="budget" type="number" min="0" step="0.01" value={form.budget} onChange={updateField} required placeholder="5000" className={fieldInputClass} /></FormField>
@@ -190,40 +149,6 @@ export default function ProjectAdd() {
           <div className="mt-4">
             <FormField label="Payment terms"><textarea name="payment_terms" value={form.payment_terms} onChange={updateField} className={`${fieldInputClass} min-h-24 resize-y`} /></FormField>
           </div>
-        </section>
-
-        <section className="rounded-2xl border border-brand-border p-4">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h3 className="font-bold text-brand-primary">Payment Plan Rows</h3>
-              <p className="text-sm text-brand-muted">Add deposit, milestone, progress, or final payment rows before saving the project.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-              <ReadonlyTile label="Planned" value={formatCurrency(plannedAmount)} />
-              <ReadonlyTile label="Planned %" value={formatPercentage(plannedPercentage)} />
-              <Button type="button" variant="outline" className="gap-2" onClick={addPlanItem}><Plus size={16} />Add Row</Button>
-            </div>
-          </div>
-          {plannedPercentage > 100 && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-brand-warning">Total percentage is above 100%. Reduce a row before saving.</p>}
-          <div className="space-y-3">
-            {planItems.map((item, index) => {
-              const itemAmount = expectedAmount(item, contractAmount);
-              return <div key={index} className="rounded-xl bg-brand-soft p-3">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1fr_150px_130px_150px_150px_1fr_140px_auto]">
-                  <FormField label="Plan item"><input value={item.name} onChange={(event) => updatePlanItem(index, "name", event.target.value)} className={fieldInputClass} placeholder="Deposit, Design approval..." /></FormField>
-                  <FormField label="Amount type"><select value={item.payment_type} onChange={(event) => updatePlanItem(index, "payment_type", event.target.value)} className={fieldInputClass}><option value="percentage">Percentage</option><option value="fixed">Fixed Amount</option></select></FormField>
-                  <FormField label="Percentage"><input type="number" min="0" max="100" step="0.01" value={item.percentage} onChange={(event) => updatePlanItem(index, "percentage", event.target.value)} disabled={item.payment_type !== "percentage"} className={fieldInputClass} /></FormField>
-                  <FormField label="Expected amount"><input type="number" min="0" step="0.01" value={item.payment_type === "percentage" ? itemAmount.toFixed(2) : item.amount} onChange={(event) => updatePlanItem(index, "amount", event.target.value)} disabled={item.payment_type === "percentage"} className={fieldInputClass} /></FormField>
-                  <FormField label="Due date"><input type="date" value={item.due_date} onChange={(event) => updatePlanItem(index, "due_date", event.target.value)} className={fieldInputClass} /></FormField>
-                  <FormField label="Due stage"><input value={item.due_condition} onChange={(event) => updatePlanItem(index, "due_condition", event.target.value)} className={fieldInputClass} placeholder="Design approval..." /></FormField>
-                  <FormField label="Status"><select value={item.status} onChange={(event) => updatePlanItem(index, "status", event.target.value)} className={fieldInputClass}><option>Pending</option><option>Due</option><option>Partially Paid</option><option>Paid</option><option>Overdue</option><option>Cancelled</option></select></FormField>
-                  <div className="flex items-end"><Button type="button" variant="outline" className="w-full px-3 text-brand-danger" onClick={() => removePlanItem(index)}><Trash2 size={16} /></Button></div>
-                </div>
-                <div className="mt-3"><FormField label="Notes"><input value={item.notes} onChange={(event) => updatePlanItem(index, "notes", event.target.value)} className={fieldInputClass} /></FormField></div>
-              </div>;
-            })}
-          </div>
-          {!hasPlanItems && <p className="mt-3 text-sm text-brand-muted">Leave payment rows blank if this project does not need a plan yet.</p>}
         </section>
 
         <section className="rounded-2xl border border-brand-border p-4">
@@ -249,16 +174,5 @@ export default function ProjectAdd() {
         <div className="flex justify-end"><Button disabled={saving || status !== "connected"}>{saving ? "Saving Project..." : "Save Project"}</Button></div>
       </form>
     </Card>
-  </div>;
-}
-
-function expectedAmount(item, contractAmount) {
-  return item.payment_type === "percentage" ? Number(((contractAmount * toNumber(item.percentage)) / 100).toFixed(2)) : toNumber(item.amount);
-}
-
-function ReadonlyTile({ label, value }) {
-  return <div className="rounded-lg border border-brand-border bg-white px-3 py-2">
-    <p className="text-[11px] font-black uppercase tracking-wide text-brand-muted">{label}</p>
-    <p className="mt-0.5 font-black text-brand-primary">{value}</p>
   </div>;
 }

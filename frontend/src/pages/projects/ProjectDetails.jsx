@@ -10,7 +10,7 @@ import { addProjectMember, createDocument, createExpense, createPayment, deleteD
 import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 import { getProject } from "./projectApi";
 
-const tabs = ["Overview", "Payment Plan", "Client Payments / Revenue", "Expenses", "Financial Summary", "Documents", "Tasks", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
+const tabs = ["Overview", "Client Payments / Revenue", "Expenses", "Financial Summary", "Documents", "Tasks", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
 const paymentMethods = ["cash", "bank transfer", "EVC Plus", "card", "other"];
 
 export default function ProjectDetails() {
@@ -29,7 +29,7 @@ export default function ProjectDetails() {
   const [docForm, setDocForm] = useState({ title: "", document_category: "Photo", visibility: "internal", file: null });
   const [editingDocument, setEditingDocument] = useState(null);
   const [materialForm, setMaterialForm] = useState({ material_id: "", quantity: 1, unit_cost: "", notes: "" });
-  const [paymentForm, setPaymentForm] = useState({ payment_stage_id: "", amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
+  const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
   const [expenseForm, setExpenseForm] = useState({ supplier_id: "", category_id: "", category: "", title: "", paid_by: "", quantity: "1", unit_cost: "", total_cost: "", expense_date: new Date().toISOString().slice(0, 10), payment_method: "cash", notes: "" });
   const [status, setStatus] = useState("loading");
 
@@ -150,7 +150,6 @@ export default function ProjectDetails() {
       type: "client",
       project_id: Number(id),
       client_id: raw.client_id || raw.client?.id || null,
-      payment_stage_id: paymentForm.payment_stage_id ? Number(paymentForm.payment_stage_id) : null,
       amount: toNumber(paymentForm.amount),
       payment_date: paymentForm.payment_date,
       payment_method: paymentForm.payment_method,
@@ -158,7 +157,7 @@ export default function ProjectDetails() {
       status: "paid",
       notes: paymentForm.notes,
     });
-    setPaymentForm({ payment_stage_id: "", amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
+    setPaymentForm({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_method: "cash", reference_number: "", notes: "" });
     loadProject();
   };
 
@@ -240,8 +239,6 @@ export default function ProjectDetails() {
       <Card className="p-5"><h3 className="mb-4 font-bold">Client Information</h3><InfoRows rows={[["Name", raw.client?.name], ["Phone", raw.client?.phone], ["Email", raw.client?.email], ["Address", raw.client?.address || raw.client?.location]]} /></Card>
       <Card className="p-5"><h3 className="mb-4 font-bold">Notes</h3><p className="text-sm text-brand-muted">{raw.notes || raw.description || "No notes added."}</p></Card>
     </section>}
-
-    {activeTab === "Payment Plan" && <PaymentPlanTab finance={finance} />}
 
     {activeTab === "Client Payments / Revenue" && <ClientPaymentsTab
       finance={finance}
@@ -377,30 +374,12 @@ function InfoRows({ rows }) {
   return <div className="space-y-3 text-sm">{rows.map(([label, value]) => <div key={label} className="flex justify-between rounded-xl bg-brand-soft p-3"><span>{label}</span><b>{value || "-"}</b></div>)}</div>;
 }
 
-function PaymentPlanTab({ finance }) {
-  const money = (value) => formatCurrency(value);
-  return <Card className="p-5">
-    <h3 className="mb-4 font-bold">Payment Plan</h3>
-    <Table columns={[
-      { key: "name", label: "Payment Title", render: (stage) => <b>{stage.name}</b> },
-      { key: "percentage", label: "Percentage", render: (stage) => formatPercentage(stage.percentage) },
-      { key: "amount", label: "Expected Amount", render: (stage) => money(stage.amount) },
-      { key: "paid_amount", label: "Paid Amount", render: (stage) => money(stage.paid_amount) },
-      { key: "balance", label: "Remaining", render: (stage) => money(stage.balance) },
-      { key: "due", label: "Due Date/Stage", render: (stage) => stage.due_date || stage.due_condition || "-" },
-      { key: "status", label: "Status", render: (stage) => <Badge>{stage.status}</Badge> },
-      { key: "action", label: "Action", render: () => <span className="text-sm font-semibold text-brand-muted">Link payment when recording revenue</span> },
-    ]} rows={finance?.payment_stages || []} empty="No payment plan rows yet." />
-  </Card>;
-}
-
 function ClientPaymentsTab({ finance, form, onChange, onSubmit }) {
   const money = (value) => formatCurrency(value);
   return <div className="space-y-5">
     <Card className="p-5">
       <h3 className="font-bold">Add Client Payment</h3>
       <form onSubmit={onSubmit} className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <FormField label="Related installment"><select name="payment_stage_id" value={form.payment_stage_id} onChange={onChange} className={fieldInputClass}><option value="">No installment</option>{(finance?.payment_stages || []).map((stage) => <option key={stage.id} value={stage.id}>{stage.name} - {money(stage.balance || stage.amount)}</option>)}</select></FormField>
         <FormField label="Amount paid"><input name="amount" type="number" min="0.01" step="0.01" required value={form.amount} onChange={onChange} className={fieldInputClass} /></FormField>
         <FormField label="Payment date"><input name="payment_date" type="date" value={form.payment_date} onChange={onChange} className={fieldInputClass} /></FormField>
         <FormField label="Payment method"><select name="payment_method" value={form.payment_method} onChange={onChange} className={fieldInputClass}>{paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}</select></FormField>
@@ -412,7 +391,6 @@ function ClientPaymentsTab({ finance, form, onChange, onSubmit }) {
     <FinanceTable title="Recent Client Payments" rows={finance?.client_payments || []} columns={[
       { key: "payment_date", label: "Date" },
       { key: "amount", label: "Amount", render: (row) => money(row.amount) },
-      { key: "payment_stage", label: "Installment", render: (row) => row.payment_stage?.name || "-" },
       { key: "payment_method", label: "Method" },
       { key: "reference_number", label: "Reference" },
       { key: "notes", label: "Notes" },
@@ -472,19 +450,6 @@ function ProjectFinancePanel({ finance }) {
       <Metric label="Other Costs" value={money(metrics.other_project_costs)} />
       <Metric label="Supplier Payables" value={money(metrics.supplier_payables)} />
     </section>
-
-    <Card className="p-5">
-      <h3 className="mb-4 font-bold">Payment Stages</h3>
-      <Table columns={[
-        { key: "name", label: "Stage", render: (stage) => <b>{stage.name}</b> },
-        { key: "percentage", label: "%", render: (stage) => formatPercentage(stage.percentage) },
-        { key: "amount", label: "Amount", render: (stage) => money(stage.amount) },
-        { key: "paid_amount", label: "Paid", render: (stage) => money(stage.paid_amount) },
-        { key: "balance", label: "Balance", render: (stage) => money(stage.balance) },
-        { key: "due_condition", label: "Due Condition" },
-        { key: "status", label: "Status", render: (stage) => <Badge>{stage.status}</Badge> },
-      ]} rows={finance?.payment_stages || []} empty="No payment stages yet." />
-    </Card>
 
     <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       <FinanceTable title="Project Cost Groups" rows={Object.entries(finance?.expense_breakdown || {}).map(([group, amount]) => ({ group, amount }))} columns={[
