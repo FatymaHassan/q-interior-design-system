@@ -22,12 +22,12 @@ export default function ClientPortalLogin() {
     }
   };
 
-  return <main className="flex min-h-screen items-center justify-center bg-[#F4F6F8] p-4">
-    <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)] lg:grid-cols-[1fr_0.92fr]">
-      <div className="hidden bg-slate-950 p-8 text-white lg:flex lg:flex-col lg:justify-between">
+  return <main className="flex min-h-screen items-center justify-center bg-brand-bg p-4 text-brand-text">
+    <section className="grid w-full max-w-5xl overflow-hidden rounded-lg border border-brand-border bg-white shadow-card lg:grid-cols-[1fr_0.92fr]">
+      <div className="hidden bg-brand-primaryDark p-8 text-white lg:flex lg:flex-col lg:justify-between">
         <div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-slate-950"><FolderOpen size={22} /></div>
-          <p className="mt-8 text-xs font-black uppercase tracking-[0.18em] text-cyan-200">Client Portal</p>
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/12 bg-white/10 text-brand-gold"><FolderOpen size={22} /></div>
+          <p className="mt-8 text-xs font-black uppercase tracking-[0.18em] text-brand-gold">Client Portal</p>
           <h1 className="mt-3 max-w-md text-4xl font-black leading-tight">Project progress, approvals, files, and messages in one clean workspace.</h1>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -38,10 +38,10 @@ export default function ClientPortalLogin() {
         </div>
       </div>
       <div className="p-6 sm:p-8 lg:p-10">
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white"><Lock size={20} /></div>
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">Q Interior</p>
-        <h2 className="mt-2 text-3xl font-black text-slate-950">Client Login</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">Open your project updates, quotations, approvals, and messages.</p>
+        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-brand-primary text-white"><Lock size={20} /></div>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-gold">Q Interior</p>
+        <h2 className="mt-2 text-3xl font-black text-brand-primary">Client Login</h2>
+        <p className="mt-2 text-sm leading-6 text-brand-muted">Open your project updates, quotations, approvals, and messages.</p>
         {error && <p className="mt-4 rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
         <form onSubmit={submit} className="mt-6 space-y-4">
           <FormField label="Email"><input name="email" type="email" value={form.email} onChange={updateField} className={fieldInputClass} required /></FormField>
