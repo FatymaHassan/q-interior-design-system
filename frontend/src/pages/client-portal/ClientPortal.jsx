@@ -106,7 +106,7 @@ export default function ClientPortal() {
     onLogout={signOut}
     notificationCount={pendingApprovals}
   >
-    {notice && <p className="rounded-2xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{notice}</p>}
+    {notice && <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{notice}</p>}
     {loading && !portal ? <PortalSkeleton /> : !selectedProject ? <PortalEmptyState title="No project connected" description="Your project updates will appear here after Q Interior connects a project to your account." /> : <>
       {active === "Dashboard" && <Dashboard project={selectedProject} projects={projects} documents={documents} photos={photos} messages={messages} approvals={approvals} quotations={projectQuotations} invoices={invoices} onRefresh={load} loading={loading} />}
       {active === "My Project" && <ProjectHub projects={projects} project={selectedProject} selectedProjectId={selectedProjectId} setSelectedProjectId={setSelectedProjectId} timeline={timeline} />}
@@ -173,7 +173,7 @@ function ProjectHub({ projects, project, selectedProjectId, setSelectedProjectId
     <PortalCard className="p-4">
       <PortalSectionHeader title="My Projects" subtitle="Select a project" />
       <div className="space-y-2">
-        {projects.map((item) => <button key={item.id} type="button" onClick={() => setSelectedProjectId(String(item.id))} className={`w-full rounded-2xl border p-3 text-left transition ${String(item.id) === String(selectedProjectId) ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
+        {projects.map((item) => <button key={item.id} type="button" onClick={() => setSelectedProjectId(String(item.id))} className={`w-full rounded-lg border p-3 text-left transition ${String(item.id) === String(selectedProjectId) ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
           <p className="truncate text-sm font-black">{item.project_name || item.name}</p>
           <p className={`mt-1 text-xs ${String(item.id) === String(selectedProjectId) ? "text-slate-300" : "text-slate-500"}`}>{item.stage?.name || "Inquiry"} - {item.progress || 0}%</p>
         </button>)}
@@ -187,7 +187,7 @@ function ProjectHub({ projects, project, selectedProjectId, setSelectedProjectId
             <h2 className="mt-3 text-2xl font-black text-slate-950">{project.project_name || project.name}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{project.description || project.notes || "Project information, timeline, documents, approvals, and messages are available here."}</p>
           </div>
-          <div className="rounded-2xl bg-slate-50 p-4 text-sm">
+          <div className="rounded-lg bg-slate-50 p-4 text-sm">
             <p className="font-black text-slate-950">{progress}% complete</p>
             <p className="mt-1 text-slate-500">Deadline {formatDateOnly(project.deadline || project.end_date) || "-"}</p>
           </div>
@@ -211,7 +211,7 @@ function Timeline({ items }) {
   return <PortalCard className="p-5">
     <PortalSectionHeader title="Project Timeline" subtitle="Design and delivery milestones" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-      {rows.slice(0, 5).map((item, index) => <div key={`${item.title}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+      {rows.slice(0, 5).map((item, index) => <div key={`${item.title}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-black text-blue-700">{index + 1}</div>
         <p className="font-black text-slate-950">{item.title}</p>
         <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{item.status || item.type}</p>
@@ -232,8 +232,8 @@ function Files({ photos, files }) {
     <PortalCard className="p-5">
       <PortalSectionHeader title="Documents" subtitle="Contracts, invoices, quotations, and design files" action={<select value={filter} onChange={(event) => setFilter(event.target.value)} className={`${fieldInputClass} w-44`}><option>All</option><option>Design</option><option>Contract</option><option>Invoice</option><option>Quotation</option><option>Other</option></select>} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {filteredFiles.map((file) => <a key={file.id} href={getClientPortalDocumentUrl(file.id)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:bg-slate-50">
-          <span className="flex min-w-0 items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><FileText size={20} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.document_category || "Document"}</span></span></span>
+        {filteredFiles.map((file) => <a key={file.id} href={getClientPortalDocumentUrl(file.id)} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 transition hover:bg-slate-50">
+          <span className="flex min-w-0 items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={20} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.document_category || "Document"}</span></span></span>
           <Download size={17} className="shrink-0 text-slate-500" />
         </a>)}
       </div>
@@ -267,14 +267,14 @@ function Approvals({ approvals, quotations, signedName, setSignedName, approvalC
 }
 
 function ApprovalCard({ item, onApprove, onRevision, onReject }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-4">
+  return <div className="rounded-lg border border-slate-200 bg-white p-4">
     <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-950">{item.title}</p><p className="mt-1 text-sm text-slate-500">{item.description || item.approval_type}</p></div><PortalStatusBadge>{item.status}</PortalStatusBadge></div>
     {item.status === "Pending" && <ActionRow onApprove={onApprove} onRevision={onRevision} onReject={onReject} />}
   </div>;
 }
 
 function QuotationCard({ quotation, onApprove, onRevision, onReject }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-4">
+  return <div className="rounded-lg border border-slate-200 bg-white p-4">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div><div className="flex flex-wrap gap-2"><PortalStatusBadge>{quotation.status}</PortalStatusBadge><PortalStatusBadge>{quotation.quotationNumber}</PortalStatusBadge></div><p className="mt-2 font-black text-slate-950">{quotation.title || quotation.projectTitle}</p><p className="mt-1 text-sm text-slate-500">{money(quotation.totalAmount)} - valid {formatDateOnly(quotation.validUntil) || "-"}</p></div>
       <a href={getClientPortalQuotationPdfUrl(quotation.id)} download className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-900 hover:bg-slate-50"><Download className="mr-2 h-4 w-4" />PDF</a>
@@ -297,7 +297,7 @@ function Messages({ messages, client, message, setMessage, submitMessage }) {
     <div className="mb-4 max-h-[520px] space-y-3 overflow-auto pr-1">
       {messages.map((item) => {
         const clientMessage = item.sender_type === "client";
-        return <div key={item.id} className={`max-w-[86%] rounded-2xl p-4 text-sm ${clientMessage ? "ml-auto bg-slate-950 text-white" : "bg-slate-100 text-slate-900"}`}>
+        return <div key={item.id} className={`max-w-[86%] rounded-lg p-4 text-sm ${clientMessage ? "ml-auto bg-slate-950 text-white" : "bg-slate-100 text-slate-900"}`}>
           <p className={`font-black ${clientMessage ? "text-white" : "text-slate-950"}`}>{clientMessage ? client?.name : item.user?.name || "Q Interior"}</p>
           <p className={`mt-1 leading-5 ${clientMessage ? "text-slate-200" : "text-slate-600"}`}>{item.message}</p>
           {item.created_at && <p className={`mt-2 text-xs ${clientMessage ? "text-slate-400" : "text-slate-500"}`}>{formatDateTime(item.created_at)}</p>}
@@ -317,7 +317,7 @@ function Profile({ client, invoices, quotations }) {
     <PortalCard className="p-5">
       <PortalSectionHeader title="Profile" subtitle="Client portal account" />
       <div className="flex items-center gap-3">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-xl font-black text-blue-700">{client?.name?.slice(0, 1) || "C"}</span>
+        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-blue-50 text-xl font-black text-blue-700">{client?.name?.slice(0, 1) || "C"}</span>
         <div><p className="font-black text-slate-950">{client?.name}</p><p className="text-sm text-slate-500">{client?.email}</p></div>
       </div>
       <div className="mt-4 grid grid-cols-1 gap-3"><InfoTile label="Phone" value={client?.phone || "-"} /><InfoTile label="Location" value={client?.location || "-"} /></div>
@@ -335,7 +335,7 @@ function Profile({ client, invoices, quotations }) {
 
 function PhotoGrid({ photos }) {
   return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {photos.map((photo) => <a key={photo.id} href={getClientPortalDocumentUrl(photo.id)} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+    {photos.map((photo) => <a key={photo.id} href={getClientPortalDocumentUrl(photo.id)} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
       <img src={getClientPortalDocumentUrl(photo.id)} alt={photo.title} className="h-40 w-full object-cover transition group-hover:scale-[1.02]" />
       <div className="p-3"><p className="truncate text-sm font-black text-slate-950">{photo.title}</p><p className="mt-1 text-xs font-semibold text-slate-500">{photo.document_category || "Photo"}</p></div>
     </a>)}
@@ -344,7 +344,7 @@ function PhotoGrid({ photos }) {
 }
 
 function MiniDocument({ title, value, status, href }) {
-  const content = <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+  const content = <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
     <div className="min-w-0"><p className="truncate font-black text-slate-950">{title}</p><p className="mt-1 text-sm font-bold text-slate-500">{value}</p></div>
     <PortalStatusBadge>{status}</PortalStatusBadge>
   </div>;
@@ -352,8 +352,9 @@ function MiniDocument({ title, value, status, href }) {
 }
 
 function InfoTile({ label, value }) {
-  return <div className="rounded-2xl bg-slate-50 p-3">
+  return <div className="rounded-lg bg-slate-50 p-3">
     <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</p>
     <p className="mt-1 font-black text-slate-950">{value}</p>
   </div>;
 }
+

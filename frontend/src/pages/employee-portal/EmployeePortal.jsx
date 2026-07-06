@@ -68,7 +68,7 @@ export default function EmployeePortal() {
     onLogout={signOut}
     notificationCount={pendingLeaves}
   >
-    {notice && <p className="rounded-2xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{notice}</p>}
+    {notice && <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{notice}</p>}
     {loading && !data ? <PortalSkeleton /> : <>
       {active === "Dashboard" && <Dashboard dashboard={data} leaveBalances={leaveBalances} payslips={payslips} requests={leaveRequests} />}
       {active === "Check In" && <CheckInPanel today={data?.today_attendance} employee={data?.employee} onDone={load} />}
@@ -95,7 +95,7 @@ function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
           <h1 className="mt-1 text-2xl font-black text-slate-950 md:text-3xl">{dashboard?.employee?.name || "Employee"}</h1>
           <p className="mt-1 text-sm text-slate-500">{dashboard?.employee?.position || "Staff"} {dashboard?.employee?.department?.name ? `- ${dashboard.employee.department.name}` : ""}</p>
         </div>
-        <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white">
+        <div className="rounded-lg bg-slate-950 px-4 py-3 text-white">
           <p className="text-xs font-black uppercase tracking-wide text-slate-300">Today</p>
           <p className="mt-1 text-lg font-black">{todayInSomalia()}</p>
         </div>
@@ -121,7 +121,7 @@ function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
       </PortalCard>
       <PortalCard className="p-5">
         <PortalSectionHeader title="Latest Payslip" subtitle="Payment summary" />
-        {latestPayslip ? <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4">
+        {latestPayslip ? <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 p-4">
           <div>
             <p className="font-black text-slate-950">{latestPayslip.month}/{latestPayslip.year}</p>
             <p className="mt-1 text-sm text-slate-500">Net salary: ${Number(latestPayslip.net_salary || 0).toLocaleString()}</p>
@@ -180,13 +180,13 @@ function CheckInPanel({ today, employee, onDone }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
         <div>
           <div className="mb-4 flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-700"><MapPin size={22} /></span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><MapPin size={22} /></span>
             <div>
               <h1 className="text-xl font-black text-slate-950">GPS Check In / Check Out</h1>
               <p className="text-sm text-slate-500">Allow location permission and stay inside the office radius.</p>
             </div>
           </div>
-          {message && <p className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm font-bold text-blue-700">{message}</p>}
+          {message && <p className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm font-bold text-blue-700">{message}</p>}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <InfoTile label="Status" value={<PortalStatusBadge>{today?.status || "No entry"}</PortalStatusBadge>} />
             <InfoTile label="Check In" value={today?.check_in || "-"} />
@@ -206,7 +206,7 @@ function CheckInPanel({ today, employee, onDone }) {
             <InfoTile label="Office" value={debug.office_name || "-"} />
           </div>}
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-black uppercase tracking-wide text-slate-500">Employee</p>
           <p className="mt-2 text-lg font-black text-slate-950">{employee?.name || "-"}</p>
           <p className="mt-1 text-sm text-slate-500">{employee?.position || "Staff"}</p>
@@ -248,7 +248,7 @@ function AttendancePanel({ attendance }) {
 }
 
 function AttendanceCard({ row }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-4">
+  return <div className="rounded-lg border border-slate-200 bg-white p-4">
     <div className="flex items-center justify-between gap-2"><p className="font-black text-slate-950">{row.date}</p><PortalStatusBadge>{row.status}</PortalStatusBadge></div>
     <div className="mt-3 grid grid-cols-3 gap-2 text-sm"><InfoTile label="In" value={row.check_in || "-"} /><InfoTile label="Out" value={row.check_out || "-"} /><InfoTile label="Hours" value={row.total_hours || "0.00"} /></div>
   </div>;
@@ -284,7 +284,7 @@ function LeavePanel({ requests, balances, onDone }) {
     <PortalCard className="p-5">
       <PortalSectionHeader title="Leave Requests" subtitle="Your request history" />
       <div className="space-y-3">
-        {requests.map((request) => <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+        {requests.map((request) => <div key={request.id} className="rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-950">{request.leave_type}</p><p className="mt-1 text-sm text-slate-500">{request.start_date} to {request.end_date} - {request.total_days} days</p></div><PortalStatusBadge>{request.status}</PortalStatusBadge></div>
           {request.reason && <p className="mt-3 text-sm text-slate-600">{request.reason}</p>}
           {request.rejection_reason && <p className="mt-2 text-sm font-bold text-red-600">{request.rejection_reason}</p>}
@@ -299,7 +299,7 @@ function PayslipPanel({ rows }) {
   return <PortalCard className="p-5">
     <PortalSectionHeader title="Payslips" subtitle="Payroll documents and payment status" />
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {rows.map((row) => <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+      {rows.map((row) => <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between gap-2"><p className="font-black text-slate-950">{row.month}/{row.year}</p><PortalStatusBadge>{row.payment_status}</PortalStatusBadge></div>
         <p className="mt-3 text-2xl font-black text-slate-950">${Number(row.net_salary || 0).toLocaleString()}</p>
         <p className="mt-1 text-sm text-slate-500">Approval: {row.approval_status}</p>
@@ -314,7 +314,7 @@ function ReviewPanel({ data }) {
     <PortalCard className="p-5">
       <PortalSectionHeader title="Performance Reviews" subtitle="Scores and manager comments" />
       <div className="space-y-3">
-        {(data?.reviews || []).map((review) => <div key={review.id} className="rounded-2xl border border-slate-200 p-4">
+        {(data?.reviews || []).map((review) => <div key={review.id} className="rounded-lg border border-slate-200 p-4">
           <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-950">{review.review_period}</p><p className="mt-1 text-sm text-slate-500">Rating: {review.overall_rating || "-"}</p></div><PortalStatusBadge>{review.status}</PortalStatusBadge></div>
           <p className="mt-3 text-sm text-slate-600">{review.manager_comments || "No manager comments yet."}</p>
         </div>)}
@@ -324,7 +324,7 @@ function ReviewPanel({ data }) {
     <PortalCard className="p-5">
       <PortalSectionHeader title="Goals" subtitle="Current goals and progress" />
       <div className="space-y-3">
-        {(data?.goals || []).map((goal) => <div key={goal.id} className="rounded-2xl border border-slate-200 p-4">
+        {(data?.goals || []).map((goal) => <div key={goal.id} className="rounded-lg border border-slate-200 p-4">
           <div className="flex items-start justify-between gap-2"><p className="font-black text-slate-950">{goal.title}</p><PortalStatusBadge>{goal.status}</PortalStatusBadge></div>
           <p className="mt-2 text-sm text-slate-500">{goal.description || "No description"}</p>
           <div className="mt-3 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.min(Number(goal.progress || 0), 100)}%` }} /></div>
@@ -336,8 +336,9 @@ function ReviewPanel({ data }) {
 }
 
 function InfoTile({ label, value }) {
-  return <div className="rounded-2xl bg-slate-50 p-3">
+  return <div className="rounded-lg bg-slate-50 p-3">
     <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</p>
     <div className="mt-1 font-black text-slate-950">{value}</div>
   </div>;
 }
+
