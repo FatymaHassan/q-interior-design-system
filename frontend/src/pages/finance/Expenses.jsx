@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
+import Button from "../../components/ui/Button";
 import ExpenseList from "./ExpenseList";
 import { approveExpense, deleteExpense, getExpenses, rejectExpense } from "./expenseApi";
 import { FinanceHeader } from "./financeUi";
@@ -25,7 +28,11 @@ export default function Expenses() {
   };
 
   return <div className="space-y-6">
-    <FinanceHeader title="Expenses" description="Manage project expense records with the same finance UI pattern used for payroll and payments." />
+    <FinanceHeader
+      title="Expenses"
+      description="Manage project expense records with the same finance UI pattern used for payroll and payments."
+      action={<Link to="/expenses/add"><Button className="gap-2"><Plus size={16} />Add Expense</Button></Link>}
+    />
     <ExpenseList expenses={expenses} onDelete={removeExpense} onApprove={approve} onReject={reject} />
   </div>;
 }

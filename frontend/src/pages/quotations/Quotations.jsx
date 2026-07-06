@@ -4,19 +4,15 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
-import { deleteQuotation, getQuotationPdfUrl, getQuotationReport, getQuotations, sendQuotation } from "./quotationApi";
+import { deleteQuotation, getQuotationPdfUrl, getQuotations, sendQuotation } from "./quotationApi";
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
-  const [report, setReport] = useState(null);
   const [notice, setNotice] = useState("");
 
   const load = () => {
-    Promise.all([getQuotations(), getQuotationReport()])
-      .then(([quotationData, reportData]) => {
-        setQuotations(quotationData);
-        setReport(reportData);
-      })
+    getQuotations()
+      .then(setQuotations)
       .catch(() => setNotice("Backend is not reachable."));
   };
 
@@ -44,22 +40,6 @@ export default function Quotations() {
       <Link to="/quotations/add"><Button>Create Quotation</Button></Link>
     </div>
     {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
-
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-      {[
-        ["Total Quotes", report?.total || quotations.length],
-        ["Sent", report?.sent || 0],
-        ["Approved", report?.approved || 0],
-        ["Pipeline Value", `$${Number(report?.pipeline_value || 0).toLocaleString()}`],
-        ["Approved Value", `$${Number(report?.approved_value || 0).toLocaleString()}`],
-        ["Conversion Rate", `${Number(report?.conversion_rate || 0).toLocaleString()}%`],
-        ["Pending Response", report?.pending_response || 0],
-        ["Avg Approval Hours", report?.average_approval_hours || 0],
-      ].map(([label, value]) => <Card key={label} className="p-4">
-        <p className="text-sm text-brand-muted">{label}</p>
-        <b className="mt-1 block text-2xl text-brand-primary">{value}</b>
-      </Card>)}
-    </div>
 
     <Card className="p-5 md:p-6">
       <Table

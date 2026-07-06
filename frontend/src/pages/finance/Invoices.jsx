@@ -128,13 +128,6 @@ export default function Invoices() {
     <FinanceHeader
       title="Invoices & Billing"
       description="Create client and supplier invoices with labor, materials, delivery, and design fee lines."
-      action={<select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className={`${fieldInputClass} min-w-[220px]`}>
-        <option value="">All statuses</option>
-        <option>Unpaid</option>
-        <option>Partially Paid</option>
-        <option>Paid</option>
-        <option>Overdue</option>
-      </select>}
     />
 
     {status === "error" && <FinanceNotice tone="error">Invoices could not be loaded.</FinanceNotice>}
@@ -201,7 +194,17 @@ export default function Invoices() {
       </form>
     </FinanceSection>
 
-    <FinanceSection title="Invoice List" subtitle="Manage invoice status, PDF downloads, reminders, and balances.">
+    <FinanceSection
+      title="Invoice List"
+      subtitle="Manage invoice status, PDF downloads, reminders, and balances."
+      action={<select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className={`${fieldInputClass} min-w-[220px]`}>
+        <option value="">All statuses</option>
+        <option>Unpaid</option>
+        <option>Partially Paid</option>
+        <option>Paid</option>
+        <option>Overdue</option>
+      </select>}
+    >
       <Table
         columns={[
           { key: "number", label: "Invoice", render: (invoice) => <b>{invoice.number}</b> },

@@ -58,10 +58,14 @@ export default function ProjectBoard() {
         <h1 className="mt-2 text-3xl font-black text-brand-primary">Project Board</h1>
         <p className="text-sm text-brand-muted">Move projects through Inquiry, Design, Materials Order, Installation, and Completed.</p>
       </div>
-      <div className="flex flex-wrap gap-2"><Button variant={view === "board" ? "primary" : "outline"} onClick={() => setView("board")}>Board</Button><Button variant={view === "list" ? "primary" : "outline"} onClick={() => setView("list")}>List</Button><Link to="/projects/add"><Button>Add Project</Button></Link></div>
+      <Link to="/projects/add"><Button>Add Project</Button></Link>
     </div>
 
     <Card className="p-5">
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button variant={view === "board" ? "primary" : "outline"} onClick={() => setView("board")}>Board</Button>
+        <Button variant={view === "list" ? "primary" : "outline"} onClick={() => setView("list")}>List</Button>
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <FormField label="Search"><input name="search" value={filters.search} onChange={updateFilter} placeholder="Project or client" className={fieldInputClass} /></FormField>
         <FormField label="Status"><select name="status" value={filters.status} onChange={updateFilter} className={fieldInputClass}><option value="">All</option><option>Pending</option><option>Active</option><option>In Progress</option><option>Completed</option><option>Delayed</option><option>Cancelled</option></select></FormField>

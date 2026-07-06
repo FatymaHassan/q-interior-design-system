@@ -136,11 +136,11 @@ export default function UsersRoles() {
   };
 
   return <div className="space-y-4">
-    <PageHeader eyebrow="Admin" title="Users & Roles" description="Create staff users with email, password, and role access checklist. Create client portal logins separately for clients." action={<div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setActiveMenu("Client Access")}>Client Portal Access</Button><Button type="button" onClick={() => {
+    <PageHeader eyebrow="Admin" title="Users & Roles" description="Manage staff access and client portal logins." action={<Button type="button" onClick={() => {
       setEditingUser(null);
       setForm({ ...emptyForm, role_ids: defaultRoleIds(roles) });
       setActiveMenu("Add User");
-    }}>Add User</Button></div>} />
+    }}>Add User</Button>} />
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <Card className="min-h-[96px] p-4"><p className="text-xs font-bold uppercase tracking-wide text-brand-muted">Users</p><b className="mt-1 block text-2xl">{users.length}</b></Card>
       <Card className="min-h-[96px] p-4"><p className="text-xs font-bold uppercase tracking-wide text-brand-muted">Access Roles</p><b className="mt-1 block text-2xl">{roles.length}</b></Card>
@@ -159,11 +159,6 @@ export default function UsersRoles() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search users..." className="h-11 rounded-xl border border-brand-border px-4 text-sm outline-none" />
             <Button type="button" variant="outline" onClick={() => setActiveMenu("Client Access")}>Add Client Login</Button>
-            <Button type="button" onClick={() => {
-              setEditingUser(null);
-              setForm({ ...emptyForm, role_ids: defaultRoleIds(roles) });
-              setActiveMenu("Add User");
-            }}>Add User</Button>
           </div>
         </div>
         <Table

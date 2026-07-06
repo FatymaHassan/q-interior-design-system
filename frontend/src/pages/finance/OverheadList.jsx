@@ -1,6 +1,5 @@
 import Table from "../../components/ui/Table";
-import Button from "../../components/ui/Button";
-import { Edit3, Plus, Trash2 } from "lucide-react";
+import { Edit3, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FinanceActionButton, FinanceMetric, FinanceSection, money } from "./financeUi";
 
@@ -12,7 +11,6 @@ export default function OverheadList({ overheads = [], onDelete }) {
   return <FinanceSection
     title="Overhead List"
     subtitle="Review office, transport, utilities, rent, and other company operating costs."
-    action={<Link to="/overheads/add"><Button className="gap-2"><Plus size={16} />Add Overhead</Button></Link>}
   >
     <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
       <FinanceMetric label="Total Overheads" value={money(total)} />

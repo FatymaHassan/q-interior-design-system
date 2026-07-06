@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, DollarSign, FileSpreadsheet, Receipt, ScrollText, Wallet } from "lucide-react";
+import { AlertTriangle, DollarSign, Receipt, ScrollText, Wallet } from "lucide-react";
 import Card from "../../components/ui/Card";
 import MetricCard from "../../components/ui/MetricCard";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
-import { downloadReportExport, getFinanceOverview } from "../../services/api";
+import { getFinanceOverview } from "../../services/api";
 
 const money = (value) => `$${Number(value || 0).toLocaleString()}`;
 
@@ -28,14 +28,8 @@ export default function FinanceOverview() {
     <PageHeader
       eyebrow="Finance"
       title="Finance Overview"
-      description="Invoices, budget tracking, expense control, cash flow, and financial reports."
-      action={<div className="flex flex-wrap gap-2">
-        <Link to="/invoices"><Button variant="outline">Create Invoice</Button></Link>
-        <Link to="/expenses/add"><Button>Add Expense</Button></Link>
-        <Link to="/payments/add"><Button variant="outline">Add Payment</Button></Link>
-        <Link to="/overheads/add"><Button variant="outline">Add Overhead</Button></Link>
-        <Link to="/finance/pnl"><Button variant="outline">P&L Summary</Button></Link>
-      </div>}
+      description="Finance records and totals in one clean overview."
+      action={<Link to="/expenses/add"><Button>Add Expense</Button></Link>}
     />
 
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">Finance overview could not be loaded.</Card>}
@@ -53,37 +47,6 @@ export default function FinanceOverview() {
       <MetricCard label="Outstanding Invoices" value={overview?.outstanding_invoices ?? "..."} icon={ScrollText} />
       <MetricCard label="Overdue Invoices" value={overview?.overdue_invoices ?? "..."} icon={AlertTriangle} />
     </section>
-
-    <SectionCard title="Budget Tracker" subtitle="Actual spend against project budget with 80% warning alerts and profit margin." action={<Link to="/projects/add"><Button variant="outline">Set Project Budget</Button></Link>}>
-      <Table
-        columns={[
-          { key: "project", label: "Project", render: (row) => <b>{row.project}</b> },
-          { key: "client", label: "Client" },
-          { key: "budget", label: "Budget", render: (row) => money(row.budget) },
-          { key: "actual_spend", label: "Actual Spend", render: (row) => money(row.actual_spend) },
-          { key: "budget_used_percent", label: "Used", render: (row) => <span className={row.alert ? "font-bold text-brand-danger" : "font-semibold text-brand-primary"}>{row.budget_used_percent}%</span> },
-          { key: "profit", label: "Profit", render: (row) => money(row.profit) },
-          { key: "profit_margin", label: "Margin", render: (row) => `${row.profit_margin}%` },
-          { key: "alert", label: "Alert", render: (row) => row.over_budget ? "Over budget" : row.alert ? "Above 80%" : "Healthy" },
-        ]}
-        rows={overview?.budget_tracker || []}
-        empty="No project budgets yet."
-      />
-    </SectionCard>
-
-    <SectionCard title="Financial Reports" subtitle="Export Profit & Loss, Cash Flow, revenue breakdowns, and invoice status lists." action={<Link to="/reports"><Button variant="outline">Open Reports Center</Button></Link>}>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {[
-          ["profit-loss", "P&L"],
-          ["cash-flow", "Cash Flow"],
-          ["revenue-by-project", "By Project"],
-          ["revenue-by-client", "By Client"],
-          ["outstanding-invoices", "Outstanding"],
-        ].map(([key, label]) => <Button key={key} type="button" variant="outline" className="gap-2" onClick={() => downloadReportExport(key, "excel")}>
-          <FileSpreadsheet size={16} />{label}
-        </Button>)}
-      </div>
-    </SectionCard>
 
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <SectionCard title="Recent Expenses">

@@ -1,8 +1,7 @@
 import Table from "../../components/ui/Table";
-import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import ActionButton from "../../components/ui/ActionButton";
-import { CheckCircle2, Pencil, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Pencil, Trash2, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FinanceMetric, FinanceSection, money } from "./financeUi";
 
@@ -13,7 +12,6 @@ export default function ExpenseList({ expenses, onDelete, onApprove, onReject })
   return <FinanceSection
     title="Project Expense Records"
     subtitle="Review costs recorded against projects, suppliers, categories, and approval status."
-    action={<Link to="/expenses/add"><Button className="gap-2"><Plus size={16} />Add Project Expense</Button></Link>}
   >
     <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
       <FinanceMetric label="Total Recorded" value={money(total)} />
