@@ -229,7 +229,7 @@ class QuotationController extends Controller
         $token = request()->query('token') ?: str_replace('Bearer ', '', request()->header('Authorization', ''));
         abort_unless(request()->user() || ($token && PersonalAccessToken::findToken($token)), 401);
 
-        return response($this->htmlPreview($quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'approvals'])))
+        return response($this->htmlPreview($quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'attachments', 'approvals'])))
             ->header('Content-Type', 'text/html');
     }
 
@@ -339,7 +339,7 @@ class QuotationController extends Controller
             abort_unless($token && PersonalAccessToken::findToken($token), 401);
         }
 
-        $quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'approvals']);
+        $quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'attachments', 'approvals']);
 
         return response($this->pdfDocument($quotation))
             ->header('Content-Type', 'application/pdf')
@@ -589,17 +589,17 @@ class QuotationController extends Controller
     protected function pdfDocument(Quotation $quotation): string
     {
         $content = [];
-        $logoPath = public_path('images/q-interior-logo.jpeg');
-        $logo = is_file($logoPath) ? file_get_contents($logoPath) : null;
-        $this->drawQuotationPage($content, $quotation, (bool) $logo);
+        $logo = $this->pdfImageFromPath(public_path('images/q-interior-logo.jpeg'), 'Logo');
+        $images = $this->pdfAttachmentImages($quotation);
+        $this->drawQuotationPage($content, $quotation, (bool) $logo, $images);
 
-        return $this->buildPdf(implode("\n", $content), $logo);
+        return $this->buildPdf(implode("\n", $content), $logo, $images);
     }
 
-    protected function drawQuotationPage(array &$content, Quotation $quotation, bool $hasLogo = false): void
+    protected function drawQuotationPage(array &$content, Quotation $quotation, bool $hasLogo = false, array $images = []): void
     {
         if ($hasLogo) {
-            $content[] = 'q 82 0 0 82 42 748 cm /Im1 Do Q';
+            $this->pdfImage($content, 'Logo', 42, 748, 82, 82);
         }
 
         $this->pdfText($content, 'Q INTERIOR DESIGN STUDIO', $hasLogo ? 140 : 174, 790, 16, true);
@@ -614,6 +614,16 @@ class QuotationController extends Controller
         $this->pdfText($content, 'Date: ' . ($quotation->quotation_date?->format('d-m-Y') ?? now()->format('d-m-Y')), 430, 648, 10);
 
         $y = 610;
+        if ($images !== []) {
+            $this->pdfText($content, 'PROJECT IMAGES', 42, 616, 10, true);
+            foreach (array_slice($images, 0, 3) as $index => $image) {
+                $x = 42 + ($index * 170);
+                $this->rectStroke($content, $x, 514, 154, 82);
+                $this->pdfImage($content, $image['name'], $x + 2, 516, 150, 78);
+            }
+            $y = 480;
+        }
+
         $this->rect($content, 42, $y, 511, 22, '0.10 0.12 0.16 rg');
         $this->pdfText($content, 'Description / Scope of Work', 48, $y + 7, 9, true, '1 1 1 rg');
         $this->pdfText($content, 'Qty / Unit', 306, $y + 7, 9, true, '1 1 1 rg');
@@ -688,9 +698,9 @@ class QuotationController extends Controller
     {
         $rows = '';
         foreach ($quotation->sections as $section) {
-            $rows .= '<tr class="section"><td colspan="5">' . e(strtoupper($section->title)) . '</td></tr>';
+            $rows .= '<tr class="section"><td colspan="7">' . e(strtoupper($section->title)) . '</td></tr>';
             foreach ($section->rooms as $index => $room) {
-                $rows .= '<tr class="room"><td colspan="5">' . ($index + 1) . '. ' . e($room->title) . '</td></tr>';
+                $rows .= '<tr class="room"><td colspan="7">' . ($index + 1) . '. ' . e($room->title) . '</td></tr>';
                 foreach ($room->items as $item) {
                     $rows .= '<tr><td>' . e($item->description) . '</td><td>' . e($this->formatQuantityUnit($item)) . '</td><td>$' . number_format((float) ($item->rate ?: $item->unit_price), 2) . '</td><td>$' . number_format((float) $item->discount, 2) . '</td><td>$' . number_format((float) $item->tax, 2) . '</td><td>$' . number_format((float) $item->total, 2) . '</td><td>' . e($item->notes) . '</td></tr>';
                 }
@@ -702,7 +712,26 @@ class QuotationController extends Controller
             }
         }
 
-        return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:34px;color:#161a22}.center{text-align:center}.line{border-top:1px solid #333;margin:14px 0}h1{font-size:32px;letter-spacing:2px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:13px}th{background:#151923;color:white;padding:10px;text-align:left}td{border:1px solid #ccc;padding:8px}.section td{background:#d9d9d9;font-weight:700}.room td{background:#efefef;font-weight:700}.total{background:#151923;color:white;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}.footer{text-align:center;font-style:italic;margin-top:30px}</style></head><body><div class="center"><h2>Q INTERIOR DESIGN STUDIO</h2><p>Mogadishu, Somalia | +252 61 0000000</p></div><div class="line"></div><h1 class="center">QUOTATION</h1><div class="line"></div><p><b>PROJECT:</b> ' . e($quotation->project_title ?: $quotation->title) . '</p><p><b>Client Name:</b> ' . e($quotation->client_name ?: $quotation->client?->name) . '</p><p><b>Location:</b> ' . e($quotation->location ?: $quotation->project?->location) . '</p><p><b>Date:</b> ' . e($quotation->quotation_date?->format('d-m-Y')) . '</p><table><thead><tr><th>Description / Scope of Work</th><th>Qty / Unit</th><th>Rate ($)</th><th>Discount</th><th>VAT/Tax</th><th>Total ($)</th><th>Notes</th></tr></thead><tbody>' . $rows . '<tr><td colspan="5"><b>Profit ' . number_format((float) $quotation->profit_percentage, 2) . '%</b></td><td colspan="2"><b>$' . number_format((float) $quotation->profit_amount, 2) . '</b></td></tr><tr class="total"><td colspan="5">GRAND TOTAL</td><td colspan="2">$' . number_format((float) ($quotation->grand_total ?: $quotation->total_amount), 2) . '</td></tr></tbody></table><div class="grid"><div><h3>PAYMENT TERMS</h3><p>' . nl2br(e($quotation->payment_terms)) . '</p><h3>PAYMENT DETAILS</h3><p>Account Name: ' . e($quotation->payment_account_name ?: '________________') . '<br>Bank: ' . e($quotation->payment_bank ?: '________________') . '<br>Account No: ' . e($quotation->payment_account_no ?: '________________') . '<br>Phone: ' . e($quotation->payment_phone ?: '________________') . '<br>' . nl2br(e($quotation->payment_notes ?: '')) . '</p></div><div><h3>TERMS & CONDITIONS</h3><p>' . nl2br(e($quotation->terms_conditions)) . '</p><h3>APPROVAL</h3><p>Client Signature: ____________________<br>Date: ____________________</p></div></div><p class="footer">' . e($quotation->footer_note ?: 'Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!') . '</p></body></html>';
+        $imageGallery = '';
+        foreach ($this->quotationImageAttachments($quotation) as $attachment) {
+            $imageGallery .= '<figure><img src="' . e(Storage::disk('public')->url($attachment->file_path)) . '" alt="' . e($attachment->title) . '"><figcaption>' . e($attachment->title) . '</figcaption></figure>';
+        }
+        $imageSection = $imageGallery ? '<section class="images"><h2>Project Images</h2><div class="image-grid">' . $imageGallery . '</div></section>' : '';
+        $logo = asset('images/q-interior-logo.jpeg');
+
+        return '<!doctype html><html><head><meta charset="utf-8"><title>' . e($quotation->quotation_number) . '</title><style>
+            *{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#141923;font-family:Arial,sans-serif}.page{width:min(1080px,100%);margin:0 auto;background:#fff;min-height:100vh;padding:42px 48px 36px}.brand{display:grid;grid-template-columns:auto 1fr auto;gap:22px;align-items:center;border-bottom:3px solid #151923;padding-bottom:20px}.brand img{width:88px;height:88px;object-fit:contain}.brand h1{margin:0;font-size:28px;letter-spacing:1px}.brand p{margin:5px 0 0;color:#697284}.quote-badge{background:#151923;color:#fff;padding:18px 24px;text-align:center;text-transform:uppercase;letter-spacing:2px;font-weight:800}.meta{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;margin:26px 0}.meta-card{border:1px solid #d8dde6;padding:18px}.meta-card h2{margin:0 0 14px;font-size:16px;text-transform:uppercase}.info{display:grid;grid-template-columns:132px 1fr;gap:8px 14px;font-size:14px}.info b{color:#697284}.images{margin:10px 0 26px}.images h2{font-size:16px;text-transform:uppercase;margin:0 0 12px}.image-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.image-grid figure{margin:0;border:1px solid #d8dde6;background:#fff}.image-grid img{display:block;width:100%;height:190px;object-fit:cover}.image-grid figcaption{padding:9px 10px;font-size:12px;font-weight:700;color:#697284}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#151923;color:#fff;padding:11px 9px;text-align:left}td{border:1px solid #d8dde6;padding:9px;vertical-align:top}.section td{background:#dfe3ea;font-weight:800;text-transform:uppercase}.room td{background:#f3f5f8;font-weight:700}.money{text-align:right}.total td{background:#151923;color:#fff;font-weight:800;font-size:15px}.terms{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:26px}.terms div{border:1px solid #d8dde6;padding:18px}.terms h2{margin:0 0 10px;font-size:15px;text-transform:uppercase}.terms p{margin:0;line-height:1.55;white-space:pre-line}.footer{text-align:center;border-top:1px solid #d8dde6;margin-top:26px;padding-top:18px;font-style:italic;color:#697284}@media(max-width:760px){.page{padding:24px 16px}.brand{grid-template-columns:1fr;text-align:center}.quote-badge{width:100%}.meta,.terms,.image-grid{grid-template-columns:1fr}.info{grid-template-columns:1fr}table{font-size:12px;display:block;overflow-x:auto;white-space:nowrap}}</style></head><body><main class="page"><header class="brand"><img src="' . e($logo) . '" alt="Q Interior logo"><div><h1>Q INTERIOR DESIGN STUDIO</h1><p>Mogadishu, Somalia | +252 61 0000000</p></div><div class="quote-badge">Quotation</div></header><section class="meta"><div class="meta-card"><h2>Project Information</h2><div class="info"><b>Project</b><span>' . e($quotation->project_title ?: $quotation->title) . '</span><b>Client</b><span>' . e($quotation->client_name ?: $quotation->client?->name ?: '-') . '</span><b>Location</b><span>' . e($quotation->location ?: $quotation->project?->location ?: '-') . '</span><b>Project Type</b><span>' . e($quotation->project_type ?: 'Interior Design') . '</span></div></div><div class="meta-card"><h2>Quotation Details</h2><div class="info"><b>No.</b><span>' . e($quotation->quotation_number) . '</span><b>Date</b><span>' . e($quotation->quotation_date?->format('d-m-Y')) . '</span><b>Valid Until</b><span>' . e($quotation->valid_until?->format('d-m-Y') ?: '-') . '</span><b>Status</b><span>' . e($quotation->status) . '</span></div></div></section>' . $imageSection . '<table><thead><tr><th>Description / Scope of Work</th><th>Qty / Unit</th><th>Rate ($)</th><th>Discount</th><th>VAT/Tax</th><th>Total ($)</th><th>Notes</th></tr></thead><tbody>' . $rows . '<tr><td colspan="5"><b>Subtotal</b></td><td colspan="2" class="money"><b>$' . number_format((float) $quotation->subtotal, 2) . '</b></td></tr><tr><td colspan="5"><b>Profit ' . number_format((float) $quotation->profit_percentage, 2) . '%</b></td><td colspan="2" class="money"><b>$' . number_format((float) $quotation->profit_amount, 2) . '</b></td></tr><tr class="total"><td colspan="5">GRAND TOTAL</td><td colspan="2" class="money">$' . number_format((float) ($quotation->grand_total ?: $quotation->total_amount), 2) . '</td></tr></tbody></table><section class="terms"><div><h2>Payment Terms</h2><p>' . e($quotation->payment_terms ?: "60% advance upon agreement\n30% upon progress payment\n10% final payment") . '</p><h2>Payment Details</h2><p>Account Name: ' . e($quotation->payment_account_name ?: '________________') . "\n" . 'Bank: ' . e($quotation->payment_bank ?: '________________') . "\n" . 'Account No: ' . e($quotation->payment_account_no ?: '________________') . "\n" . 'Phone: ' . e($quotation->payment_phone ?: '________________') . '</p></div><div><h2>Terms & Conditions</h2><p>' . e($quotation->terms_conditions ?: '-') . '</p><h2>Approval</h2><p>Client Signature: ____________________' . "\n" . 'Date: ____________________</p></div></section><p class="footer">' . e($quotation->footer_note ?: 'Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!') . '</p></main></body></html>';
+    }
+
+    protected function quotationImageAttachments(Quotation $quotation)
+    {
+        return $quotation->attachments
+            ->filter(function ($attachment) {
+                $extension = strtolower((string) ($attachment->file_type ?: pathinfo($attachment->file_path, PATHINFO_EXTENSION)));
+                return in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+                    && Storage::disk('public')->exists($attachment->file_path);
+            })
+            ->values();
     }
 
     protected function formatQuantityUnit(QuotationItem $item): string
@@ -737,6 +766,16 @@ class QuotationController extends Controller
         $content[] = $fill . ' ' . $x . ' ' . $y . ' ' . $w . ' ' . $h . ' re f';
     }
 
+    protected function rectStroke(array &$content, int $x, int $y, int $w, int $h): void
+    {
+        $content[] = '0.82 0.84 0.88 RG ' . $x . ' ' . $y . ' ' . $w . ' ' . $h . ' re S';
+    }
+
+    protected function pdfImage(array &$content, string $name, int $x, int $y, int $w, int $h): void
+    {
+        $content[] = 'q ' . $w . ' 0 0 ' . $h . ' ' . $x . ' ' . $y . ' cm /' . $name . ' Do Q';
+    }
+
     protected function multiline(array &$content, string $text, int $x, int $y, int $size, int $lines): void
     {
         foreach (array_slice(preg_split('/\r\n|\r|\n/', $text), 0, $lines) as $index => $line) {
@@ -751,19 +790,85 @@ class QuotationController extends Controller
         return str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text ?: '');
     }
 
-    protected function buildPdf(string $pageContent, ?string $logo): string
+    protected function pdfAttachmentImages(Quotation $quotation): array
     {
+        $images = [];
+        foreach ($this->quotationImageAttachments($quotation) as $attachment) {
+            $path = storage_path('app/public/' . $attachment->file_path);
+            $image = $this->pdfImageFromPath($path, 'Photo' . (count($images) + 1));
+            if ($image) {
+                $images[] = $image;
+            }
+            if (count($images) >= 3) {
+                break;
+            }
+        }
+
+        return $images;
+    }
+
+    protected function pdfImageFromPath(string $path, string $name): ?array
+    {
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $size = @getimagesize($path);
+        if (! $size) {
+            return null;
+        }
+
+        $data = null;
+        if (($size['mime'] ?? '') === 'image/jpeg') {
+            $data = file_get_contents($path);
+        } elseif (function_exists('imagecreatefromstring') && function_exists('imagejpeg')) {
+            $source = @imagecreatefromstring(file_get_contents($path));
+            if ($source) {
+                ob_start();
+                imagejpeg($source, null, 90);
+                $data = ob_get_clean();
+                imagedestroy($source);
+            }
+        }
+
+        if (! $data) {
+            return null;
+        }
+
+        return [
+            'name' => $name,
+            'data' => $data,
+            'width' => (int) $size[0],
+            'height' => (int) $size[1],
+        ];
+    }
+
+    protected function buildPdf(string $pageContent, ?array $logo, array $images = []): string
+    {
+        $xObjects = [];
+        $nextObjectId = 7;
+        foreach (array_filter(array_merge($logo ? [$logo] : [], $images)) as $image) {
+            $xObjects[] = ['object_id' => $nextObjectId++, 'image' => $image];
+        }
+
+        $xObjectResource = '';
+        if ($xObjects !== []) {
+            $entries = array_map(fn ($entry) => '/' . $entry['image']['name'] . ' ' . $entry['object_id'] . ' 0 R', $xObjects);
+            $xObjectResource = '/XObject << ' . implode(' ', $entries) . ' >>';
+        }
+
         $objects = [
             '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
             '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-            '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> ' . ($logo ? '/XObject << /Im1 7 0 R >>' : '') . ' >> /Contents 6 0 R >> endobj',
+            '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> ' . $xObjectResource . ' >> /Contents 6 0 R >> endobj',
             '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
             '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj',
             '6 0 obj << /Length ' . strlen($pageContent) . " >> stream\n" . $pageContent . "\nendstream endobj",
         ];
 
-        if ($logo) {
-            $objects[] = '7 0 obj << /Type /XObject /Subtype /Image /Width 500 /Height 500 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($logo) . " >> stream\n" . $logo . "\nendstream endobj";
+        foreach ($xObjects as $entry) {
+            $image = $entry['image'];
+            $objects[] = $entry['object_id'] . ' 0 obj << /Type /XObject /Subtype /Image /Width ' . $image['width'] . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($image['data']) . " >> stream\n" . $image['data'] . "\nendstream endobj";
         }
 
         $pdf = "%PDF-1.4\n";

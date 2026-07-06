@@ -5,7 +5,7 @@ import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { createClient, getClients, getProjects, getQuotationPreviewUrl, getQuotationPdfUrl } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
-import { createQuotation, getQuotation, updateQuotation } from "./quotationApi";
+import { createQuotation, getQuotation, updateQuotation, uploadQuotationAttachment } from "./quotationApi";
 
 const unitTypes = ["M²", "Meter", "Piece", "Unit", "Set", "Day", "Hour", "Lump Sum", "Custom"];
 const defaultItem = { description: "", unit_type: "M²", quantity: 0, rate: 0, discount: 0, tax: 0, total: 0, is_manual_total: false, notes: "" };
@@ -44,6 +44,7 @@ export default function QuotationForm() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [newClient, setNewClient] = useState({ name: "", phone: "", email: "", location: "" });
+  const [imageFiles, setImageFiles] = useState([]);
 
   useEffect(() => {
     Promise.all([getClients(), getProjects(), id ? getQuotation(id) : Promise.resolve(null)]).then(([clientData, projectData, quotation]) => {
@@ -149,7 +150,15 @@ export default function QuotationForm() {
     };
     try {
       const quotation = id ? await updateQuotation(id, payload) : await createQuotation(payload);
+      for (const [index, file] of imageFiles.entries()) {
+        const imageForm = new FormData();
+        imageForm.append("title", `Quotation image ${index + 1}`);
+        imageForm.append("visibility", "client");
+        imageForm.append("file", file);
+        await uploadQuotationAttachment(quotation.id, imageForm);
+      }
       setSavedId(quotation.id);
+      setImageFiles([]);
       navigate(`/quotations/${quotation.id}`);
     } catch (error) {
       setNotice(error.response?.data?.message || "Could not save quotation.");
@@ -243,6 +252,27 @@ export default function QuotationForm() {
           <FormField label="Payment phone"><input name="payment_phone" value={form.payment_phone} onChange={updateField} className={fieldInputClass} /></FormField>
           <FormField label="Payment notes"><input name="payment_notes" value={form.payment_notes} onChange={updateField} className={fieldInputClass} /></FormField>
           <FormField label="Footer note"><input name="footer_note" value={form.footer_note} onChange={updateField} className={fieldInputClass} /></FormField>
+        </div>
+        <div className="rounded-2xl border border-dashed border-brand-border bg-brand-soft/50 p-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="font-bold text-brand-primary">Quotation Images</h3>
+              <p className="text-sm text-brand-muted">Optional client-visible photos for the quotation preview and PDF.</p>
+            </div>
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(event) => setImageFiles(Array.from(event.target.files || []))}
+              className={`${fieldInputClass} md:max-w-sm`}
+            />
+          </div>
+          {imageFiles.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {imageFiles.map((file) => <div key={`${file.name}-${file.lastModified}`} className="overflow-hidden rounded-xl border border-brand-border bg-white">
+              <img src={URL.createObjectURL(file)} alt={file.name} className="h-24 w-full object-cover" />
+              <p className="truncate px-3 py-2 text-xs font-semibold text-brand-muted">{file.name}</p>
+            </div>)}
+          </div>}
         </div>
         <div className="flex justify-end"><Button disabled={saving}>{saving ? "Saving..." : "Save Quotation"}</Button></div>
       </form>
