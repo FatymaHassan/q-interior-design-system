@@ -5,7 +5,6 @@ import Card from "../../components/ui/Card";
 import MetricCard from "../../components/ui/MetricCard";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
-import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
 import { getFinanceOverview } from "../../services/api";
 
@@ -25,12 +24,7 @@ export default function FinanceOverview() {
   }, []);
 
   return <div className="space-y-4">
-    <PageHeader
-      eyebrow="Finance"
-      title="Finance Overview"
-      description="Finance records and totals in one clean overview."
-      action={<Link to="/expenses/add"><Button>Add Expense</Button></Link>}
-    />
+    <div className="flex justify-end"><Link to="/expenses/add"><Button>Add Expense</Button></Link></div>
 
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">Finance overview could not be loaded.</Card>}
 

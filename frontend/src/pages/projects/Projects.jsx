@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
-import PageHeader from "../../components/ui/PageHeader";
 import ProjectList from "./ProjectList";
 import { deleteProject, getProjects } from "./projectApi";
 
@@ -36,7 +35,7 @@ export default function Projects() {
   };
 
   return <div className="space-y-4">
-    <PageHeader eyebrow="Project Work" title="Projects" description="All project records in one clean list." action={<Link to="/projects/add"><Button>Add Project</Button></Link>} />
+    <div className="flex justify-end"><Link to="/projects/add"><Button>Add Project</Button></Link></div>
     <ProjectList projects={projects} status={status} onDelete={removeProject} />
   </div>;
 }

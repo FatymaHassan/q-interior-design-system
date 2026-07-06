@@ -3,7 +3,6 @@ import { BarChart3, Receipt, Wallet } from "lucide-react";
 import Card from "../../components/ui/Card";
 import MetricCard from "../../components/ui/MetricCard";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
-import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
 import Table from "../../components/ui/Table";
 import { getFinancePnl, getOverheadReport, getPayrollReport, getProjectProfitReport, getProjects } from "../../services/api";
@@ -38,15 +37,7 @@ export default function ProfitLoss() {
       .catch(() => setStatus("error"));
   }, [selectedProject]);
 
-  const selectedProjectName = projectOptions.find((project) => String(project.id) === String(selectedProject))?.name;
-
   return <div className="space-y-4">
-    <PageHeader
-      eyebrow="Finance"
-      title={selectedProject ? `${selectedProjectName || "Project"} P&L Summary` : "P&L Summary"}
-      description={selectedProject ? "Project revenue, project cost, profit, and margin." : "All-project revenue, project costs, overhead, payroll, net profit, and project margins."}
-    />
-
     {status === "error" && <Card className="p-4 text-sm text-brand-danger">P&L report could not be loaded.</Card>}
 
     <Card className="p-4">

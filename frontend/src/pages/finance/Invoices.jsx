@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Table from "../../components/ui/Table";
 import { createInvoice, deleteInvoice, downloadInvoicePdf, getClients, getInvoices, getProjects, getSuppliers, sendInvoiceReminder, updateInvoice } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
-import { FinanceActionButton, FinanceHeader, FinanceMetric, FinanceNotice, FinanceSection } from "./financeUi";
+import { FinanceActionButton, FinanceMetric, FinanceNotice, FinanceSection } from "./financeUi";
 
 const money = (value) => formatCurrency(value);
 const fieldInputClass = "w-full rounded-xl border border-brand-border bg-white px-4 py-3 text-sm outline-none focus:border-brand-gold";
@@ -25,7 +26,7 @@ const emptyForm = {
   items: [{ ...emptyItem }],
 };
 
-export default function Invoices() {
+export default function Invoices({ mode = "list" }) {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -124,25 +125,24 @@ export default function Invoices() {
     }));
   };
 
+  const showForm = mode === "add" || editingInvoice;
+
   return <div className="space-y-6">
-    <FinanceHeader
-      title="Invoices & Billing"
-      description="Create client and supplier invoices with labor, materials, delivery, and design fee lines."
-    />
+    {mode === "list" && !editingInvoice && <div className="flex justify-end"><Link to="/invoices/add"><Button className="gap-2"><Plus size={16} />Add Invoice</Button></Link></div>}
+    {mode === "add" && <div><Link to="/invoices"><Button variant="outline">Back to Invoices</Button></Link></div>}
 
     {status === "error" && <FinanceNotice tone="error">Invoices could not be loaded.</FinanceNotice>}
 
-    <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+    {mode === "list" && !editingInvoice && <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
       <FinanceMetric label="Invoices" value={invoices.length} />
       <FinanceMetric label="Open Balance" value={money(invoices.reduce((sum, invoice) => sum + Number(invoice.balance || 0), 0))} />
       <FinanceMetric label="Paid Total" value={money(invoices.filter((invoice) => invoice.status === "Paid").reduce((sum, invoice) => sum + Number(invoice.total || 0), 0))} />
-      <FinanceMetric label="Draft Total" value={money(totals.total)} hint="Current form" />
-    </section>
+    </section>}
 
-    <FinanceSection
+    {showForm && <FinanceSection
       title={editingInvoice ? `Edit ${editingInvoice.number}` : "Create Invoice"}
       subtitle={`Invoice total: ${money(totals.total)}`}
-      action={editingInvoice && <Button type="button" variant="outline" onClick={resetForm}>Cancel Edit</Button>}
+      action={editingInvoice && <Button type="button" variant="outline" onClick={resetForm}>Back to List</Button>}
     >
       <form onSubmit={submitInvoice} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
@@ -192,9 +192,9 @@ export default function Invoices() {
 
         <Button>{editingInvoice ? "Save Invoice" : "Create Invoice"}</Button>
       </form>
-    </FinanceSection>
+    </FinanceSection>}
 
-    <FinanceSection
+    {mode === "list" && !editingInvoice && <FinanceSection
       title="Invoice List"
       subtitle="Manage invoice status, PDF downloads, reminders, and balances."
       action={<select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} className={`${fieldInputClass} min-w-[220px]`}>
@@ -225,6 +225,6 @@ export default function Invoices() {
         rows={invoices}
         empty="No invoices yet."
       />
-    </FinanceSection>
+    </FinanceSection>}
   </div>;
 }

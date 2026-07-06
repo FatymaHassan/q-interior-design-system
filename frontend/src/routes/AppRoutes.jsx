@@ -114,6 +114,7 @@ export default function AppRoutes() {
         <Route path="/finance" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProfitLoss /></RoleRoute>} />
         <Route path="/finance/pnl" element={<RoleRoute roles={["admin", "manager", "finance"]}><ProfitLoss /></RoleRoute>} />
         <Route path="/invoices" element={<RoleRoute roles={["admin", "manager", "finance"]}><Invoices /></RoleRoute>} />
+        <Route path="/invoices/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><Invoices mode="add" /></RoleRoute>} />
         <Route path="/expenses" element={<RoleRoute roles={["admin", "manager", "finance"]}><Expenses /></RoleRoute>} />
         <Route path="/expense-categories" element={<RoleRoute roles={["admin", "manager", "finance"]}><ExpenseCategories /></RoleRoute>} />
         <Route path="/expenses/add" element={<RoleRoute roles={["admin", "manager", "finance"]}><ExpenseAdd /></RoleRoute>} />

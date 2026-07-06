@@ -52,14 +52,7 @@ export default function ProjectBoard() {
   };
 
   return <div className="space-y-6">
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-gold">Project & Daily Work</p>
-        <h1 className="mt-2 text-3xl font-black text-brand-primary">Project Board</h1>
-        <p className="text-sm text-brand-muted">Move projects through Inquiry, Design, Materials Order, Installation, and Completed.</p>
-      </div>
-      <Link to="/projects/add"><Button>Add Project</Button></Link>
-    </div>
+    <div className="flex justify-end"><Link to="/projects/add"><Button>Add Project</Button></Link></div>
 
     <Card className="p-5">
       <div className="mb-4 flex flex-wrap gap-2">

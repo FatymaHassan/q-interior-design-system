@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import { deleteEmployee } from "../../services/api";
-import { EmployeeTable, HRPageHeader } from "./hrShared";
+import { EmployeeTable } from "./hrShared";
 import useHrData from "./useHrData";
 
 export default function EmployeeDirectory() {
@@ -11,11 +11,7 @@ export default function EmployeeDirectory() {
   const { employees, notice, reload } = useHrData(["employees"]);
 
   return <div className="space-y-6">
-    <HRPageHeader
-      title="Employee Directory"
-      description="Browse staff records, open professional employee profiles, and manage active or inactive employees."
-      action={<Link to="/hr/employees/add"><Button className="gap-2"><Plus size={16} />Add Employee</Button></Link>}
-    />
+    <div className="flex justify-end"><Link to="/hr/employees/add"><Button className="gap-2"><Plus size={16} />Add Employee</Button></Link></div>
     {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
     <Card className="p-5">
       <EmployeeTable

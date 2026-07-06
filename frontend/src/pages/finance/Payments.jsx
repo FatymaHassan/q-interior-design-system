@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import Button from "../../components/ui/Button";
 import PaymentList from "./PaymentList";
 import { deletePayment, getPayments } from "./paymentApi";
-import { FinanceHeader } from "./financeUi";
 
 export default function Payments() {
   const [payments, setPayments] = useState([]);
@@ -18,11 +17,7 @@ export default function Payments() {
     loadPayments();
   };
   return <div className="space-y-6">
-    <FinanceHeader
-      title="Payments"
-      description="Track client receipts and supplier payouts with the same clean finance workflow as payroll."
-      action={<Link to="/payments/add"><Button className="gap-2"><Plus size={16} />Add Payment</Button></Link>}
-    />
+    <div className="flex justify-end"><Link to="/payments/add"><Button className="gap-2"><Plus size={16} />Add Payment</Button></Link></div>
     <PaymentList payments={payments} onDelete={removePayment} />
   </div>;
 }

@@ -3,7 +3,6 @@ import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
-import PageHeader from "../../components/ui/PageHeader";
 import ActionButton from "../../components/ui/ActionButton";
 import { createClient, createUser, deleteUser, getClients, getRoles, getUsers, updateClient, updateUser } from "../../services/api";
 
@@ -136,11 +135,11 @@ export default function UsersRoles() {
   };
 
   return <div className="space-y-4">
-    <PageHeader eyebrow="Admin" title="Users & Roles" description="Manage staff access and client portal logins." action={<Button type="button" onClick={() => {
+    <div className="flex justify-end"><Button type="button" onClick={() => {
       setEditingUser(null);
       setForm({ ...emptyForm, role_ids: defaultRoleIds(roles) });
       setActiveMenu("Add User");
-    }}>Add User</Button>} />
+    }}>Add User</Button></div>
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <Card className="min-h-[96px] p-4"><p className="text-xs font-bold uppercase tracking-wide text-brand-muted">Users</p><b className="mt-1 block text-2xl">{users.length}</b></Card>
       <Card className="min-h-[96px] p-4"><p className="text-xs font-bold uppercase tracking-wide text-brand-muted">Access Roles</p><b className="mt-1 block text-2xl">{roles.length}</b></Card>

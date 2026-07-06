@@ -32,13 +32,7 @@ export default function Quotations() {
   };
 
   return <div className="space-y-6">
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-gold">Phase 4</p>
-        <h1 className="font-display text-3xl font-bold text-brand-primary">Quotations</h1>
-      </div>
-      <Link to="/quotations/add"><Button>Create Quotation</Button></Link>
-    </div>
+    <div className="flex justify-end"><Link to="/quotations/add"><Button>Create Quotation</Button></Link></div>
     {notice && <p className="rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
 
     <Card className="p-5 md:p-6">

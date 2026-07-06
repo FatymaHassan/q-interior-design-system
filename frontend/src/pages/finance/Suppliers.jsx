@@ -6,7 +6,7 @@ import Button from "../../components/ui/Button";
 import { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
 import { deleteSupplier, getSuppliers } from "../../services/api";
-import { FinanceActionButton, FinanceHeader, FinanceMetric, FinanceNotice, FinanceSection, money } from "./financeUi";
+import { FinanceActionButton, FinanceMetric, FinanceNotice, FinanceSection, money } from "./financeUi";
 
 export default function Suppliers() {
   const [suppliers, setSuppliers] = useState([]);
@@ -50,11 +50,7 @@ export default function Suppliers() {
   };
 
   return <div className="space-y-6">
-    <FinanceHeader
-      title="Suppliers"
-      description="Track supplier balances, invoices, payments, and expense links from MySQL."
-      action={<Link to="/suppliers/add"><Button className="gap-2"><Plus size={16} />Add Supplier</Button></Link>}
-    />
+    <div className="flex justify-end"><Link to="/suppliers/add"><Button className="gap-2"><Plus size={16} />Add Supplier</Button></Link></div>
 
     {notice && <FinanceNotice tone={status === "error" ? "error" : "info"}>{notice}</FinanceNotice>}
 
