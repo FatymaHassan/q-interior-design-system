@@ -10,7 +10,6 @@ import { addProjectMember, createDocument, createExpense, createPayment, deleteD
 import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
 import { getProject } from "./projectApi";
 
-const tabs = ["Overview", "Client Payments / Revenue", "Expenses", "Financial Summary", "Documents", "Tasks", "Timeline", "Team", "Materials Used", "Client Messages", "Approvals"];
 const paymentMethods = ["cash", "bank transfer", "EVC Plus", "card", "other"];
 
 export default function ProjectDetails() {
@@ -24,7 +23,6 @@ export default function ProjectDetails() {
   const [expenseItems, setExpenseItems] = useState([]);
   const [materialsUsed, setMaterialsUsed] = useState([]);
   const [finance, setFinance] = useState(null);
-  const [activeTab, setActiveTab] = useState("Overview");
   const [memberForm, setMemberForm] = useState({ employee_id: "", role_on_project: "Member", assigned_date: new Date().toISOString().slice(0, 10), notes: "" });
   const [docForm, setDocForm] = useState({ title: "", document_category: "Photo", visibility: "internal", file: null });
   const [editingDocument, setEditingDocument] = useState(null);
@@ -231,34 +229,46 @@ export default function ProjectDetails() {
       </div>
     </Card>
 
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {tabs.map((tab) => <Button key={tab} variant={activeTab === tab ? "primary" : "outline"} className="whitespace-nowrap px-4 py-2" onClick={() => setActiveTab(tab)}>{tab}</Button>)}
-    </div>
+    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <Metric label="Contract Amount" value={formatCurrency(finance?.metrics?.contract_amount ?? finance?.metrics?.expected_revenue)} />
+      <Metric label="Revenue Received" value={formatCurrency(finance?.metrics?.received_revenue)} />
+      <Metric label="Balance Receivable" value={formatCurrency(finance?.metrics?.balance_receivable ?? finance?.metrics?.outstanding_client_balance)} />
+      <Metric label="Project Profit" value={formatCurrency(finance?.metrics?.project_profit)} />
+    </section>
 
-    {activeTab === "Overview" && <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       <Card className="p-5"><h3 className="mb-4 font-bold">Client Information</h3><InfoRows rows={[["Name", raw.client?.name], ["Phone", raw.client?.phone], ["Email", raw.client?.email], ["Address", raw.client?.address || raw.client?.location]]} /></Card>
       <Card className="p-5"><h3 className="mb-4 font-bold">Notes</h3><p className="text-sm text-brand-muted">{raw.notes || raw.description || "No notes added."}</p></Card>
-    </section>}
+    </section>
 
-    {activeTab === "Client Payments / Revenue" && <ClientPaymentsTab
-      finance={finance}
-      form={paymentForm}
-      onChange={updatePaymentForm}
-      onSubmit={addClientPayment}
-    />}
+    <SectionBlock title="Financial Summary" subtitle="Contract value, received revenue, expenses, and profit in one view.">
+      <ProjectFinancePanel finance={finance} />
+    </SectionBlock>
 
-    {activeTab === "Expenses" && <ProjectExpensesTab
-      finance={finance}
-      form={expenseForm}
-      suppliers={suppliers}
-      expenseItems={expenseItems}
-      onChange={updateExpenseForm}
-      onSubmit={addProjectExpense}
-    />}
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <SectionBlock title="Client Payments / Revenue" subtitle="Record and review client payments for this project.">
+        <ClientPaymentsTab
+          finance={finance}
+          form={paymentForm}
+          onChange={updatePaymentForm}
+          onSubmit={addClientPayment}
+        />
+      </SectionBlock>
 
-    {activeTab === "Financial Summary" && <ProjectFinancePanel finance={finance} />}
+      <SectionBlock title="Project Expenses" subtitle="Record direct project costs and supplier payments.">
+        <ProjectExpensesTab
+          finance={finance}
+          form={expenseForm}
+          suppliers={suppliers}
+          expenseItems={expenseItems}
+          onChange={updateExpenseForm}
+          onSubmit={addProjectExpense}
+        />
+      </SectionBlock>
+    </section>
 
-    {activeTab === "Tasks" && <Card className="p-5">
+    <SectionBlock title="Tasks" subtitle="Daily project work connected to this project.">
+    <Card className="p-5">
       <Table columns={[
         { key: "title", label: "Task", render: (task) => <Link to={`/tasks/${task.id}`} className="font-bold text-brand-primary hover:underline">{task.title}</Link> },
         { key: "assignee", label: "Assigned", render: (task) => (task.assignee_employee || task.assigneeEmployee)?.name || task.assignee?.name || "-" },
@@ -266,9 +276,11 @@ export default function ProjectDetails() {
         { key: "status", label: "Status", render: (task) => <Badge>{task.status}</Badge> },
         { key: "deadline", label: "Deadline" },
       ]} rows={tasks} empty="No daily tasks for this project yet." />
-    </Card>}
+    </Card>
+    </SectionBlock>
 
-    {activeTab === "Documents" && <Card className="p-5">
+    <SectionBlock title="Documents" subtitle="Upload files, photos, contracts, receipts, and client-visible documents.">
+    <Card className="p-5">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h3 className="font-bold">{editingDocument ? "Edit Project Document" : "Upload Project Document"}</h3>
         {editingDocument && <Button type="button" variant="outline" onClick={() => {
@@ -293,9 +305,12 @@ export default function ProjectDetails() {
           <button type="button" onClick={() => removeDocument(document)} className="font-semibold text-brand-danger underline">Delete</button>
         </div> },
       ]} rows={documents} empty="No documents uploaded for this project yet." />
-    </Card>}
+    </Card>
+    </SectionBlock>
 
-    {activeTab === "Timeline" && <Card className="p-5">
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <SectionBlock title="Timeline" subtitle="Recent project events and status changes.">
+    <Card className="p-5">
       <h3 className="mb-4 font-bold">Project Timeline</h3>
       <div className="space-y-3">
         {timeline.map((item, index) => <div key={`${item.type}-${index}`} className="flex gap-3 rounded-2xl border border-brand-border p-4">
@@ -304,9 +319,11 @@ export default function ProjectDetails() {
         </div>)}
         {timeline.length === 0 && <p className="text-sm text-brand-muted">No timeline events yet.</p>}
       </div>
-    </Card>}
+    </Card>
+    </SectionBlock>
 
-    {activeTab === "Team" && <Card className="p-5">
+    <SectionBlock title="Team" subtitle="Assign and manage employees working on this project.">
+    <Card className="p-5">
       <form onSubmit={addMember} className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
         <FormField label="Employee"><select value={memberForm.employee_id} onChange={(event) => setMemberForm((current) => ({ ...current, employee_id: event.target.value }))} className={fieldInputClass}>{employees.map((member) => <option key={member.id} value={member.id}>{member.name} - {member.position}</option>)}</select><Link to="/hr/employees/add" className="mt-2 block text-sm font-bold text-brand-primary">+ Add Employee in Directory</Link></FormField>
         <FormField label="Role on project"><input value={memberForm.role_on_project} onChange={(event) => setMemberForm((current) => ({ ...current, role_on_project: event.target.value }))} className={fieldInputClass} /></FormField>
@@ -321,9 +338,12 @@ export default function ProjectDetails() {
         { key: "status", label: "Status", render: (member) => <Badge>{member.employee?.status || "Active"}</Badge> },
         { key: "actions", label: "Actions", render: (member) => <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeMember(member)}>Remove</Button> },
       ]} rows={members} empty="No employees assigned yet." />
-    </Card>}
+    </Card>
+    </SectionBlock>
+    </section>
 
-    {activeTab === "Materials Used" && <Card className="p-5">
+    <SectionBlock title="Materials Used" subtitle="Track materials consumed by this project.">
+    <Card className="p-5">
       <h3 className="mb-4 font-bold">Project Materials Used</h3>
       <form onSubmit={addProjectMaterial} className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_140px_140px_1fr_auto]">
         <select value={materialForm.material_id} onChange={(event) => {
@@ -347,21 +367,28 @@ export default function ProjectDetails() {
         { key: "created_by", label: "Created By", render: (movement) => movement.creator?.name || "-" },
         { key: "notes", label: "Notes" },
       ]} rows={materialsUsed} empty="No materials recorded for this project yet." />
-    </Card>}
+    </Card>
+    </SectionBlock>
 
-    {activeTab === "Client Messages" && <Card className="p-5">
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+    <SectionBlock title="Client Messages" subtitle="Messages connected to the client portal conversation.">
+    <Card className="p-5">
       <div className="space-y-3">
         {messages.map((message) => <div key={message.id} className="rounded-2xl border border-brand-border p-4 text-sm"><b>{message.sender_type === "client" ? raw.client?.name : message.user?.name || "Staff"}</b><p className="mt-1 text-brand-muted">{message.message}</p></div>)}
         {messages.length === 0 && <p className="text-sm text-brand-muted">No client messages yet.</p>}
       </div>
-    </Card>}
+    </Card>
+    </SectionBlock>
 
-    {activeTab === "Approvals" && <Card className="p-5">
+    <SectionBlock title="Approvals" subtitle="Client approvals and signed decisions.">
+    <Card className="p-5">
       <div className="space-y-3">
         {approvals.map((approval) => <div key={approval.id} className="rounded-2xl bg-brand-soft p-4 text-sm"><div className="flex justify-between gap-3"><b>{approval.title}</b><Badge>{approval.status}</Badge></div><p className="mt-1 text-brand-muted">{approval.description}</p></div>)}
         {approvals.length === 0 && <p className="text-sm text-brand-muted">No client approvals yet.</p>}
       </div>
-    </Card>}
+    </Card>
+    </SectionBlock>
+    </section>
     
   </div>;
 }
@@ -372,6 +399,17 @@ function Metric({ label, value }) {
 
 function InfoRows({ rows }) {
   return <div className="space-y-3 text-sm">{rows.map(([label, value]) => <div key={label} className="flex justify-between rounded-xl bg-brand-soft p-3"><span>{label}</span><b>{value || "-"}</b></div>)}</div>;
+}
+
+function SectionBlock({ title, subtitle, children }) {
+  return <section className="space-y-3">
+    <div className="rounded-lg border border-brand-border bg-white/80 px-4 py-3 shadow-sm">
+      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-brand-gold">Project View</p>
+      <h3 className="mt-1 text-lg font-black text-brand-primary">{title}</h3>
+      {subtitle && <p className="mt-1 text-sm text-brand-muted">{subtitle}</p>}
+    </div>
+    {children}
+  </section>;
 }
 
 function ClientPaymentsTab({ finance, form, onChange, onSubmit }) {
