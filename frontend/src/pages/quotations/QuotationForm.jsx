@@ -44,7 +44,7 @@ export default function QuotationForm() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [newClient, setNewClient] = useState({ name: "", phone: "", email: "", location: "" });
-  const [imageFiles, setImageFiles] = useState([]);
+  const [imageFiles, setImageFiles] = useState({ quotation: [], sections: {}, items: {} });
 
   useEffect(() => {
     Promise.all([getClients(), getProjects(), id ? getQuotation(id) : Promise.resolve(null)]).then(([clientData, projectData, quotation]) => {
@@ -109,6 +109,10 @@ export default function QuotationForm() {
   const updateRoom = (sectionIndex, roomIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, title } : room) } : section) }));
   const addItem = (sectionIndex, roomIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: [...room.items, { ...defaultItem }] } : room) } : section) }));
   const updateItem = (sectionIndex, roomIndex, itemIndex, field, value) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => iIndex === itemIndex ? { ...item, [field]: value } : item) } : room) } : section) }));
+  const updateImages = (group, key, files) => setImageFiles((current) => {
+    if (group === "quotation") return { ...current, quotation: files };
+    return { ...current, [group]: { ...current[group], [key]: files } };
+  });
   const changeUnitType = (sectionIndex, roomIndex, itemIndex, unitType) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => {
     if (iIndex !== itemIndex) return item;
     const next = { ...item, unit_type: unitType, is_manual_total: unitType === "Custom" };
@@ -150,15 +154,9 @@ export default function QuotationForm() {
     };
     try {
       const quotation = id ? await updateQuotation(id, payload) : await createQuotation(payload);
-      for (const [index, file] of imageFiles.entries()) {
-        const imageForm = new FormData();
-        imageForm.append("title", `Quotation image ${index + 1}`);
-        imageForm.append("visibility", "client");
-        imageForm.append("file", file);
-        await uploadQuotationAttachment(quotation.id, imageForm);
-      }
+      await uploadScopedImages(quotation.id, form, imageFiles);
       setSavedId(quotation.id);
-      setImageFiles([]);
+      setImageFiles({ quotation: [], sections: {}, items: {} });
       navigate(`/quotations/${quotation.id}`);
     } catch (error) {
       setNotice(error.response?.data?.message || "Could not save quotation.");
@@ -213,22 +211,37 @@ export default function QuotationForm() {
                 <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} className={`${fieldInputClass} font-bold uppercase`} />
                 <Button type="button" variant="outline" className="px-3 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
               </div>
+              <ScopedImageInput
+                label="Floor / section images"
+                files={imageFiles.sections[sectionKey(sectionIndex)] || []}
+                onChange={(files) => updateImages("sections", sectionKey(sectionIndex), files)}
+              />
               <div className="space-y-4">
                 {section.rooms.map((room, roomIndex) => <div key={roomIndex} className="rounded-xl bg-white p-3">
                   <input value={room.title} onChange={(event) => updateRoom(sectionIndex, roomIndex, event.target.value)} className={`${fieldInputClass} mb-3 font-semibold`} />
                   <div className="space-y-2">
-                    {room.items.map((item, itemIndex) => <div key={itemIndex} className="grid grid-cols-1 gap-2 lg:grid-cols-[2fr_.8fr_.6fr_.7fr_.6fr_.6fr_.8fr_1fr]">
-                      <input value={item.description} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "description", event.target.value)} required placeholder="Wall Decoration" className={fieldInputClass} />
-                      <select value={item.unit_type} onChange={(event) => changeUnitType(sectionIndex, roomIndex, itemIndex, event.target.value)} className={fieldInputClass}>{unitTypes.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>
-                      <input value={item.quantity} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "quantity", event.target.value)} type="number" min="0" step="0.01" placeholder="Qty" className={fieldInputClass} disabled={item.unit_type === "Lump Sum"} />
-                      <input value={item.rate} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "rate", event.target.value)} type="number" min="0" step="0.01" placeholder="Rate" className={fieldInputClass} />
-                      <input value={item.discount} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "discount", event.target.value)} type="number" min="0" step="0.01" placeholder="Disc" className={fieldInputClass} />
-                      <input value={item.tax} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "tax", event.target.value)} type="number" min="0" step="0.01" placeholder="Tax" className={fieldInputClass} />
-                      {item.unit_type === "Custom" || item.unit_type === "Lump Sum"
-                        ? <input value={item.total} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "total", event.target.value)} type="number" min="0" step="0.01" placeholder="Total" className={fieldInputClass} />
-                        : <div className="rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">{formatCurrency(itemTotal(item))}</div>}
-                      <input value={item.notes} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "notes", event.target.value)} placeholder="Notes" className={fieldInputClass} />
-                    </div>)}
+                    {room.items.map((item, itemIndex) => {
+                      const key = itemKey(sectionIndex, roomIndex, itemIndex);
+                      return <div key={itemIndex} className="rounded-xl border border-brand-border p-3">
+                        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[2fr_.8fr_.6fr_.7fr_.6fr_.6fr_.8fr_1fr]">
+                          <input value={item.description} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "description", event.target.value)} required placeholder="Wall Decoration" className={fieldInputClass} />
+                          <select value={item.unit_type} onChange={(event) => changeUnitType(sectionIndex, roomIndex, itemIndex, event.target.value)} className={fieldInputClass}>{unitTypes.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>
+                          <input value={item.quantity} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "quantity", event.target.value)} type="number" min="0" step="0.01" placeholder="Qty" className={fieldInputClass} disabled={item.unit_type === "Lump Sum"} />
+                          <input value={item.rate} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "rate", event.target.value)} type="number" min="0" step="0.01" placeholder="Rate" className={fieldInputClass} />
+                          <input value={item.discount} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "discount", event.target.value)} type="number" min="0" step="0.01" placeholder="Disc" className={fieldInputClass} />
+                          <input value={item.tax} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "tax", event.target.value)} type="number" min="0" step="0.01" placeholder="Tax" className={fieldInputClass} />
+                          {item.unit_type === "Custom" || item.unit_type === "Lump Sum"
+                            ? <input value={item.total} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "total", event.target.value)} type="number" min="0" step="0.01" placeholder="Total" className={fieldInputClass} />
+                            : <div className="rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">{formatCurrency(itemTotal(item))}</div>}
+                          <input value={item.notes} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "notes", event.target.value)} placeholder="Notes" className={fieldInputClass} />
+                        </div>
+                        <ScopedImageInput
+                          label="Item images"
+                          files={imageFiles.items[key] || []}
+                          onChange={(files) => updateImages("items", key, files)}
+                        />
+                      </div>;
+                    })}
                   </div>
                   <Button type="button" variant="outline" className="mt-3 px-3 py-2" onClick={() => addItem(sectionIndex, roomIndex)}>Add Work Item</Button>
                 </div>)}
@@ -263,12 +276,12 @@ export default function QuotationForm() {
               type="file"
               multiple
               accept="image/*"
-              onChange={(event) => setImageFiles(Array.from(event.target.files || []))}
+              onChange={(event) => updateImages("quotation", null, Array.from(event.target.files || []))}
               className={`${fieldInputClass} md:max-w-sm`}
             />
           </div>
-          {imageFiles.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {imageFiles.map((file) => <div key={`${file.name}-${file.lastModified}`} className="overflow-hidden rounded-xl border border-brand-border bg-white">
+          {imageFiles.quotation.length > 0 && <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {imageFiles.quotation.map((file) => <div key={`${file.name}-${file.lastModified}`} className="overflow-hidden rounded-xl border border-brand-border bg-white">
               <img src={URL.createObjectURL(file)} alt={file.name} className="h-24 w-full object-cover" />
               <p className="truncate px-3 py-2 text-xs font-semibold text-brand-muted">{file.name}</p>
             </div>)}
@@ -279,6 +292,47 @@ export default function QuotationForm() {
     </Card>
   </div>;
 }
+
+function ScopedImageInput({ label, files, onChange }) {
+  return <div className="mt-3 rounded-xl border border-dashed border-brand-border bg-white/70 p-3">
+    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <span className="text-sm font-semibold text-brand-primary">{label}</span>
+      <input type="file" multiple accept="image/*" onChange={(event) => onChange(Array.from(event.target.files || []))} className={`${fieldInputClass} md:max-w-xs`} />
+    </div>
+    {files.length > 0 && <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+      {files.map((file) => <div key={`${file.name}-${file.lastModified}`} className="overflow-hidden rounded-lg border border-brand-border bg-white">
+        <img src={URL.createObjectURL(file)} alt={file.name} className="h-20 w-full object-cover" />
+        <p className="truncate px-2 py-1 text-[11px] font-semibold text-brand-muted">{file.name}</p>
+      </div>)}
+    </div>}
+  </div>;
+}
+
+async function uploadScopedImages(quotationId, form, imageFiles) {
+  await uploadFiles(quotationId, "QI_SCOPE|quotation|Project images", imageFiles.quotation);
+  for (const [sectionIndex, section] of form.sections.entries()) {
+    await uploadFiles(quotationId, `QI_SCOPE|section|${sectionIndex}|${section.title || "Section"}`, imageFiles.sections[sectionKey(sectionIndex)] || []);
+    for (const [roomIndex, room] of section.rooms.entries()) {
+      for (const [itemIndex, item] of room.items.entries()) {
+        const files = imageFiles.items[itemKey(sectionIndex, roomIndex, itemIndex)] || [];
+        await uploadFiles(quotationId, `QI_SCOPE|item|${sectionIndex}|${roomIndex}|${itemIndex}|${item.description || "Item"}`, files);
+      }
+    }
+  }
+}
+
+async function uploadFiles(quotationId, titlePrefix, files) {
+  for (const [index, file] of files.entries()) {
+    const imageForm = new FormData();
+    imageForm.append("title", `${titlePrefix}|${index + 1}`);
+    imageForm.append("visibility", "client");
+    imageForm.append("file", file);
+    await uploadQuotationAttachment(quotationId, imageForm);
+  }
+}
+
+const sectionKey = (sectionIndex) => String(sectionIndex);
+const itemKey = (sectionIndex, roomIndex, itemIndex) => `${sectionIndex}-${roomIndex}-${itemIndex}`;
 
 function itemTotal(item) {
   const quantity = item.unit_type === "Lump Sum" ? 1 : toNumber(item.quantity);
