@@ -57,3 +57,4 @@ export default function Projects() {
     <ProjectList projects={projects} status={status} onDelete={removeProject} />
   </div>;
 }
+
