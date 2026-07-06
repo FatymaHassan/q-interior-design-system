@@ -39,8 +39,11 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payment_date' => 'nullable|date',
             'payment_method' => 'nullable|string|max:255',
+            'payment_type' => 'nullable|string|max:255',
+            'related_stage' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:255',
             'receipt_file' => 'nullable|string|max:255',
+            'receipt' => 'nullable|file|max:10240',
             'method' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
@@ -49,6 +52,10 @@ class PaymentController extends Controller
         $data['type'] = $data['type'] ?? $request->route('type') ?? 'client';
         $data['method'] = $data['method'] ?? $data['payment_method'] ?? null;
         $data['payment_method'] = $data['payment_method'] ?? $data['method'];
+        if ($request->hasFile('receipt')) {
+            $data['receipt_file'] = $request->file('receipt')->store('receipts', 'public');
+        }
+        unset($data['receipt']);
 
         $payment = Payment::create($data);
         $this->refreshRelated($payment, $finance);
@@ -72,8 +79,11 @@ class PaymentController extends Controller
             'amount' => 'sometimes|required|numeric|min:0.01',
             'payment_date' => 'nullable|date',
             'payment_method' => 'nullable|string|max:255',
+            'payment_type' => 'nullable|string|max:255',
+            'related_stage' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:255',
             'receipt_file' => 'nullable|string|max:255',
+            'receipt' => 'nullable|file|max:10240',
             'method' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
@@ -81,6 +91,10 @@ class PaymentController extends Controller
         ]);
         $data['method'] = $data['method'] ?? $data['payment_method'] ?? $payment->method;
         $data['payment_method'] = $data['payment_method'] ?? $data['method'];
+        if ($request->hasFile('receipt')) {
+            $data['receipt_file'] = $request->file('receipt')->store('receipts', 'public');
+        }
+        unset($data['receipt']);
 
         $oldProject = $payment->project;
         $oldInvoice = $payment->invoice;

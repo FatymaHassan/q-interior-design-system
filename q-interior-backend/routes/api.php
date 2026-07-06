@@ -220,6 +220,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('overheads', OverheadController::class);
     Route::get('/tasks/daily-summary', [TaskController::class, 'dailySummary']);
     Route::post('/tasks/check-overdue', [TaskController::class, 'checkOverdue'])->middleware('role:admin,manager');
+    Route::post('/tasks/{task}/approve', [TaskController::class, 'approve'])->middleware('role:admin,manager');
+    Route::post('/tasks/{task}/reject', [TaskController::class, 'reject'])->middleware('role:admin,manager');
     Route::apiResource('tasks', TaskController::class);
     Route::patch('/tasks/{task}/status', [TaskController::class, 'status']);
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store']);

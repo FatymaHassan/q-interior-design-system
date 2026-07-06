@@ -266,7 +266,10 @@ export function mapPayment(payment) {
     amount: money(payment.amount),
     date: payment.payment_date || "-",
     method: payment.payment_method || payment.method || "-",
+    paymentType: payment.payment_type || "Flexible payment",
+    relatedStage: payment.related_stage || "-",
     referenceNumber: payment.reference_number || "-",
+    receiptFile: payment.receipt_file || "",
     status: payment.status || "pending",
     raw: payment,
   };
@@ -379,10 +382,16 @@ export function mapTask(task) {
     project: task.project?.name || task.project?.project_name || "-",
     assignee: employee?.name || task.assignee?.name || "-",
     employeeId: task.employee_id || employee?.id || "",
+    workDate: task.work_date || task.deadline || "-",
+    relatedStage: task.related_stage || "-",
+    progressAdded: Number(task.progress_added || 0),
     priority: task.priority || "Medium",
     status: task.status || "Pending",
     deadline: task.deadline || "-",
     notes: task.notes || "",
+    adminNote: task.admin_note || "",
+    approvedBy: task.approver?.name || "-",
+    approvedAt: task.approved_at || "",
     raw: task,
   };
 }
@@ -639,6 +648,16 @@ export async function createTask(payload) {
 
 export async function updateTaskStatus(id, status, note = "") {
   const response = await api.patch(`/tasks/${id}/status`, { status, note });
+  return mapTask(response.data);
+}
+
+export async function approveTask(id, payload = {}) {
+  const response = await api.post(`/tasks/${id}/approve`, payload);
+  return mapTask(response.data);
+}
+
+export async function rejectTask(id, payload = {}) {
+  const response = await api.post(`/tasks/${id}/reject`, payload);
   return mapTask(response.data);
 }
 

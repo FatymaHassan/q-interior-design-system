@@ -15,10 +15,11 @@ const sections = [
     label: "Project & Daily Work",
     items: [
       { label: "Projects", icon: Briefcase, to: "/projects" },
+      { label: "Daily Work", icon: CheckSquare, to: "/daily-tasks" },
       { label: "Client Payments", icon: Wallet, to: "/project-client-payments", roles: ["admin", "manager", "finance"] },
       { label: "Project Expenses", icon: Receipt, to: "/project-expenses", roles: ["admin", "manager", "finance"] },
+      { label: "Project Financial Summary", icon: ClipboardList, to: "/finance/pnl", roles: ["admin", "manager", "finance"] },
       { label: "Project Board", icon: Columns3, to: "/project-board" },
-      { label: "Daily Tasks", icon: CheckSquare, to: "/daily-tasks" },
       { label: "Photos", icon: Image, to: "/photos" },
       { label: "Documents", icon: FileText, to: "/documents" },
       { label: "Client Messages", icon: Inbox, to: "/client-messages" },
@@ -27,13 +28,13 @@ const sections = [
   {
     label: "Finance",
     items: [
-      { label: "P&L Summary", icon: ClipboardList, to: "/finance", roles: ["admin", "manager", "finance"] },
+      { label: "Reports", icon: ClipboardList, to: "/finance", roles: ["admin", "manager", "finance"] },
       { label: "Invoices", icon: ScrollText, to: "/invoices", roles: ["admin", "manager", "finance"] },
       { label: "Expenses", icon: Receipt, to: "/expenses", roles: ["admin", "manager", "finance"] },
       { label: "Expense Categories", icon: Tags, to: "/expense-categories", roles: ["admin", "manager", "finance"] },
       { label: "Suppliers", icon: Users, to: "/suppliers", roles: ["admin", "manager", "finance"] },
       { label: "Payments", icon: Wallet, to: "/payments", roles: ["admin", "manager", "finance"] },
-      { label: "Overheads", icon: FileText, to: "/overheads", roles: ["admin", "manager", "finance"] },
+      { label: "Office Expenses", icon: FileText, to: "/overheads", roles: ["admin", "manager", "finance"] },
       { label: "Payroll", icon: Wallet, to: "/finance/payroll", roles: ["admin", "manager", "finance"] },
       { label: "Quotations", icon: ScrollText, to: "/quotations", roles: ["admin", "manager", "designer"] },
     ],

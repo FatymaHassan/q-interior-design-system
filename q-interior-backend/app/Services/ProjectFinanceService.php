@@ -104,7 +104,11 @@ class ProjectFinanceService
         $expected = (float) $project->contract_amount;
         $projectRevenue = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: $received);
         $cost = $projectExpenses + $supplierCosts;
-        $profit = $projectRevenue - $projectExpenses;
+        $expectedProfit = $projectRevenue - $projectExpenses;
+        $actualProfit = $received - $projectExpenses;
+        $paymentStatus = $projectRevenue > 0 && $received >= $projectRevenue
+            ? 'Fully Paid'
+            : ($received > 0 ? 'Partially Paid' : 'Unpaid');
 
         return [
             'project' => $project->load('client'),
@@ -117,6 +121,7 @@ class ProjectFinanceService
                 'deposit_amount' => round((float) $project->deposit_amount, 2),
                 'payment_percentage' => (float) $project->payment_percentage,
                 'payment_progress' => $projectRevenue > 0 ? round(($received / $projectRevenue) * 100, 2) : 0,
+                'payment_status' => $paymentStatus,
                 'total_project_expenses' => round($projectExpenses, 2),
                 'cash_left' => round($received - $projectExpenses, 2),
                 'total_project_cost' => round($cost, 2),
@@ -128,8 +133,10 @@ class ProjectFinanceService
                 'project_expenses' => round($projectExpenses, 2),
                 'supplier_costs' => round($supplierCosts, 2),
                 'supplier_payables' => round($supplierPayables, 2),
-                'project_profit' => round($profit, 2),
-                'profit_margin' => $projectRevenue > 0 ? round(($profit / $projectRevenue) * 100, 2) : 0,
+                'project_profit' => round($expectedProfit, 2),
+                'expected_profit' => round($expectedProfit, 2),
+                'actual_profit_from_received_money' => round($actualProfit, 2),
+                'profit_margin' => $projectRevenue > 0 ? round(($expectedProfit / $projectRevenue) * 100, 2) : 0,
                 'expense_usage' => $projectRevenue > 0 ? round(($projectExpenses / $projectRevenue) * 100, 2) : 0,
             ],
             'expense_breakdown' => $expenseBreakdown,

@@ -13,15 +13,26 @@ class Task extends Model
         'assigned_by',
         'title',
         'description',
+        'work_date',
+        'related_stage',
+        'progress_added',
         'priority',
         'status',
         'deadline',
         'completed_at',
         'notes',
+        'admin_note',
+        'approved_by',
+        'approved_at',
+        'rejected_at',
     ];
 
     protected $casts = [
+        'work_date' => 'date',
+        'progress_added' => 'decimal:2',
         'completed_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function project()
@@ -42,6 +53,11 @@ class Task extends Model
     public function assigner()
     {
         return $this->belongsTo(User::class, 'assigned_by');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function comments()

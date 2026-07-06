@@ -4,15 +4,19 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import ProgressBar from "../../components/ui/ProgressBar";
+import Table from "../../components/ui/Table";
 import { getProjectFinanceSummary } from "../../services/api";
 import { formatCurrency, formatPercentage } from "../../utils/numberFormat";
 import { getProject } from "./projectApi";
+
+const tabs = ["Overview", "Contract Details", "Client Payments", "Project Expenses", "Daily Work", "Employees", "Financial Summary", "Documents"];
 
 export default function ProjectDetails() {
   const { id } = useParams();
   const [project, setProject] = useState(null);
   const [finance, setFinance] = useState(null);
   const [status, setStatus] = useState("loading");
+  const [activeTab, setActiveTab] = useState("Overview");
 
   useEffect(() => {
     Promise.all([
@@ -27,6 +31,11 @@ export default function ProjectDetails() {
 
   const raw = project?.raw || {};
   const metrics = finance?.metrics || {};
+  const clientPayments = finance?.client_payments || raw.payments || [];
+  const projectExpenses = finance?.project_expenses || raw.expenses || [];
+  const dailyWork = raw.tasks || [];
+  const employees = raw.members || [];
+  const documents = raw.documents || [];
   const generalRows = useMemo(() => [
     ["Project Name", project?.name],
     ["Client", project?.client],
@@ -42,7 +51,22 @@ export default function ProjectDetails() {
     ["Budget", formatCurrency(project?.budget)],
     ["Contract Amount", formatCurrency(metrics.contract_amount ?? project?.contractAmount)],
     ["Progress", formatPercentage(project?.progress)],
+    ["Payment Plan Type", raw.payment_plan_type || "-"],
+    ["Deposit", formatCurrency(raw.deposit_amount || metrics.deposit_amount)],
+    ["Payment Terms", raw.payment_terms || "-"],
   ], [project, metrics]);
+
+  const financeRows = [
+    ["Contract Amount", formatCurrency(metrics.contract_amount ?? project?.contractAmount)],
+    ["Revenue Received", formatCurrency(metrics.received_revenue)],
+    ["Balance Receivable", formatCurrency(metrics.balance_receivable)],
+    ["Payment Status", metrics.payment_status || "-"],
+    ["Project Expenses", formatCurrency(metrics.total_project_expenses)],
+    ["Cash Left", formatCurrency(metrics.cash_left)],
+    ["Expected Profit", formatCurrency(metrics.expected_profit ?? metrics.project_profit)],
+    ["Actual Profit From Received", formatCurrency(metrics.actual_profit_from_received_money)],
+    ["Profit Margin", formatPercentage(metrics.profit_margin)],
+  ];
 
   if (status === "loading") return <Card className="p-5 text-sm text-brand-muted">Loading project...</Card>;
   if (status === "error" || !project) return <Card className="p-5 text-sm text-brand-danger">Project could not be loaded.</Card>;
@@ -77,15 +101,80 @@ export default function ProjectDetails() {
       </div>
     </section>
 
-    <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-      <InfoPanel title="General Information" rows={generalRows} />
-      <InfoPanel title="Contract Snapshot" rows={contractRows} />
-    </section>
-
-    <Card className="p-5">
-      <h2 className="text-lg font-black text-brand-primary">Project Notes</h2>
-      <p className="mt-3 text-sm leading-6 text-brand-muted">{raw.notes || raw.description || "No notes added."}</p>
+    <Card className="p-2">
+      <div className="flex gap-2 overflow-x-auto">
+        {tabs.map((tab) => <button
+          key={tab}
+          type="button"
+          onClick={() => setActiveTab(tab)}
+          className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-brand-primary text-white" : "text-brand-muted hover:bg-brand-soft hover:text-brand-primary"}`}
+        >
+          {tab}
+        </button>)}
+      </div>
     </Card>
+
+    {activeTab === "Overview" && <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+      <InfoPanel title="General Information" rows={generalRows} />
+      <Card className="p-5">
+        <h2 className="text-lg font-black text-brand-primary">Project Notes</h2>
+        <p className="mt-3 text-sm leading-6 text-brand-muted">{raw.notes || raw.description || "No notes added."}</p>
+      </Card>
+    </section>}
+
+    {activeTab === "Contract Details" && <InfoPanel title="Contract Details" rows={contractRows} />}
+
+    {activeTab === "Client Payments" && <Card className="p-5">
+      <Table columns={[
+        { key: "payment_date", label: "Date", render: (row) => dateValue(row.payment_date) },
+        { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
+        { key: "payment_type", label: "Type", render: (row) => row.payment_type || "Flexible payment" },
+        { key: "related_stage", label: "Stage", render: (row) => row.related_stage || "-" },
+        { key: "payment_method", label: "Method", render: (row) => row.payment_method || row.method || "-" },
+        { key: "reference_number", label: "Reference", render: (row) => row.reference_number || "-" },
+      ]} rows={clientPayments} empty="No client payments yet." />
+    </Card>}
+
+    {activeTab === "Project Expenses" && <Card className="p-5">
+      <Table columns={[
+        { key: "expense_date", label: "Date", render: (row) => dateValue(row.expense_date) },
+        { key: "title", label: "Expense", render: (row) => row.title || row.item_name || row.category || "-" },
+        { key: "category", label: "Category", render: (row) => row.category_model?.name || row.category || "-" },
+        { key: "paid_by", label: "Paid To", render: (row) => row.supplier?.name || row.paid_by || "-" },
+        { key: "amount", label: "Amount", render: (row) => formatCurrency(row.total_cost || row.amount) },
+      ]} rows={projectExpenses} empty="No project expenses yet." />
+    </Card>}
+
+    {activeTab === "Daily Work" && <Card className="p-5">
+      <Table columns={[
+        { key: "title", label: "Work", render: (row) => row.title || "-" },
+        { key: "employee", label: "Employee", render: (row) => row.assignee_employee?.name || row.assignee?.name || "-" },
+        { key: "work_date", label: "Date", render: (row) => dateValue(row.work_date || row.deadline) },
+        { key: "related_stage", label: "Stage", render: (row) => row.related_stage || "-" },
+        { key: "progress_added", label: "Progress", render: (row) => `${Number(row.progress_added || 0)}%` },
+        { key: "status", label: "Status", render: (row) => <Badge>{row.status || "Pending"}</Badge> },
+      ]} rows={dailyWork} empty="No daily work yet." />
+    </Card>}
+
+    {activeTab === "Employees" && <Card className="p-5">
+      <Table columns={[
+        { key: "member", label: "Member", render: (row) => row.employee?.name || row.user?.name || "-" },
+        { key: "position", label: "Position", render: (row) => row.employee?.position || "-" },
+        { key: "role", label: "Project Role", render: (row) => row.role || "Member" },
+        { key: "status", label: "Status", render: (row) => <Badge>{row.status || "Active"}</Badge> },
+      ]} rows={employees} empty="No employees assigned yet." />
+    </Card>}
+
+    {activeTab === "Financial Summary" && <InfoPanel title="Financial Summary" rows={financeRows} />}
+
+    {activeTab === "Documents" && <Card className="p-5">
+      <Table columns={[
+        { key: "title", label: "Title", render: (row) => row.title || "-" },
+        { key: "document_category", label: "Category", render: (row) => row.document_category || "other" },
+        { key: "visibility", label: "Visibility", render: (row) => row.visibility || "internal" },
+        { key: "created_at", label: "Uploaded", render: (row) => dateValue(row.created_at) },
+      ]} rows={documents} empty="No documents uploaded yet." />
+    </Card>}
   </div>;
 }
 

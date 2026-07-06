@@ -19,6 +19,8 @@ class Payment extends Model
         'amount',
         'payment_date',
         'payment_method',
+        'payment_type',
+        'related_stage',
         'reference_number',
         'receipt_file',
         'method',

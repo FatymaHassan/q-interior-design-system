@@ -203,6 +203,8 @@ class ProjectController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payment_date' => 'nullable|date',
             'payment_method' => 'nullable|string|max:255',
+            'payment_type' => 'nullable|string|max:255',
+            'related_stage' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
