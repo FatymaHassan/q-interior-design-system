@@ -123,4 +123,49 @@ class QuotationModuleTest extends TestCase
         $this->assertSame(1, Invoice::count());
         $this->assertSame('Apartment styling quotation', Quotation::first()->project->name);
     }
+
+    public function test_quotation_can_be_recorded_without_existing_client_or_project(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $quotation = $this->postJson('/api/quotations', [
+            'client_id' => null,
+            'project_id' => null,
+            'title' => 'Walk-in office quotation',
+            'project_title' => 'Walk-in office quotation',
+            'client_name' => 'New Walk-in Client',
+            'quotation_date' => now()->toDateString(),
+            'sections' => [[
+                'title' => 'GROUND FLOOR',
+                'rooms' => [[
+                    'title' => 'Reception',
+                    'items' => [
+                        ['description' => 'Concept design', 'unit_type' => 'Lump Sum', 'quantity' => 1, 'rate' => 250],
+                    ],
+                ]],
+            ]],
+        ])
+            ->assertCreated()
+            ->assertJsonFragment(['client_name' => 'New Walk-in Client'])
+            ->json();
+
+        $this->assertDatabaseHas('quotations', [
+            'id' => $quotation['id'],
+            'client_id' => null,
+            'project_id' => null,
+            'status' => 'Draft',
+        ]);
+
+        $this->postJson('/api/quotations/' . $quotation['id'] . '/reject', [
+            'client_comment' => 'Client chose another supplier.',
+        ])
+            ->assertOk()
+            ->assertJsonFragment(['status' => 'Rejected']);
+
+        $this->postJson('/api/quotations/' . $quotation['id'] . '/approve', [
+            'client_comment' => 'Client came back and approved.',
+        ])
+            ->assertOk()
+            ->assertJsonFragment(['status' => 'Approved']);
+    }
 }

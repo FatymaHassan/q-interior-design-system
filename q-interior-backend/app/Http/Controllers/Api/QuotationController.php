@@ -61,7 +61,7 @@ class QuotationController extends Controller
 
             Notification::create([
                 'title' => 'Quotation created',
-                'message' => $quotation->quotation_number . ' was created for ' . $quotation->client?->name,
+                'message' => $quotation->quotation_number . ' was created for ' . ($quotation->client?->name ?: $quotation->client_name ?: 'a walk-in client'),
                 'type' => 'quotation_created',
                 'link' => '/quotations/' . $quotation->id,
                 'is_read' => false,
@@ -120,13 +120,15 @@ class QuotationController extends Controller
             'sent_by' => request()->user()?->id,
         ]);
 
-        QuotationApproval::updateOrCreate([
-            'quotation_id' => $quotation->id,
-            'client_id' => $quotation->client_id,
-        ], [
-            'status' => 'Pending',
-            'client_comment' => null,
-        ]);
+        if ($quotation->client_id) {
+            QuotationApproval::updateOrCreate([
+                'quotation_id' => $quotation->id,
+                'client_id' => $quotation->client_id,
+            ], [
+                'status' => 'Pending',
+                'client_comment' => null,
+            ]);
+        }
 
         Notification::create([
             'title' => 'Quotation sent',
@@ -137,6 +139,16 @@ class QuotationController extends Controller
         ]);
 
         return $quotation->load(['client', 'project', 'items', 'approvals']);
+    }
+
+    public function approve(Request $request, Quotation $quotation)
+    {
+        return $this->recordDecision($request, $quotation, 'Approved');
+    }
+
+    public function reject(Request $request, Quotation $quotation)
+    {
+        return $this->recordDecision($request, $quotation, 'Rejected');
     }
 
     public function revise(Request $request, Quotation $quotation)
@@ -349,7 +361,7 @@ class QuotationController extends Controller
     protected function validated(Request $request, bool $partial = false): array
     {
         return $request->validate([
-            'client_id' => ($partial ? 'sometimes|' : '') . 'required|exists:clients,id',
+            'client_id' => 'nullable|exists:clients,id',
             'project_id' => 'nullable|exists:projects,id',
             'title' => ($partial ? 'sometimes|' : '') . 'required|string|max:255',
             'project_title' => 'nullable|string|max:255',
@@ -432,6 +444,55 @@ class QuotationController extends Controller
         $this->recalculateTotals($quotation);
     }
 
+    protected function recordDecision(Request $request, Quotation $quotation, string $status): Quotation
+    {
+        $data = $request->validate([
+            'client_comment' => 'nullable|string',
+            'signed_name' => 'nullable|string|max:255',
+        ]);
+
+        abort_if($quotation->status === 'Approved' && $status !== 'Approved', 422, 'This quotation is already approved.');
+
+        $updates = [
+            'status' => $status,
+            'approved_at' => $status === 'Approved' ? now() : null,
+            'rejected_at' => $status === 'Rejected' ? now() : null,
+            'locked_at' => $status === 'Approved' ? now() : null,
+            'updated_by' => $request->user()?->id,
+        ];
+        $quotation->update($updates);
+
+        if ($quotation->client_id) {
+            $quotation->approvals()->updateOrCreate([
+                'quotation_id' => $quotation->id,
+                'client_id' => $quotation->client_id,
+            ], [
+                'status' => $status,
+                'client_comment' => $data['client_comment'] ?? null,
+                'signed_name' => $data['signed_name'] ?? $request->user()?->name,
+                'signed_at' => now(),
+                'ip_address' => $request->ip(),
+                'approved_at' => $status === 'Approved' ? now() : null,
+                'rejected_at' => $status === 'Rejected' ? now() : null,
+                'revision_requested_at' => null,
+            ]);
+        }
+
+        Notification::create([
+            'client_id' => $quotation->client_id,
+            'project_id' => $quotation->project_id,
+            'title' => 'Quotation ' . strtolower($status),
+            'message' => $quotation->quotation_number . ' was marked ' . strtolower($status) . '.',
+            'type' => 'quotation_' . strtolower($status),
+            'link' => '/quotations/' . $quotation->id,
+            'is_read' => false,
+        ]);
+
+        $this->snapshot($quotation, 'Marked ' . strtolower($status), $request->user()?->id);
+
+        return $quotation->load(['client', 'project', 'invoice.items', 'sections.rooms.items', 'items', 'versions', 'attachments', 'approvals']);
+    }
+
     protected function createStructuredItem(Quotation $quotation, array $item, ?int $sectionId, ?int $roomId, int $sortOrder): void
     {
         $unitType = $item['unit_type'] ?? (isset($item['area_m2']) ? 'M²' : 'Unit');
@@ -494,6 +555,7 @@ class QuotationController extends Controller
     public function convertApprovedQuotation(Quotation $quotation, ?int $userId = null): Quotation
     {
         $quotation->loadMissing(['items', 'project', 'invoice']);
+        abort_unless($quotation->client_id, 422, 'Link this approved quotation to a client before converting it to a project or invoice.');
 
         $project = $quotation->project ?: Project::create([
             'client_id' => $quotation->client_id,

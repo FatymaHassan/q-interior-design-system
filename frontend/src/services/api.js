@@ -401,9 +401,9 @@ export function mapQuotation(quotation) {
     id: quotation.id,
     quotationNumber: quotation.quotation_number,
     title: quotation.title,
-    client: quotation.client?.name || "-",
+    client: quotation.client?.name || quotation.client_name || "-",
     clientId: quotation.client_id || quotation.client?.id || "",
-    project: quotation.project?.name || quotation.project?.project_name || "-",
+    project: quotation.project?.name || quotation.project?.project_name || quotation.project_title || quotation.title || "-",
     projectId: quotation.project_id || quotation.project?.id || "",
     projectTitle: quotation.project_title || quotation.title,
     clientName: quotation.client_name || quotation.client?.name || "",
@@ -1241,6 +1241,16 @@ export async function deleteQuotation(id) {
 
 export async function sendQuotation(id) {
   const response = await api.post(`/quotations/${id}/send`);
+  return mapQuotation(response.data);
+}
+
+export async function approveQuotation(id, payload = {}) {
+  const response = await api.post(`/quotations/${id}/approve`, payload);
+  return mapQuotation(response.data);
+}
+
+export async function rejectQuotation(id, payload = {}) {
+  const response = await api.post(`/quotations/${id}/reject`, payload);
   return mapQuotation(response.data);
 }
 

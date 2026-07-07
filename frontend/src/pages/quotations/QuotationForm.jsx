@@ -90,8 +90,6 @@ export default function QuotationForm() {
             })),
           })) : [{ ...defaultSection }],
         });
-      } else {
-        setForm((current) => ({ ...current, client_id: clientData[0]?.id || "", project_id: "" }));
       }
     }).catch(() => setNotice("Could not load quotation form data."));
   }, [id]);
@@ -103,6 +101,26 @@ export default function QuotationForm() {
   }, [form.sections, form.profit_percentage]);
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const selectClientOption = (event) => {
+    const value = event.target.value;
+    const selected = clients.find((client) => client.name.toLowerCase() === value.trim().toLowerCase());
+    setForm((current) => ({
+      ...current,
+      client_name: value,
+      client_id: selected?.id || "",
+      location: selected?.location || current.location,
+    }));
+  };
+  const selectProjectOption = (event) => {
+    const value = event.target.value;
+    const selected = projects.find((project) => project.name.toLowerCase() === value.trim().toLowerCase());
+    setForm((current) => ({
+      ...current,
+      project_title: value,
+      project_id: selected?.id || "",
+      location: selected?.location || current.location,
+    }));
+  };
   const updateSection = (sectionIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, title } : section) }));
   const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "NEW FLOOR / AREA", rooms: [{ title: "New Room", items: [{ ...defaultItem }] }] }] }));
   const addRoom = (sectionIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title: "New Room", items: [{ ...defaultItem }] }] } : section) }));
@@ -128,7 +146,7 @@ export default function QuotationForm() {
     const payload = {
       ...form,
       title: form.title || form.project_title,
-      client_id: Number(form.client_id),
+      client_id: form.client_id ? Number(form.client_id) : null,
       project_id: form.project_id ? Number(form.project_id) : null,
       profit_percentage: toNumber(form.profit_percentage),
       sections: form.sections.map((section, sectionIndex) => ({
@@ -176,10 +194,34 @@ export default function QuotationForm() {
       {notice && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-brand-danger">{notice}</p>}
       <form onSubmit={submit} className="mt-5 space-y-6">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <FormField label="Client"><select name="client_id" value={form.client_id} onChange={updateField} required className={fieldInputClass}><option value="">Select client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></FormField>
-          <FormField label="Project"><select name="project_id" value={form.project_id} onChange={updateField} className={fieldInputClass}><option value="">No linked project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></FormField>
-          <FormField label="Project title"><input name="project_title" value={form.project_title} onChange={updateField} required placeholder="Ali VILLA HOUSE" className={fieldInputClass} /></FormField>
-          <FormField label="Client name snapshot"><input name="client_name" value={form.client_name} onChange={updateField} placeholder="Ali Ahmed" className={fieldInputClass} /></FormField>
+          <FormField label="Client">
+            <input
+              name="client_name"
+              value={form.client_name}
+              onChange={selectClientOption}
+              list="quotation-client-options"
+              placeholder="Type client name or choose existing"
+              className={fieldInputClass}
+            />
+            <datalist id="quotation-client-options">
+              {clients.map((client) => <option key={client.id} value={client.name} />)}
+            </datalist>
+          </FormField>
+          <FormField label="Project">
+            <input
+              name="project_title"
+              value={form.project_title}
+              onChange={selectProjectOption}
+              list="quotation-project-options"
+              required
+              placeholder="Type project title or choose existing"
+              className={fieldInputClass}
+            />
+            <datalist id="quotation-project-options">
+              {projects.map((project) => <option key={project.id} value={project.name} />)}
+            </datalist>
+          </FormField>
+          <FormField label="Quotation title"><input name="title" value={form.title} onChange={updateField} placeholder="Optional custom title" className={fieldInputClass} /></FormField>
           <FormField label="Location"><input name="location" value={form.location} onChange={updateField} placeholder="Mogadishu" className={fieldInputClass} /></FormField>
           <FormField label="Date"><input name="quotation_date" type="date" value={form.quotation_date} onChange={updateField} className={fieldInputClass} /></FormField>
         </div>

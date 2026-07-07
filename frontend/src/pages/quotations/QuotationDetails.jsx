@@ -5,7 +5,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { convertQuotation, getQuotation, getQuotationPdfUrl, getQuotationPreviewUrl, reviseQuotation, sendQuotation, uploadQuotationAttachment } from "./quotationApi";
+import { approveQuotation, convertQuotation, getQuotation, getQuotationPdfUrl, getQuotationPreviewUrl, rejectQuotation, reviseQuotation, sendQuotation, uploadQuotationAttachment } from "./quotationApi";
 
 export default function QuotationDetails() {
   const { id } = useParams();
@@ -24,6 +24,8 @@ export default function QuotationDetails() {
     try {
       if (action === "send") await sendQuotation(id);
       if (action === "revise") await reviseQuotation(id, { change_notes: "Manual revision" });
+      if (action === "approve") await approveQuotation(id, { client_comment: "Recorded by admin" });
+      if (action === "reject") await rejectQuotation(id, { client_comment: "Recorded by admin" });
       if (action === "convert") await convertQuotation(id);
       await load();
     } catch (error) {
@@ -54,9 +56,11 @@ export default function QuotationDetails() {
       </div>
       <div className="flex flex-wrap gap-2">
         <Link to={`/quotations/${quotation.id}/edit`}><Button variant="outline">Edit</Button></Link>
-        <Button variant="outline" onClick={() => run("send")}>Send</Button>
-        <Button variant="outline" onClick={() => run("revise")}>Revise</Button>
-        <Button onClick={() => run("convert")}>Convert</Button>
+        {quotation.status !== "Approved" && <Button variant="outline" onClick={() => run("send")}>Send</Button>}
+        {quotation.status !== "Approved" && <Button variant="outline" onClick={() => run("revise")}>Revise</Button>}
+        {quotation.status !== "Approved" && <Button variant="outline" onClick={() => run("approve")}>Approve</Button>}
+        {quotation.status !== "Rejected" && quotation.status !== "Approved" && <Button variant="outline" onClick={() => run("reject")}>Reject</Button>}
+        {quotation.status === "Approved" && <Button onClick={() => run("convert")}>Convert</Button>}
         <a href={getQuotationPreviewUrl(quotation.id)} target="_blank" rel="noreferrer"><Button variant="outline">Preview</Button></a>
         <a href={getQuotationPdfUrl(quotation.id)} download><Button variant="outline">Download PDF</Button></a>
       </div>

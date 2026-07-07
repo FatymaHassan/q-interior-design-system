@@ -338,6 +338,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/{key}/export', [ReportsController::class, 'export'])->middleware('role:admin,manager,finance');
     Route::apiResource('quotations', QuotationController::class);
     Route::post('/quotations/{quotation}/send', [QuotationController::class, 'send']);
+    Route::post('/quotations/{quotation}/approve', [QuotationController::class, 'approve']);
+    Route::post('/quotations/{quotation}/reject', [QuotationController::class, 'reject']);
     Route::post('/quotations/{quotation}/revise', [QuotationController::class, 'revise']);
     Route::get('/quotations/{quotation}/versions', [QuotationController::class, 'versions']);
     Route::post('/quotations/{quotation}/attachments', [QuotationController::class, 'attachment']);
