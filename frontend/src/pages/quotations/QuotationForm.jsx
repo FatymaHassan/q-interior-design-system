@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
-import { createClient, getClients, getProjects, getQuotationPreviewUrl, getQuotationPdfUrl } from "../../services/api";
+import { getClients, getProjects, getQuotationPreviewUrl, getQuotationPdfUrl } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
 import { createQuotation, getQuotation, updateQuotation, uploadQuotationAttachment } from "./quotationApi";
 
@@ -43,7 +43,6 @@ export default function QuotationForm() {
   const [savedId, setSavedId] = useState(id || null);
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
-  const [newClient, setNewClient] = useState({ name: "", phone: "", email: "", location: "" });
   const [imageFiles, setImageFiles] = useState({ quotation: [], sections: {}, items: {} });
 
   useEffect(() => {
@@ -225,23 +224,6 @@ export default function QuotationForm() {
           <FormField label="Location"><input name="location" value={form.location} onChange={updateField} placeholder="Mogadishu" className={fieldInputClass} /></FormField>
           <FormField label="Date"><input name="quotation_date" type="date" value={form.quotation_date} onChange={updateField} className={fieldInputClass} /></FormField>
         </div>
-        <div className="rounded-2xl border border-brand-border p-4">
-          <h3 className="mb-3 font-bold text-brand-primary">Create New Client</h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-            <input placeholder="Name" value={newClient.name} onChange={(event) => setNewClient({ ...newClient, name: event.target.value })} className={fieldInputClass} />
-            <input placeholder="Phone" value={newClient.phone} onChange={(event) => setNewClient({ ...newClient, phone: event.target.value })} className={fieldInputClass} />
-            <input placeholder="Email" value={newClient.email} onChange={(event) => setNewClient({ ...newClient, email: event.target.value })} className={fieldInputClass} />
-            <input placeholder="Location" value={newClient.location} onChange={(event) => setNewClient({ ...newClient, location: event.target.value })} className={fieldInputClass} />
-            <Button type="button" variant="outline" onClick={async () => {
-              if (!newClient.name.trim()) return;
-              const client = await createClient(newClient);
-              setClients((current) => [...current, client]);
-              setForm((current) => ({ ...current, client_id: client.id, client_name: client.name, location: current.location || client.location }));
-              setNewClient({ name: "", phone: "", email: "", location: "" });
-            }}>Add</Button>
-          </div>
-        </div>
-
         <div className="rounded-2xl border border-brand-border p-4">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold text-brand-primary">Scope of Work</h3>
