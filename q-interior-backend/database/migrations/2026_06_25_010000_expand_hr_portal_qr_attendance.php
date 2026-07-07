@@ -11,9 +11,9 @@ return new class extends Migration
     {
         Schema::create('office_locations', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->default('SOMOIL CAR WASH');
-            $table->decimal('latitude', 10, 7)->default(2.0314625);
-            $table->decimal('longitude', 10, 7)->default(45.3122031);
+            $table->string('name')->default('Main Office');
+            $table->decimal('latitude', 10, 7)->default(0);
+            $table->decimal('longitude', 10, 7)->default(0);
             $table->unsignedInteger('allowed_radius_meters')->default(100);
             $table->time('work_start_time')->default('08:00:00');
             $table->time('work_end_time')->default('17:00:00');
@@ -81,10 +81,10 @@ return new class extends Migration
         });
 
         DB::table('office_locations')->updateOrInsert(
-            ['name' => 'SOMOIL CAR WASH'],
+            ['name' => 'Main Office'],
             [
-                'latitude' => 2.0314625,
-                'longitude' => 45.3122031,
+                'latitude' => 0,
+                'longitude' => 0,
                 'allowed_radius_meters' => 100,
                 'work_start_time' => '08:00:00',
                 'work_end_time' => '17:00:00',

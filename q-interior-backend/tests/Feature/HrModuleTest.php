@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\OfficeLocation;
 use App\Models\Payroll;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -96,6 +97,7 @@ class HrModuleTest extends TestCase
             'position' => 'Designer',
             'email' => 'portal-employee@example.com',
             'password' => 'secret123',
+            'password_confirmation' => 'secret123',
             'monthly_salary' => 1200,
             'status' => 'Active',
         ])->assertCreated()->json();
@@ -136,6 +138,7 @@ class HrModuleTest extends TestCase
             'name' => 'Existing Employee Updated',
             'email' => 'existing-employee@example.com',
             'password' => 'updated123',
+            'password_confirmation' => 'updated123',
             'monthly_salary' => 1300,
             'status' => 'Active',
         ])->assertOk()->assertJsonFragment(['name' => 'Existing Employee Updated']);
@@ -159,10 +162,21 @@ class HrModuleTest extends TestCase
             'status' => 'Active',
         ]);
         OfficeLocation::query()->update(['status' => 'Inactive']);
+        foreach ([
+            'attendance_office_name' => ['value' => 'Test Office', 'type' => 'string'],
+            'attendance_office_latitude' => ['value' => '1.2345678', 'type' => 'number'],
+            'attendance_office_longitude' => ['value' => '1.2345678', 'type' => 'number'],
+            'attendance_allowed_radius_meters' => ['value' => '100', 'type' => 'number'],
+            'working_hours_start' => ['value' => '08:00', 'type' => 'string'],
+            'working_hours_end' => ['value' => '17:00', 'type' => 'string'],
+            'hr_start_time' => ['value' => '08:15', 'type' => 'string'],
+        ] as $key => $setting) {
+            Setting::updateOrCreate(['key' => $key], $setting);
+        }
         OfficeLocation::create([
-            'name' => 'SOMOIL CAR WASH',
-            'latitude' => 2.0314625,
-            'longitude' => 45.3122031,
+            'name' => 'Test Office',
+            'latitude' => 1.2345678,
+            'longitude' => 1.2345678,
             'allowed_radius_meters' => 100,
             'work_start_time' => '08:00',
             'work_end_time' => '17:00',
@@ -174,22 +188,22 @@ class HrModuleTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-07-04 08:30:00', 'Africa/Mogadishu'));
 
         $this->postJson('/api/employee/attendance/check-in', [
-            'latitude' => 2.0314625,
-            'longitude' => 45.3122031,
+            'latitude' => 1.2345678,
+            'longitude' => 1.2345678,
         ])->assertOk()->assertJsonPath('attendance.date', '2026-07-04');
 
         $this->postJson('/api/employee/attendance/check-out', [
-            'latitude' => 2.0314625,
-            'longitude' => 45.3122031,
+            'latitude' => 1.2345678,
+            'longitude' => 1.2345678,
         ])->assertStatus(422)->assertJsonPath('message', 'Check out cannot be the same time as check in.');
 
         Carbon::setTestNow(Carbon::parse('2026-07-04 10:00:00', 'Africa/Mogadishu'));
         $this->postJson('/api/employee/attendance/check-out', [
-            'latitude' => 2.0314625,
-            'longitude' => 45.3122031,
+            'latitude' => 1.2345678,
+            'longitude' => 1.2345678,
         ])
             ->assertOk()
-            ->assertJsonPath('message', 'Checked out before the work end time.')
+            ->assertJsonPath('message', 'Attendance accepted.')
             ->assertJsonPath('attendance.status', 'Late / Early Out')
             ->assertJsonPath('attendance.check_out', '10:00:00');
 

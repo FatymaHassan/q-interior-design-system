@@ -22,9 +22,9 @@ export default function Settings() {
 
   const editableKeys = useMemo(() => Object.values(sections).flat(), []);
   const defaultValues = {
-    attendance_office_name: "Orfano Tower",
-    attendance_office_latitude: "2.0334707",
-    attendance_office_longitude: "45.3122083",
+    attendance_office_name: "Main Office",
+    attendance_office_latitude: "0",
+    attendance_office_longitude: "0",
     attendance_allowed_radius_meters: "150",
   };
 

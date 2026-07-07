@@ -5,9 +5,9 @@ import { fieldInputClass, HRPageHeader, SectionCard } from "./hrShared";
 import { getOfficeLocations, saveOfficeLocation } from "../../services/api";
 
 const emptyOffice = {
-  name: "Orfano Tower",
-  latitude: "2.0334707",
-  longitude: "45.3122083",
+  name: "Main Office",
+  latitude: "0",
+  longitude: "0",
   allowed_radius_meters: "150",
   work_start_time: "09:00",
   work_end_time: "17:00",

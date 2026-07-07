@@ -520,9 +520,9 @@ class EmployeePortalController extends Controller
     private function attendanceLocationSettings(): array
     {
         $defaults = [
-            'attendance_office_name' => ['value' => 'Orfano Tower', 'type' => 'string'],
-            'attendance_office_latitude' => ['value' => '2.0334707', 'type' => 'number'],
-            'attendance_office_longitude' => ['value' => '45.3122083', 'type' => 'number'],
+            'attendance_office_name' => ['value' => 'Main Office', 'type' => 'string'],
+            'attendance_office_latitude' => ['value' => '0', 'type' => 'number'],
+            'attendance_office_longitude' => ['value' => '0', 'type' => 'number'],
             'attendance_allowed_radius_meters' => ['value' => '150', 'type' => 'number'],
         ];
 
@@ -533,9 +533,9 @@ class EmployeePortalController extends Controller
         $values = Setting::whereIn('key', array_keys($defaults))->pluck('value', 'key');
 
         return [
-            'name' => $values['attendance_office_name'] ?: 'Orfano Tower',
-            'latitude' => (float) ($values['attendance_office_latitude'] ?: 2.0334707),
-            'longitude' => (float) ($values['attendance_office_longitude'] ?: 45.3122083),
+            'name' => $values['attendance_office_name'] ?: 'Main Office',
+            'latitude' => (float) ($values['attendance_office_latitude'] ?: 0),
+            'longitude' => (float) ($values['attendance_office_longitude'] ?: 0),
             'allowed_radius_meters' => max(10, (int) ($values['attendance_allowed_radius_meters'] ?: 150)),
         ];
     }

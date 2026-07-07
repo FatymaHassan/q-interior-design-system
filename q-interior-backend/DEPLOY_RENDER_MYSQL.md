@@ -29,14 +29,14 @@ APP_NAME=Q Interior
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-render-backend.onrender.com
-APP_KEY=base64:PASTE_APP_KEY_HERE
+APP_KEY=PASTE_GENERATED_APP_KEY_HERE
 
 DB_CONNECTION=mysql
 DB_HOST=your-aiven-host
 DB_PORT=3306
 DB_DATABASE=your-aiven-database
 DB_USERNAME=your-aiven-username
-DB_PASSWORD=your-aiven-password
+DB_PASSWORD=PASTE_DATABASE_PASSWORD_HERE
 
 FILESYSTEM_DISK=public
 FRONTEND_URL=https://your-frontend.vercel.app

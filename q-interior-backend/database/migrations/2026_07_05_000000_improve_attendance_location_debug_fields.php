@@ -56,14 +56,14 @@ return new class extends Migration
 
         if (Schema::hasTable('office_locations')) {
             DB::table('office_locations')
-                ->where('name', 'SOMOIL CAR WASH')
+                ->where('name', 'Main Office')
                 ->orWhere(function ($query) {
-                    $query->where('latitude', 2.0314625)->where('longitude', 45.3122031);
+                    $query->where('latitude', 0)->where('longitude', 0);
                 })
                 ->update([
-                    'name' => 'Orfano Tower',
-                    'latitude' => 2.0334707,
-                    'longitude' => 45.3122083,
+                    'name' => 'Main Office',
+                    'latitude' => 0,
+                    'longitude' => 0,
                     'allowed_radius_meters' => 150,
                     'updated_at' => now(),
                 ]);
@@ -71,9 +71,9 @@ return new class extends Migration
 
         if (Schema::hasTable('settings')) {
             foreach ([
-                ['key' => 'attendance_office_name', 'value' => 'Orfano Tower', 'type' => 'string'],
-                ['key' => 'attendance_office_latitude', 'value' => '2.0334707', 'type' => 'number'],
-                ['key' => 'attendance_office_longitude', 'value' => '45.3122083', 'type' => 'number'],
+                ['key' => 'attendance_office_name', 'value' => 'Main Office', 'type' => 'string'],
+                ['key' => 'attendance_office_latitude', 'value' => '0', 'type' => 'number'],
+                ['key' => 'attendance_office_longitude', 'value' => '0', 'type' => 'number'],
                 ['key' => 'attendance_allowed_radius_meters', 'value' => '150', 'type' => 'number'],
             ] as $setting) {
                 DB::table('settings')->updateOrInsert(
