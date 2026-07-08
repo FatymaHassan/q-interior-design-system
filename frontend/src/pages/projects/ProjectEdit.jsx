@@ -16,6 +16,8 @@ const emptyForm = {
   end_date: "",
   deadline: "",
   budget: "",
+  total_quotation: "",
+  profit_percentage: "",
   contract_amount: "",
   payment_plan_type: "Deposit + Final Payment",
   deposit_percentage: "50",
@@ -55,6 +57,8 @@ export default function ProjectEdit() {
         end_date: raw.end_date || "",
         deadline: raw.deadline || "",
         budget: raw.budget || "",
+        total_quotation: raw.total_quotation || raw.revenue || raw.budget || "",
+        profit_percentage: raw.profit_percentage || "0",
         contract_amount: raw.contract_amount || raw.revenue || raw.budget || "",
         payment_plan_type: raw.payment_plan_type || "Deposit + Final Payment",
         deposit_percentage: raw.deposit_percentage || "50",
@@ -77,6 +81,11 @@ export default function ProjectEdit() {
     const { name, value } = event.target;
     setForm((current) => {
       const next = { ...current, [name]: value };
+      if (name === "total_quotation" || name === "profit_percentage") {
+        const quote = toNumber(name === "total_quotation" ? value : next.total_quotation);
+        const profit = toNumber(name === "profit_percentage" ? value : next.profit_percentage);
+        next.contract_amount = quote > 0 ? String((quote * (1 + (profit / 100))).toFixed(2)) : next.contract_amount;
+      }
       const amount = toNumber(name === "contract_amount" ? value : next.contract_amount || next.budget);
       const percent = toNumber(name === "deposit_percentage" ? value : next.deposit_percentage);
       if (name === "contract_amount" || name === "deposit_percentage") {
@@ -96,6 +105,8 @@ export default function ProjectEdit() {
         client_id: Number(form.client_id),
         project_stage_id: form.project_stage_id ? Number(form.project_stage_id) : null,
         budget: toNumber(form.budget),
+        total_quotation: toNumber(form.total_quotation || form.contract_amount || form.budget),
+        profit_percentage: toNumber(form.profit_percentage),
         contract_amount: toNumber(form.contract_amount || form.budget),
         payment_plan_type: form.payment_plan_type,
         deposit_percentage: toNumber(form.deposit_percentage),
@@ -148,6 +159,8 @@ export default function ProjectEdit() {
           <h3 className="font-bold text-brand-primary">Project Payment Plan</h3>
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <FormField label="Contract amount"><input name="contract_amount" type="number" min="0" step="0.01" value={form.contract_amount} onChange={updateContractField} className={fieldInputClass} /></FormField>
+            <FormField label="Total quotation"><input name="total_quotation" type="number" min="0" step="0.01" value={form.total_quotation} onChange={updateContractField} className={fieldInputClass} /></FormField>
+            <FormField label="Profit %"><input name="profit_percentage" type="number" min="0" max="100" step="0.01" value={form.profit_percentage} onChange={updateContractField} className={fieldInputClass} /></FormField>
             <FormField label="Payment plan type"><select name="payment_plan_type" value={form.payment_plan_type} onChange={updateContractField} className={fieldInputClass}><option>Full Payment</option><option>Deposit + Final Payment</option><option>Milestone Payments</option><option>Progress Payments</option><option>Custom Payment Plan</option></select></FormField>
             <FormField label="Deposit %"><input name="deposit_percentage" type="number" min="0" max="100" step="0.01" value={form.deposit_percentage} onChange={updateContractField} className={fieldInputClass} /></FormField>
             <FormField label="Deposit amount"><input name="deposit_amount" type="number" min="0" step="0.01" value={form.deposit_amount} onChange={updateContractField} className={fieldInputClass} /></FormField>

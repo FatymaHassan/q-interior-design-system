@@ -79,9 +79,17 @@ class InvoiceController extends Controller
         });
     }
 
-    public function destroy(Invoice $invoice)
+    public function destroy(Invoice $invoice, ProjectFinanceService $finance)
     {
+        $project = $invoice->project;
+        $supplier = $invoice->supplier;
         $invoice->delete();
+        if ($project) {
+            $finance->refreshProject($project);
+        }
+        if ($supplier) {
+            $finance->refreshSupplier($supplier);
+        }
 
         return response()->json(['message' => 'Invoice deleted successfully']);
     }

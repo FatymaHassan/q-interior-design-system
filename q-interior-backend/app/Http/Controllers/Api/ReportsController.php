@@ -105,6 +105,7 @@ class ReportsController extends Controller
             ],
             'recent' => [
                 'revenue' => Payment::clientRevenue()
+                    ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')")
                     ->with(['client:id,name', 'project:id,name,project_name'])
                     ->latest('payment_date')
                     ->latest('id')
@@ -192,7 +193,7 @@ class ReportsController extends Controller
             'leave-report' => ['Leave Report', fn () => LeaveRequest::with('employee')->get()->map(fn ($l) => ['employee' => $l->employee?->name, 'type' => $l->leave_type, 'start' => optional($l->start_date)->toDateString(), 'end' => optional($l->end_date)->toDateString(), 'days' => (float) $l->total_days, 'status' => $l->status])],
             'payroll-report' => ['Payroll Report', fn () => Payroll::with('employee')->get()->map(fn ($p) => ['employee' => $p->employee?->name, 'month' => $p->month, 'year' => $p->year, 'net_salary' => (float) $p->net_salary, 'payment_status' => $p->payment_status, 'approval_status' => $p->approval_status])],
             'salary-history' => ['Salary History Report', fn () => DB::table('salary_histories')->join('employees', 'employees.id', '=', 'salary_histories.employee_id')->select('employees.name as employee', 'salary_histories.old_salary', 'salary_histories.new_salary', 'salary_histories.effective_date', 'salary_histories.reason')->get()],
-            'performance-review' => ['Performance Review Report', fn () => DB::table('performance_reviews')->join('employees', 'employees.id', '=', 'performance_reviews.employee_id')->select('employees.name as employee', 'performance_reviews.review_period', 'performance_reviews.overall_score', 'performance_reviews.status')->get()],
+            'performance-review' => ['Performance Review Report', fn () => DB::table('performance_reviews')->join('employees', 'employees.id', '=', 'performance_reviews.employee_id')->select('employees.name as employee', 'performance_reviews.review_period', 'performance_reviews.overall_rating', 'performance_reviews.status')->get()],
             'material-list' => ['Material List Report', fn () => Material::with(['category', 'supplier'])->get()->map(fn ($m) => $this->materialRow($m))],
             'stock-levels' => ['Stock Level Report', fn () => Material::with(['category', 'supplier'])->get()->map(fn ($m) => $this->materialRow($m))],
             'low-stock' => ['Low Stock Report', fn () => Material::with(['category', 'supplier'])->get()->filter(fn ($m) => $m->stock_status !== 'In Stock')->map(fn ($m) => $this->materialRow($m))->values()],
@@ -231,23 +232,27 @@ class ReportsController extends Controller
 
     protected function profitLoss(Request $request): array
     {
-        $revenue = $this->dateFilter(Payment::clientRevenue(), $request, 'payment_date')->sum('amount');
-        $expenses = $this->dateFilter(Expense::query(), $request, 'expense_date')->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
-        $overheads = DB::table('overheads')->sum('amount');
-        $payroll = Payroll::sum('net_salary');
-        return ['revenue' => round($revenue, 2), 'project_expenses' => round($expenses, 2), 'overheads' => round($overheads, 2), 'payroll' => round($payroll, 2), 'net_profit' => round($revenue - $expenses - $overheads - $payroll, 2)];
+        $finance = app(DashboardSummaryService::class)->companyFinance($request);
+        return [
+            'revenue' => $finance['total_revenue'],
+            'project_expenses' => $finance['total_project_expenses'],
+            'overheads' => $finance['company_overhead'],
+            'payroll' => $finance['payroll_expenses'],
+            'other_expenses' => $finance['other_company_expenses'],
+            'net_profit' => $finance['net_profit'],
+        ];
     }
 
     protected function cashFlow(Request $request)
     {
-        $in = $this->dateFilter(Payment::clientRevenue(), $request, 'payment_date')->select('payment_date as date', DB::raw("'Inflow' as type"), DB::raw('SUM(amount) as amount'))->groupBy('payment_date')->get();
-        $out = $this->dateFilter(Expense::query(), $request, 'expense_date')->select('expense_date as date', DB::raw("'Outflow' as type"), DB::raw('SUM(COALESCE(total_cost, amount, 0)) as amount'))->groupBy('expense_date')->get();
+        $in = $this->dateFilter(app(DashboardSummaryService::class)->approvedClientPaymentQuery(), $request, 'payment_date')->select('payment_date as date', DB::raw("'Inflow' as type"), DB::raw('SUM(amount) as amount'))->groupBy('payment_date')->get();
+        $out = $this->dateFilter(Expense::where('approval_status', 'Approved'), $request, 'expense_date')->select('expense_date as date', DB::raw("'Outflow' as type"), DB::raw('SUM(COALESCE(total_cost, amount, 0)) as amount'))->groupBy('expense_date')->get();
         return $in->concat($out)->sortBy('date')->values();
     }
 
     protected function revenueByProject(Request $request)
     {
-        return $this->dateFilter(Payment::clientRevenue(), $request, 'payment_date')
+        return $this->dateFilter(app(DashboardSummaryService::class)->approvedClientPaymentQuery(), $request, 'payment_date')
             ->with('project')
             ->when($request->filled('project_id'), fn ($q) => $q->where('project_id', $request->project_id))
             ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->client_id))
@@ -257,7 +262,7 @@ class ReportsController extends Controller
 
     protected function revenueByClient(Request $request)
     {
-        return $this->dateFilter(Payment::clientRevenue(), $request, 'payment_date')
+        return $this->dateFilter(app(DashboardSummaryService::class)->approvedClientPaymentQuery(), $request, 'payment_date')
             ->with('client')
             ->when($request->filled('project_id'), fn ($q) => $q->where('project_id', $request->project_id))
             ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->client_id))
@@ -267,7 +272,7 @@ class ReportsController extends Controller
 
     protected function expenseByCategoryRows(Request $request)
     {
-        return $this->dateFilter(Expense::query(), $request, 'expense_date')
+        return $this->dateFilter(Expense::where('approval_status', 'Approved'), $request, 'expense_date')
             ->when($request->filled('project_id'), fn ($q) => $q->where('project_id', $request->project_id))
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->supplier_id))
             ->select(DB::raw("COALESCE(category, 'Uncategorized') as category"), DB::raw('SUM(COALESCE(total_cost, amount, 0)) as total'))
@@ -355,8 +360,8 @@ class ReportsController extends Controller
             $end = $month->copy()->endOfMonth();
             return [
                 'month' => $month->format('M Y'),
-                'revenue' => (float) Payment::clientRevenue()->whereBetween('payment_date', [$start, $end])->sum('amount'),
-                'expenses' => (float) Expense::whereBetween('expense_date', [$start, $end])->sum(DB::raw('COALESCE(total_cost, amount, 0)')),
+                'revenue' => (float) app(DashboardSummaryService::class)->approvedClientPaymentQuery($start, $end)->sum('amount'),
+                'expenses' => (float) Expense::where('approval_status', 'Approved')->whereBetween('expense_date', [$start, $end])->sum(DB::raw('COALESCE(total_cost, amount, 0)')),
             ];
         });
     }

@@ -39,4 +39,9 @@ class QuotationApproval extends Model
     {
         return $this->belongsTo(Client::class);
     }
+
+    public function digitalSignature()
+    {
+        return $this->belongsTo(DigitalSignature::class, 'digital_signature_id');
+    }
 }

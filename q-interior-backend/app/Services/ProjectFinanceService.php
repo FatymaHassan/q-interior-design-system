@@ -2,32 +2,62 @@
 
 namespace App\Services;
 
-use App\Models\Expense;
 use App\Models\Invoice;
-use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 
 class ProjectFinanceService
 {
-    public function refreshProject(Project $project): Project
+    public function approvedClientPayments(Project $project)
+    {
+        return $project->payments()
+            ->clientRevenue()
+            ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')");
+    }
+
+    public function approvedProjectExpenses(Project $project)
+    {
+        return $project->expenses()
+            ->where('approval_status', 'Approved')
+            ->where(fn ($query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'));
+    }
+
+    public function metrics(Project $project): array
     {
         $contract = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: 0);
-        $paid = (float) $project->payments()->clientRevenue()->where('status', '!=', 'cancelled')->sum('amount');
-        $projectCost = (float) $project->expenses()
-            ->where('approval_status', '!=', 'Rejected')
-            ->where(fn ($query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'))
-            ->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
-        $remaining = max(0, $contract - $paid);
+        $paid = (float) $this->approvedClientPayments($project)->sum('amount');
+        $actualCost = (float) $this->approvedProjectExpenses($project)->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
+        $expectedProfit = $contract - $actualCost;
+        $actualProfit = $paid - $actualCost;
+
+        return [
+            'contract_amount' => round($contract, 2),
+            'paid_amount' => round($paid, 2),
+            'remaining_balance' => round(max(0, $contract - $paid), 2),
+            'actual_cost' => round($actualCost, 2),
+            'expected_profit' => round($expectedProfit, 2),
+            'actual_profit' => round($actualProfit, 2),
+            'payment_percentage' => $contract > 0 ? round(($paid / $contract) * 100, 2) : 0,
+            'profit_margin' => $contract > 0 ? round(($expectedProfit / $contract) * 100, 2) : 0,
+        ];
+    }
+
+    public function refreshProject(Project $project): Project
+    {
+        $metrics = $this->metrics($project);
 
         $project->forceFill([
-            'contract_amount' => $contract,
-            'deposit_amount' => round($contract * ((float) ($project->deposit_percentage ?: 0)) / 100, 2),
-            'actual_cost' => round($projectCost, 2),
-            'paid_amount' => round($paid, 2),
-            'remaining_balance' => round($remaining, 2),
-            'payment_percentage' => $contract > 0 ? round(($paid / $contract) * 100, 2) : 0,
+            'contract_amount' => $metrics['contract_amount'],
+            'total_quotation' => (float) ($project->total_quotation ?: $metrics['contract_amount']),
+            'deposit_amount' => round($metrics['contract_amount'] * ((float) ($project->deposit_percentage ?: 0)) / 100, 2),
+            'actual_cost' => $metrics['actual_cost'],
+            'paid_amount' => $metrics['paid_amount'],
+            'remaining_balance' => $metrics['remaining_balance'],
+            'expected_profit' => $metrics['expected_profit'],
+            'actual_profit' => $metrics['actual_profit'],
+            'payment_percentage' => $metrics['payment_percentage'],
+            'profit_margin' => $metrics['profit_margin'],
         ])->save();
 
         $project->invoices()->get()->each(fn (Invoice $invoice) => $this->refreshInvoice($invoice));
@@ -37,7 +67,9 @@ class ProjectFinanceService
 
     public function refreshInvoice(Invoice $invoice): Invoice
     {
-        $paid = (float) $invoice->payments()->where('status', '!=', 'cancelled')->sum('amount');
+        $paid = (float) $invoice->payments()
+            ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')")
+            ->sum('amount');
         $balance = max(0, (float) $invoice->total_amount - $paid);
         $status = $invoice->status;
 
@@ -69,8 +101,14 @@ class ProjectFinanceService
 
     public function refreshSupplier(Supplier $supplier): Supplier
     {
-        $invoiceTotal = (float) $supplier->invoices()->where('invoice_type', 'supplier')->where('status', '!=', 'Cancelled')->sum('total_amount');
-        $paid = (float) $supplier->payments()->supplierPayment()->where('status', '!=', 'cancelled')->sum('amount');
+        $invoiceTotal = (float) $supplier->invoices()
+            ->where('invoice_type', 'supplier')
+            ->where('status', '!=', 'Cancelled')
+            ->sum('total_amount');
+        $paid = (float) $supplier->payments()
+            ->supplierPayment()
+            ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')")
+            ->sum('amount');
         $balance = (float) $supplier->opening_balance + $invoiceTotal - $paid;
 
         $supplier->forceFill([
@@ -86,24 +124,20 @@ class ProjectFinanceService
     {
         $project = $this->refreshProject($project);
 
-        $clientPayments = $project->payments()->clientRevenue()->with(['client', 'invoice'])->latest()->get();
+        $clientPayments = $this->approvedClientPayments($project)->with(['client', 'invoice'])->latest()->get();
         $supplierPayments = $project->payments()->supplierPayment()->with(['supplier', 'invoice'])->latest()->get();
         $clientInvoices = $project->invoices()->where('invoice_type', 'client')->with(['client', 'items'])->latest()->get();
         $supplierInvoices = $project->invoices()->where('invoice_type', 'supplier')->with(['supplier', 'items'])->latest()->get();
-        $expenses = $project->expenses()
-            ->where(fn ($query) => $query->where('expense_type', 'project')->orWhereNull('expense_type'))
+        $expenses = $this->approvedProjectExpenses($project)
             ->with(['supplier', 'categoryModel'])
             ->latest()
             ->get();
 
         $projectExpenses = (float) $expenses->sum(fn ($expense) => (float) ($expense->total_cost ?: $expense->amount));
         $expenseBreakdown = $this->expenseBreakdown($expenses);
-        $supplierCosts = (float) $supplierInvoices->sum('total_amount');
         $supplierPayables = (float) $supplierInvoices->sum('balance_due');
         $received = (float) $clientPayments->sum('amount');
-        $expected = (float) $project->contract_amount;
         $projectRevenue = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: $received);
-        $cost = $projectExpenses + $supplierCosts;
         $expectedProfit = $projectRevenue - $projectExpenses;
         $actualProfit = $received - $projectExpenses;
         $paymentStatus = $projectRevenue > 0 && $received >= $projectRevenue
@@ -124,17 +158,18 @@ class ProjectFinanceService
                 'payment_status' => $paymentStatus,
                 'total_project_expenses' => round($projectExpenses, 2),
                 'cash_left' => round($received - $projectExpenses, 2),
-                'total_project_cost' => round($cost, 2),
+                'total_project_cost' => round($projectExpenses, 2),
                 'design_costs' => $expenseBreakdown['Design Costs'],
                 'materials' => $expenseBreakdown['Materials'],
                 'labour_costs' => $expenseBreakdown['Labour Costs'],
                 'site_expenses' => $expenseBreakdown['Site Expenses'],
                 'other_project_costs' => $expenseBreakdown['Other Project Costs'],
                 'project_expenses' => round($projectExpenses, 2),
-                'supplier_costs' => round($supplierCosts, 2),
+                'supplier_costs' => 0.0,
                 'supplier_payables' => round($supplierPayables, 2),
                 'project_profit' => round($expectedProfit, 2),
                 'expected_profit' => round($expectedProfit, 2),
+                'actual_profit' => round($actualProfit, 2),
                 'actual_profit_from_received_money' => round($actualProfit, 2),
                 'profit_margin' => $projectRevenue > 0 ? round(($expectedProfit / $projectRevenue) * 100, 2) : 0,
                 'expense_usage' => $projectRevenue > 0 ? round(($projectExpenses / $projectRevenue) * 100, 2) : 0,
@@ -150,12 +185,14 @@ class ProjectFinanceService
 
     private function refreshProjectTotalsOnly(Project $project): void
     {
-        $contract = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: 0);
-        $paid = (float) $project->payments()->clientRevenue()->where('status', '!=', 'cancelled')->sum('amount');
+        $metrics = $this->metrics($project);
         $project->forceFill([
-            'paid_amount' => round($paid, 2),
-            'remaining_balance' => round(max(0, $contract - $paid), 2),
-            'payment_percentage' => $contract > 0 ? round(($paid / $contract) * 100, 2) : 0,
+            'paid_amount' => $metrics['paid_amount'],
+            'remaining_balance' => $metrics['remaining_balance'],
+            'expected_profit' => $metrics['expected_profit'],
+            'actual_profit' => $metrics['actual_profit'],
+            'payment_percentage' => $metrics['payment_percentage'],
+            'profit_margin' => $metrics['profit_margin'],
         ])->save();
     }
 

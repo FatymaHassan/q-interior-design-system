@@ -121,6 +121,7 @@ export default function UsersRoles() {
       phone: clientForm.phone,
       location: clientForm.location,
       portal_password: clientForm.portal_password,
+      portal_password_confirmation: clientForm.portal_password,
     };
     if (clientForm.client_id) {
       await updateClient(clientForm.client_id, payload);

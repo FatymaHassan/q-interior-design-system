@@ -127,7 +127,7 @@ class ExpenseController extends Controller
         return response()->json(['message' => 'Expense deleted successfully']);
     }
 
-    public function approve(Request $request, Expense $expense)
+    public function approve(Request $request, Expense $expense, ProjectFinanceService $finance)
     {
         $expense->update([
             'approval_status' => 'Approved',
@@ -135,16 +135,24 @@ class ExpenseController extends Controller
             'approved_at' => now(),
         ]);
 
+        if ($expense->project) {
+            $finance->refreshProject($expense->project);
+        }
+
         return $expense->load(['project', 'supplier', 'categoryModel', 'approver']);
     }
 
-    public function reject(Request $request, Expense $expense)
+    public function reject(Request $request, Expense $expense, ProjectFinanceService $finance)
     {
         $expense->update([
             'approval_status' => 'Rejected',
             'approved_by' => $request->user()?->id,
             'approved_at' => now(),
         ]);
+
+        if ($expense->project) {
+            $finance->refreshProject($expense->project);
+        }
 
         return $expense->load(['project', 'supplier', 'categoryModel', 'approver']);
     }

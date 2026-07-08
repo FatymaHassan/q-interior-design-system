@@ -8,6 +8,7 @@ class Payment extends Model
 {
     public const CLIENT_TYPES = ['client', 'client_payment'];
 
+    // Canonical supplier payments live in this table. The older supplier_payments table is legacy-only.
     public const SUPPLIER_TYPES = ['supplier', 'supplier_payment'];
 
     protected $fillable = [

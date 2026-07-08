@@ -191,13 +191,13 @@ export default function Payroll() {
           <b>${monthlySalary.toLocaleString()}</b>
         </div>
         <label className="text-sm font-semibold">Bonus
-          <input type="number" min="0" value={payrollForm.bonus} onChange={(event) => setPayrollForm({ ...payrollForm, bonus: event.target.value })} className={`${fieldInputClass} mt-1`} />
+          <input type="number" min="0" step="0.01" value={payrollForm.bonus} onChange={(event) => setPayrollForm({ ...payrollForm, bonus: event.target.value })} className={`${fieldInputClass} mt-1`} />
         </label>
         <label className="text-sm font-semibold">Overtime amount
-          <input type="number" min="0" value={payrollForm.overtime_amount} onChange={(event) => setPayrollForm({ ...payrollForm, overtime_amount: event.target.value })} className={`${fieldInputClass} mt-1`} />
+          <input type="number" min="0" step="0.01" value={payrollForm.overtime_amount} onChange={(event) => setPayrollForm({ ...payrollForm, overtime_amount: event.target.value })} className={`${fieldInputClass} mt-1`} />
         </label>
         <label className="text-sm font-semibold">Deduction
-          <input type="number" min="0" value={payrollForm.deduction} onChange={(event) => setPayrollForm({ ...payrollForm, deduction: event.target.value })} className={`${fieldInputClass} mt-1`} />
+          <input type="number" min="0" step="0.01" value={payrollForm.deduction} onChange={(event) => setPayrollForm({ ...payrollForm, deduction: event.target.value })} className={`${fieldInputClass} mt-1`} />
         </label>
         <label className="text-sm font-semibold">Payment date
           <input type="date" value={payrollForm.payment_date} onChange={(event) => setPayrollForm({ ...payrollForm, payment_date: event.target.value })} className={`${fieldInputClass} mt-1`} />

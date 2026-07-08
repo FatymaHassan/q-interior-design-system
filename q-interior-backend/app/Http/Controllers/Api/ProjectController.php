@@ -40,6 +40,8 @@ class ProjectController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'deadline' => 'nullable|date',
             'budget' => 'nullable|numeric|min:0',
+            'total_quotation' => 'nullable|numeric|min:0',
+            'profit_percentage' => 'nullable|numeric|min:0|max:100',
             'contract_amount' => 'nullable|numeric|min:0',
             'payment_plan_type' => 'nullable|string|max:255',
             'deposit_percentage' => 'nullable|numeric|min:0|max:100',
@@ -54,7 +56,10 @@ class ProjectController extends Controller
             'created_by' => 'nullable|exists:users,id',
         ]);
         $data['project_name'] = $data['name'];
-        $data['contract_amount'] = $data['contract_amount'] ?? $data['revenue'] ?? $data['budget'] ?? 0;
+        $quotation = (float) ($data['total_quotation'] ?? $data['revenue'] ?? $data['budget'] ?? 0);
+        $profitPercentage = (float) ($data['profit_percentage'] ?? 0);
+        $data['total_quotation'] = $quotation;
+        $data['contract_amount'] = $data['contract_amount'] ?? round($quotation * (1 + ($profitPercentage / 100)), 2) ?: ($data['revenue'] ?? $data['budget'] ?? 0);
         $data['budget'] = $data['budget'] ?? $data['contract_amount'];
         $data['revenue'] = $data['revenue'] ?? $data['contract_amount'];
         $data['deposit_amount'] = $data['deposit_amount'] ?? round(((float) $data['contract_amount'] * (float) ($data['deposit_percentage'] ?? 0)) / 100, 2);
@@ -84,6 +89,8 @@ class ProjectController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'deadline' => 'nullable|date',
             'budget' => 'nullable|numeric|min:0',
+            'total_quotation' => 'nullable|numeric|min:0',
+            'profit_percentage' => 'nullable|numeric|min:0|max:100',
             'contract_amount' => 'nullable|numeric|min:0',
             'payment_plan_type' => 'nullable|string|max:255',
             'deposit_percentage' => 'nullable|numeric|min:0|max:100',
@@ -99,6 +106,9 @@ class ProjectController extends Controller
         ]);
         if (isset($data['name'])) {
             $data['project_name'] = $data['name'];
+        }
+        if (isset($data['total_quotation']) && isset($data['profit_percentage']) && ! isset($data['contract_amount'])) {
+            $data['contract_amount'] = round((float) $data['total_quotation'] * (1 + ((float) $data['profit_percentage'] / 100)), 2);
         }
         if (isset($data['contract_amount']) && ! isset($data['deposit_amount'])) {
             $data['deposit_amount'] = round(((float) $data['contract_amount'] * (float) ($data['deposit_percentage'] ?? $project->deposit_percentage ?? 0)) / 100, 2);

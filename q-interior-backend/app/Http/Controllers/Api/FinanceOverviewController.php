@@ -9,33 +9,29 @@ use App\Models\Overhead;
 use App\Models\Payment;
 use App\Models\Payroll;
 use App\Models\Project;
+use App\Services\DashboardSummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
 class FinanceOverviewController extends Controller
 {
-    public function __invoke()
+    public function __invoke(Request $request, DashboardSummaryService $summaryService)
     {
-        $revenue = (float) Payment::clientRevenue()->sum('amount');
-        $projectExpenses = (float) $this->expenseQuery('project')->sum('total_cost');
-        $overheadExpenses = (float) $this->expenseQuery('overhead')->sum('total_cost');
-        $payrollExpenses = (float) $this->expenseQuery('payroll')->sum('total_cost');
-        $overhead = (float) Overhead::sum('amount') + $overheadExpenses;
-        $payroll = (float) Payroll::where('approval_status', '!=', 'Rejected')->sum('net_salary') + $payrollExpenses;
-        $supplierPayments = (float) Payment::supplierPayment()->sum('amount');
-        $grossProfit = $revenue - $projectExpenses;
-        $netProfit = $grossProfit - $overhead - $payroll;
+        $finance = $summaryService->companyFinance($request);
+        $supplierPayments = (float) Payment::supplierPayment()
+            ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')")
+            ->sum('amount');
 
         return response()->json([
-            'total_revenue' => $revenue,
-            'total_project_expenses' => $projectExpenses,
-            'total_overhead' => $overhead,
-            'total_payroll' => $payroll,
+            'total_revenue' => $finance['total_revenue'],
+            'total_project_expenses' => $finance['total_project_expenses'],
+            'total_overhead' => $finance['company_overhead'],
+            'total_payroll' => $finance['payroll_expenses'],
             'total_supplier_payments' => $supplierPayments,
-            'gross_profit' => $grossProfit,
-            'net_profit' => $netProfit,
-            'profit_margin' => $revenue > 0 ? round(($netProfit / $revenue) * 100, 2) : 0,
+            'gross_profit' => $finance['gross_profit'],
+            'net_profit' => $finance['net_profit'],
+            'profit_margin' => $finance['profit_margin'],
             'pending_expenses' => Expense::where('approval_status', 'Pending')->count(),
             'outstanding_invoices' => Invoice::whereNotIn('status', ['Paid', 'Cancelled'])->count(),
             'overdue_invoices' => Invoice::whereDate('due_date', '<', now())->whereNotIn('status', ['Paid', 'Cancelled'])->count(),
@@ -45,12 +41,12 @@ class FinanceOverviewController extends Controller
             'budget_tracker' => $this->budgetTracker(),
             'monthly_chart' => collect(range(5, 0))->map(function ($monthsBack) {
                 $month = Carbon::now()->subMonths($monthsBack);
-                $revenue = (float) Payment::clientRevenue()->whereYear('payment_date', $month->year)->whereMonth('payment_date', $month->month)->sum('amount');
-                $expenses = (float) $this->expenseQuery('project')->whereYear('expense_date', $month->year)->whereMonth('expense_date', $month->month)->sum('total_cost');
-                $overhead = (float) Overhead::whereYear('overhead_date', $month->year)->whereMonth('overhead_date', $month->month)->sum('amount')
-                    + (float) $this->expenseQuery('overhead')->whereYear('expense_date', $month->year)->whereMonth('expense_date', $month->month)->sum('total_cost');
-                $payroll = (float) Payroll::where('approval_status', '!=', 'Rejected')->where('year', $month->year)->where('month', $month->month)->sum('net_salary')
-                    + (float) $this->expenseQuery('payroll')->whereYear('expense_date', $month->year)->whereMonth('expense_date', $month->month)->sum('total_cost');
+                $start = $month->copy()->startOfMonth();
+                $end = $month->copy()->endOfMonth();
+                $revenue = (float) app(DashboardSummaryService::class)->approvedClientPaymentQuery($start, $end)->sum('amount');
+                $expenses = (float) app(DashboardSummaryService::class)->approvedExpenseQuery('project', $start, $end)->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
+                $overhead = app(DashboardSummaryService::class)->overheadTotal($start, $end);
+                $payroll = app(DashboardSummaryService::class)->payrollTotal(new Request(['year' => $month->year, 'month' => $month->month]), $start, $end);
 
                 return [
                     'month' => $month->format('M Y'),
@@ -61,18 +57,17 @@ class FinanceOverviewController extends Controller
         ]);
     }
 
-    public function pnl(Request $request)
+    public function pnl(Request $request, DashboardSummaryService $summaryService)
     {
         $projectId = $request->integer('project_id') ?: null;
-        $revenue = (float) Payment::clientRevenue()
-            ->where('status', '!=', 'cancelled')
+        $revenue = (float) $summaryService->approvedClientPaymentQuery()
             ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
             ->sum('amount');
-        $projectCosts = (float) $this->expenseQuery('project')
+        $projectCosts = (float) $summaryService->approvedExpenseQuery('project')
             ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
-            ->sum('total_cost');
-        $overhead = $projectId ? 0 : (float) Overhead::sum('amount') + (float) $this->expenseQuery('overhead')->sum('total_cost');
-        $payroll = $projectId ? 0 : (float) Payroll::where('approval_status', '!=', 'Rejected')->sum('net_salary') + (float) $this->expenseQuery('payroll')->sum('total_cost');
+            ->sum(DB::raw('COALESCE(total_cost, amount, 0)'));
+        $overhead = $projectId ? 0 : $summaryService->overheadTotal();
+        $payroll = $projectId ? 0 : $summaryService->payrollTotal($request);
         $grossProfit = $revenue - $projectCosts;
         $netProfit = $grossProfit - $overhead - $payroll;
 
@@ -100,14 +95,13 @@ class FinanceOverviewController extends Controller
     public function projectProfitReport(Request $request)
     {
         $projectId = $request->integer('project_id') ?: null;
-        $expenseTotals = $this->expenseQuery('project')
+        $expenseTotals = app(DashboardSummaryService::class)->approvedExpenseQuery('project')
             ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
             ->select('project_id', DB::raw('SUM(COALESCE(total_cost, amount, 0)) as total'))
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
 
-        $revenueTotals = Payment::clientRevenue()
-            ->where('status', '!=', 'cancelled')
+        $revenueTotals = app(DashboardSummaryService::class)->approvedClientPaymentQuery()
             ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
             ->select('project_id', DB::raw('SUM(amount) as total'))
             ->groupBy('project_id')
@@ -188,12 +182,12 @@ class FinanceOverviewController extends Controller
 
     private function budgetTracker()
     {
-        $expenseTotals = $this->expenseQuery('project')
+        $expenseTotals = app(DashboardSummaryService::class)->approvedExpenseQuery('project')
             ->select('project_id', DB::raw('SUM(COALESCE(total_cost, amount, 0)) as total'))
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
 
-        $revenueTotals = Payment::clientRevenue()
+        $revenueTotals = app(DashboardSummaryService::class)->approvedClientPaymentQuery()
             ->select('project_id', DB::raw('SUM(amount) as total'))
             ->groupBy('project_id')
             ->pluck('total', 'project_id');
@@ -222,7 +216,7 @@ class FinanceOverviewController extends Controller
 
     private function expenseQuery(string $type)
     {
-        return Expense::where('approval_status', '!=', 'Rejected')
+        return Expense::where('approval_status', 'Approved')
             ->where(fn ($query) => $query->where('expense_type', $type)->when($type === 'project', fn ($inner) => $inner->orWhereNull('expense_type')));
     }
 }

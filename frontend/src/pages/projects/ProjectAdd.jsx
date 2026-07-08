@@ -83,6 +83,8 @@ export default function ProjectAdd() {
         project_stage_id: form.project_stage_id ? Number(form.project_stage_id) : null,
         deadline: form.deadline || null,
         budget: toNumber(form.budget),
+        total_quotation: toNumber(form.total_quotation || form.contract_amount || form.budget),
+        profit_percentage: toNumber(form.profit_percentage),
         revenue: toNumber(form.total_quotation || form.contract_amount || form.budget),
         contract_amount: contractAmount,
         payment_plan_type: form.payment_plan_type,
