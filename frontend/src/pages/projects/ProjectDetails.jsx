@@ -31,6 +31,7 @@ export default function ProjectDetails() {
 
   const raw = project?.raw || {};
   const metrics = finance?.metrics || {};
+  const contractSnapshot = finance?.contract_snapshot || raw.contract_snapshot || {};
   const clientPayments = finance?.client_payments || raw.payments || [];
   const projectExpenses = finance?.project_expenses || raw.expenses || [];
   const dailyWork = raw.tasks || [];
@@ -48,23 +49,30 @@ export default function ProjectDetails() {
   ], [project, raw.start_date, raw.end_date]);
 
   const contractRows = useMemo(() => [
-    ["Budget", formatCurrency(project?.budget)],
-    ["Contract Amount", formatCurrency(metrics.contract_amount ?? project?.contractAmount)],
+    ["Client", contractSnapshot.client_name || project?.client],
+    ["Project", contractSnapshot.project_name || project?.name],
+    ["Original Contract Amount", formatCurrency(contractSnapshot.contract_amount ?? metrics.contract_amount ?? project?.contractAmount)],
+    ["Original Total Quotation", formatCurrency(contractSnapshot.total_quotation ?? project?.totalQuotation)],
+    ["Original Budget", formatCurrency(contractSnapshot.budget ?? project?.budget)],
+    ["Original Profit %", formatPercentage(contractSnapshot.profit_percentage ?? project?.profitPercentage)],
     ["Progress", formatPercentage(project?.progress)],
     ["Payment Plan Type", raw.payment_plan_type || "-"],
-    ["Deposit", formatCurrency(raw.deposit_amount || metrics.deposit_amount)],
-    ["Payment Terms", raw.payment_terms || "-"],
-  ], [project, metrics]);
+    ["Original Deposit %", formatPercentage(contractSnapshot.deposit_percentage ?? raw.deposit_percentage)],
+    ["Original Deposit Amount", formatCurrency(contractSnapshot.deposit_amount ?? raw.deposit_amount ?? metrics.deposit_amount)],
+    ["Payment Terms", contractSnapshot.payment_terms || raw.payment_terms || "-"],
+  ], [project, metrics, contractSnapshot]);
 
   const financeRows = [
     ["Contract Amount", formatCurrency(metrics.contract_amount ?? project?.contractAmount)],
-    ["Revenue Received", formatCurrency(metrics.received_revenue)],
-    ["Balance Receivable", formatCurrency(metrics.balance_receivable)],
+    ["Total Quotation", formatCurrency(metrics.total_quotation ?? contractSnapshot.total_quotation)],
+    ["Paid Amount", formatCurrency(metrics.paid_amount ?? metrics.received_revenue)],
+    ["Remaining Balance", formatCurrency(metrics.remaining_balance ?? metrics.balance_receivable)],
     ["Payment Status", metrics.payment_status || "-"],
-    ["Project Expenses", formatCurrency(metrics.total_project_expenses)],
+    ["Actual Cost", formatCurrency(metrics.actual_cost ?? metrics.total_project_expenses)],
     ["Cash Left", formatCurrency(metrics.cash_left)],
     ["Expected Profit", formatCurrency(metrics.expected_profit ?? metrics.project_profit)],
-    ["Actual Profit From Received", formatCurrency(metrics.actual_profit_from_received_money)],
+    ["Actual Profit", formatCurrency(metrics.actual_profit ?? metrics.actual_profit_from_received_money)],
+    ["Payment Percentage", formatPercentage(metrics.payment_percentage ?? metrics.payment_progress)],
     ["Profit Margin", formatPercentage(metrics.profit_margin)],
   ];
 
@@ -165,7 +173,33 @@ export default function ProjectDetails() {
       ]} rows={employees} empty="No employees assigned yet." />
     </Card>}
 
-    {activeTab === "Financial Summary" && <InfoPanel title="Financial Summary" rows={financeRows} />}
+    {activeTab === "Financial Summary" && <section className="space-y-5">
+      <InfoPanel title="Financial Summary" rows={financeRows} />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Card className="p-5">
+          <h2 className="text-lg font-black text-brand-primary">Payment History</h2>
+          <div className="mt-4">
+            <Table columns={[
+              { key: "payment_date", label: "Date", render: (row) => dateValue(row.payment_date) },
+              { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
+              { key: "status", label: "Status", render: (row) => <Badge>{row.status || "-"}</Badge> },
+              { key: "reference_number", label: "Reference", render: (row) => row.reference_number || "-" },
+            ]} rows={clientPayments} empty="No client payment history yet." />
+          </div>
+        </Card>
+        <Card className="p-5">
+          <h2 className="text-lg font-black text-brand-primary">Expense History</h2>
+          <div className="mt-4">
+            <Table columns={[
+              { key: "expense_date", label: "Date", render: (row) => dateValue(row.expense_date) },
+              { key: "title", label: "Expense", render: (row) => row.title || row.item_name || row.category || "-" },
+              { key: "approval_status", label: "Status", render: (row) => <Badge>{row.approval_status || "-"}</Badge> },
+              { key: "amount", label: "Amount", render: (row) => formatCurrency(row.total_cost || row.amount) },
+            ]} rows={projectExpenses} empty="No project expense history yet." />
+          </div>
+        </Card>
+      </div>
+    </section>}
 
     {activeTab === "Documents" && <Card className="p-5">
       <Table columns={[

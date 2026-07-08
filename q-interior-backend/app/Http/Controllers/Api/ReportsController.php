@@ -92,6 +92,7 @@ class ReportsController extends Controller
     public function executiveDashboard(Request $request, DashboardSummaryService $summaryService)
     {
         $kpis = $summaryService->summary($request);
+        $projectId = $request->integer('project_id') ?: null;
 
         return [
             'kpis' => [...$kpis, 'total_documents' => Document::count()],
@@ -105,6 +106,7 @@ class ReportsController extends Controller
             ],
             'recent' => [
                 'revenue' => Payment::clientRevenue()
+                    ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
                     ->whereRaw("LOWER(COALESCE(status, '')) IN ('paid', 'completed', 'approved')")
                     ->with(['client:id,name', 'project:id,name,project_name'])
                     ->latest('payment_date')
@@ -119,6 +121,7 @@ class ReportsController extends Controller
                         'amount' => round((float) $payment->amount, 2),
                     ]),
                 'expenses' => Expense::with(['project:id,name,project_name'])
+                    ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
                     ->latest('expense_date')
                     ->latest('id')
                     ->limit(6)
@@ -131,9 +134,17 @@ class ReportsController extends Controller
                         'amount' => round((float) ($expense->total_cost ?: $expense->amount), 2),
                     ]),
                 'clients' => Client::latest()->limit(6)->get(['id', 'name', 'phone', 'email', 'created_at']),
-                'projects' => Project::with('client:id,name')->latest()->limit(6)->get(['id', 'client_id', 'name', 'project_name', 'status', 'created_at']),
+                'projects' => Project::with('client:id,name')
+                    ->when($projectId, fn ($query) => $query->where('id', $projectId))
+                    ->latest()
+                    ->limit(6)
+                    ->get(['id', 'client_id', 'name', 'project_name', 'status', 'created_at']),
                 'employees' => Employee::with('department:id,name')->latest()->limit(6)->get(['id', 'department_id', 'name', 'position', 'status', 'created_at']),
-                'documents' => Document::with('project:id,name,project_name')->latest()->limit(6)->get(['id', 'project_id', 'title', 'document_category', 'created_at']),
+                'documents' => Document::with('project:id,name,project_name')
+                    ->when($projectId, fn ($query) => $query->where('project_id', $projectId))
+                    ->latest()
+                    ->limit(6)
+                    ->get(['id', 'project_id', 'title', 'document_category', 'created_at']),
             ],
         ];
     }

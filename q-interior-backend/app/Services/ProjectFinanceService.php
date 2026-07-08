@@ -123,8 +123,11 @@ class ProjectFinanceService
     public function summary(Project $project): array
     {
         $project = $this->refreshProject($project);
+        $metrics = $this->metrics($project);
+        $project->loadMissing(['client', 'contractSnapshot']);
 
-        $clientPayments = $this->approvedClientPayments($project)->with(['client', 'invoice'])->latest()->get();
+        $clientPayments = $project->payments()->clientRevenue()->with(['client', 'invoice'])->latest()->get();
+        $approvedClientPayments = $this->approvedClientPayments($project)->with(['client', 'invoice'])->latest()->get();
         $supplierPayments = $project->payments()->supplierPayment()->with(['supplier', 'invoice'])->latest()->get();
         $clientInvoices = $project->invoices()->where('invoice_type', 'client')->with(['client', 'items'])->latest()->get();
         $supplierInvoices = $project->invoices()->where('invoice_type', 'supplier')->with(['supplier', 'items'])->latest()->get();
@@ -133,49 +136,53 @@ class ProjectFinanceService
             ->latest()
             ->get();
 
-        $projectExpenses = (float) $expenses->sum(fn ($expense) => (float) ($expense->total_cost ?: $expense->amount));
+        $projectExpenses = $metrics['actual_cost'];
         $expenseBreakdown = $this->expenseBreakdown($expenses);
         $supplierPayables = (float) $supplierInvoices->sum('balance_due');
-        $received = (float) $clientPayments->sum('amount');
-        $projectRevenue = (float) ($project->contract_amount ?: $project->revenue ?: $project->budget ?: $received);
-        $expectedProfit = $projectRevenue - $projectExpenses;
-        $actualProfit = $received - $projectExpenses;
+        $received = $metrics['paid_amount'];
+        $projectRevenue = $metrics['contract_amount'];
         $paymentStatus = $projectRevenue > 0 && $received >= $projectRevenue
             ? 'Fully Paid'
             : ($received > 0 ? 'Partially Paid' : 'Unpaid');
 
         return [
-            'project' => $project->load('client'),
+            'project' => $project,
+            'contract_snapshot' => $this->contractSnapshot($project),
             'metrics' => [
-                'contract_amount' => round($projectRevenue, 2),
-                'expected_revenue' => round($projectRevenue, 2),
-                'received_revenue' => round($received, 2),
-                'balance_receivable' => round(max(0, $projectRevenue - $received), 2),
-                'outstanding_client_balance' => round(max(0, $projectRevenue - $received), 2),
+                'contract_amount' => $metrics['contract_amount'],
+                'total_quotation' => round((float) ($project->total_quotation ?: 0), 2),
+                'expected_revenue' => $metrics['contract_amount'],
+                'received_revenue' => $metrics['paid_amount'],
+                'paid_amount' => $metrics['paid_amount'],
+                'balance_receivable' => $metrics['remaining_balance'],
+                'remaining_balance' => $metrics['remaining_balance'],
+                'outstanding_client_balance' => $metrics['remaining_balance'],
                 'deposit_amount' => round((float) $project->deposit_amount, 2),
-                'payment_percentage' => (float) $project->payment_percentage,
-                'payment_progress' => $projectRevenue > 0 ? round(($received / $projectRevenue) * 100, 2) : 0,
+                'payment_percentage' => $metrics['payment_percentage'],
+                'payment_progress' => $metrics['payment_percentage'],
                 'payment_status' => $paymentStatus,
-                'total_project_expenses' => round($projectExpenses, 2),
-                'cash_left' => round($received - $projectExpenses, 2),
-                'total_project_cost' => round($projectExpenses, 2),
+                'actual_cost' => $metrics['actual_cost'],
+                'total_project_expenses' => $metrics['actual_cost'],
+                'cash_left' => round($metrics['paid_amount'] - $metrics['actual_cost'], 2),
+                'total_project_cost' => $metrics['actual_cost'],
                 'design_costs' => $expenseBreakdown['Design Costs'],
                 'materials' => $expenseBreakdown['Materials'],
                 'labour_costs' => $expenseBreakdown['Labour Costs'],
                 'site_expenses' => $expenseBreakdown['Site Expenses'],
                 'other_project_costs' => $expenseBreakdown['Other Project Costs'],
-                'project_expenses' => round($projectExpenses, 2),
+                'project_expenses' => $metrics['actual_cost'],
                 'supplier_costs' => 0.0,
                 'supplier_payables' => round($supplierPayables, 2),
-                'project_profit' => round($expectedProfit, 2),
-                'expected_profit' => round($expectedProfit, 2),
-                'actual_profit' => round($actualProfit, 2),
-                'actual_profit_from_received_money' => round($actualProfit, 2),
-                'profit_margin' => $projectRevenue > 0 ? round(($expectedProfit / $projectRevenue) * 100, 2) : 0,
-                'expense_usage' => $projectRevenue > 0 ? round(($projectExpenses / $projectRevenue) * 100, 2) : 0,
+                'project_profit' => $metrics['expected_profit'],
+                'expected_profit' => $metrics['expected_profit'],
+                'actual_profit' => $metrics['actual_profit'],
+                'actual_profit_from_received_money' => $metrics['actual_profit'],
+                'profit_margin' => $metrics['profit_margin'],
+                'expense_usage' => $projectRevenue > 0 ? round(($metrics['actual_cost'] / $projectRevenue) * 100, 2) : 0,
             ],
             'expense_breakdown' => $expenseBreakdown,
             'client_payments' => $clientPayments,
+            'approved_client_payments' => $approvedClientPayments,
             'supplier_payments' => $supplierPayments,
             'client_invoices' => $clientInvoices,
             'supplier_invoices' => $supplierInvoices,
@@ -215,6 +222,25 @@ class ProjectFinanceService
         }
 
         return collect($groups)->map(fn ($value) => round($value, 2))->all();
+    }
+
+    private function contractSnapshot(Project $project): array
+    {
+        $snapshot = $project->contractSnapshot;
+
+        return [
+            'client_id' => $snapshot?->client_id ?? $project->client_id,
+            'client_name' => $snapshot?->client_name ?? $project->client?->name,
+            'project_name' => $snapshot?->project_name ?? ($project->project_name ?: $project->name),
+            'contract_amount' => round((float) ($snapshot?->contract_amount ?? $project->contract_amount ?? 0), 2),
+            'total_quotation' => round((float) ($snapshot?->total_quotation ?? $project->total_quotation ?? 0), 2),
+            'budget' => round((float) ($snapshot?->budget ?? $project->budget ?? 0), 2),
+            'profit_percentage' => round((float) ($snapshot?->profit_percentage ?? $project->profit_percentage ?? 0), 2),
+            'deposit_percentage' => round((float) ($snapshot?->deposit_percentage ?? $project->deposit_percentage ?? 0), 2),
+            'deposit_amount' => round((float) ($snapshot?->deposit_amount ?? $project->deposit_amount ?? 0), 2),
+            'payment_terms' => $snapshot?->payment_terms ?? $project->payment_terms,
+            'created_at' => $snapshot?->created_at,
+        ];
     }
 
     private function inferExpenseGroup(?string $name): string

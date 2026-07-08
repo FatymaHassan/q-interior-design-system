@@ -7,12 +7,13 @@ import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
 import LoadingState from "../../components/ui/LoadingState";
-import { getDashboardSummary, getExecutiveDashboard } from "../../services/api";
-import { formatCurrency, formatPercentage, toNumber } from "../../utils/numberFormat";
+import { getDashboardSummary, getExecutiveDashboard, getProjects } from "../../services/api";
+import { formatCurrency, toNumber } from "../../utils/numberFormat";
 
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState(null);
-  const [filters, setFilters] = useState({ year: new Date().getFullYear(), month: "" });
+  const [projects, setProjects] = useState([]);
+  const [filters, setFilters] = useState({ year: new Date().getFullYear(), month: "", project_id: "" });
   const [status, setStatus] = useState("loading");
 
   const load = () => {
@@ -30,6 +31,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
+    getProjects().then(setProjects).catch(() => setProjects([]));
   }, []);
 
   const kpis = dashboard?.kpis || {};
@@ -47,6 +49,10 @@ export default function Dashboard() {
       title="Today Overview"
       description="A simple management view with the numbers that need attention first."
       action={<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+        <select value={filters.project_id} onChange={(event) => setFilters({ ...filters, project_id: event.target.value })} className="col-span-2 h-10 rounded-lg border border-brand-border bg-white px-3 text-sm sm:col-span-1 sm:min-w-56">
+          <option value="">All projects</option>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+        </select>
         <select value={filters.month} onChange={(event) => setFilters({ ...filters, month: event.target.value })} className="h-10 rounded-lg border border-brand-border bg-white px-3 text-sm"><option value="">All months</option>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select>
         <input type="number" value={filters.year} onChange={(event) => setFilters({ ...filters, year: event.target.value })} className="h-10 w-full rounded-lg border border-brand-border bg-white px-3 text-sm sm:w-24" />
         <Button type="button" onClick={load}>Apply</Button>
@@ -60,11 +66,11 @@ export default function Dashboard() {
       <MetricCard label="Contract Amount" value={money(kpis.total_contract_amount)} icon={Briefcase} helper="All project value" />
       <MetricCard label="Revenue Received" value={money(kpis.total_revenue_received ?? kpis.total_revenue)} icon={DollarSign} helper="Client payments" />
       <MetricCard label="Balance Receivable" value={money(kpis.total_balance_receivable)} icon={Wallet} helper="Still unpaid" />
-      <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} tone={toNumber(kpis.net_profit) >= 0 ? "success" : "danger"} helper="After company costs" />
       <MetricCard label="Project Expenses" value={money(kpis.total_project_expenses ?? kpis.total_project_costs)} icon={Wallet} helper="Direct costs" />
+      <MetricCard label="Actual Profit" value={money(kpis.actual_profit ?? kpis.gross_profit)} icon={CheckCircle} tone={toNumber(kpis.actual_profit ?? kpis.gross_profit) >= 0 ? "success" : "danger"} helper="Revenue minus project costs" />
+      <MetricCard label="Expected Profit" value={money(kpis.expected_profit)} icon={TrendingUp} tone={toNumber(kpis.expected_profit) >= 0 ? "success" : "danger"} helper="Contract minus project costs" />
       <MetricCard label="Cash Left" value={money(kpis.cash_left ?? kpis.gross_profit)} icon={TrendingUp} tone={toNumber(kpis.cash_left ?? kpis.gross_profit) >= 0 ? "success" : "danger"} helper="Revenue minus costs" />
-      <MetricCard label="Expected Profit" value={money(kpis.expected_profit)} icon={TrendingUp} tone={toNumber(kpis.expected_profit) >= 0 ? "success" : "danger"} helper="Contract minus costs" />
-      <MetricCard label="Profit Margin" value={formatPercentage(kpis.profit_margin)} icon={TrendingUp} tone="success" helper="Business margin" />
+      <MetricCard label="Net Profit" value={money(kpis.net_profit)} icon={CheckCircle} tone={toNumber(kpis.net_profit) >= 0 ? "success" : "danger"} helper={kpis.scope === "project" ? "Selected project" : "After company costs"} />
     </section>
 
     <section className="grid grid-cols-1 gap-4 min-[1180px]:grid-cols-[1fr_360px]">

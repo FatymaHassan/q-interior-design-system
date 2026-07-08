@@ -65,14 +65,15 @@ class ProjectController extends Controller
         $data['deposit_amount'] = $data['deposit_amount'] ?? round(((float) $data['contract_amount'] * (float) ($data['deposit_percentage'] ?? 0)) / 100, 2);
 
         $project = Project::create($data);
+        $this->createContractSnapshot($project);
         $finance->refreshProject($project);
 
-        return $project->load(['client', 'stage']);
+        return $project->load(['client', 'stage', 'contractSnapshot']);
     }
 
     public function show(Project $project)
     {
-        $project->load(['client', 'stage', 'invoices.client', 'invoices.supplier', 'payments.client', 'payments.supplier', 'members.user.roles', 'members.employee.department', 'documents.uploader', 'tasks.assignee', 'tasks.assigneeEmployee.department', 'tasks.assigner', 'tasks.statusHistories.changer', 'tasks.attachments.uploader', 'clientMessages.client', 'clientMessages.user', 'approvals.signature']);
+        $project->load(['client', 'stage', 'contractSnapshot', 'invoices.client', 'invoices.supplier', 'payments.client', 'payments.supplier', 'members.user.roles', 'members.employee.department', 'documents.uploader', 'tasks.assignee', 'tasks.assigneeEmployee.department', 'tasks.assigner', 'tasks.statusHistories.changer', 'tasks.attachments.uploader', 'clientMessages.client', 'clientMessages.user', 'approvals.signature']);
 
         return $project;
     }
@@ -117,7 +118,7 @@ class ProjectController extends Controller
         $project->update($data);
         $finance->refreshProject($project);
 
-        return $project->load(['client', 'stage']);
+        return $project->load(['client', 'stage', 'contractSnapshot']);
     }
 
     public function destroy(Project $project)
@@ -237,6 +238,28 @@ class ProjectController extends Controller
         $finance->refreshProject($project);
 
         return $payment->load(['project', 'client', 'invoice']);
+    }
+
+    private function createContractSnapshot(Project $project): void
+    {
+        $project->loadMissing('client');
+
+        $project->contractSnapshot()->firstOrCreate(
+            ['project_id' => $project->id],
+            [
+                'client_id' => $project->client_id,
+                'client_name' => $project->client?->name,
+                'project_name' => $project->project_name ?: $project->name,
+                'contract_amount' => (float) ($project->contract_amount ?: 0),
+                'total_quotation' => (float) ($project->total_quotation ?: 0),
+                'budget' => (float) ($project->budget ?: 0),
+                'profit_percentage' => (float) ($project->profit_percentage ?: 0),
+                'deposit_percentage' => (float) ($project->deposit_percentage ?: 0),
+                'deposit_amount' => (float) ($project->deposit_amount ?: 0),
+                'payment_terms' => $project->payment_terms,
+                'created_by' => $project->created_by,
+            ]
+        );
     }
 
 }

@@ -98,6 +98,16 @@ class Project extends Model
         return $this->hasMany(Quotation::class);
     }
 
+    public function contractSnapshot()
+    {
+        return $this->hasOne(ProjectContractSnapshot::class);
+    }
+
+    public function contractSnapshots()
+    {
+        return $this->hasMany(ProjectContractSnapshot::class);
+    }
+
     public function assignedUsers()
     {
         return $this->belongsToMany(User::class, 'project_members')->withPivot('role', 'assigned_at')->withTimestamps();

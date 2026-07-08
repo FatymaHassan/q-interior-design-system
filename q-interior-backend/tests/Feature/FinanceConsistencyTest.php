@@ -16,7 +16,7 @@ class FinanceConsistencyTest extends TestCase
 
     public function test_project_finance_dashboard_supplier_payment_and_client_portal_stay_consistent(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
 
         $client = Client::create([
             'name' => 'Finance Client',
@@ -40,6 +40,14 @@ class FinanceConsistencyTest extends TestCase
             'deposit_percentage' => 25,
             'status' => 'Active',
         ])->assertCreated()->json();
+
+        $snapshotProject = Project::with('contractSnapshot')->findOrFail($project['id']);
+        $this->assertNotNull($snapshotProject->contractSnapshot);
+        $this->assertSame(1200.0, (float) $snapshotProject->contractSnapshot->contract_amount);
+        $this->assertSame(1000.0, (float) $snapshotProject->contractSnapshot->total_quotation);
+        $this->assertSame(1000.0, (float) $snapshotProject->contractSnapshot->budget);
+        $this->assertSame(20.0, (float) $snapshotProject->contractSnapshot->profit_percentage);
+        $this->assertSame(25.0, (float) $snapshotProject->contractSnapshot->deposit_percentage);
 
         $this->postJson('/api/payments', [
             'project_id' => $project['id'],
@@ -89,6 +97,15 @@ class FinanceConsistencyTest extends TestCase
             'payment_date' => now()->toDateString(),
         ])->assertSuccessful();
 
+        $this->postJson('/api/payments', [
+            'project_id' => $project['id'],
+            'supplier_id' => $supplier->id,
+            'type' => 'supplier',
+            'amount' => 500,
+            'status' => 'paid',
+            'payment_date' => now()->toDateString(),
+        ])->assertSuccessful();
+
         $project = Project::findOrFail($project['id']);
         $this->assertSame(1200.0, (float) $project->contract_amount);
         $this->assertSame(300.5, (float) $project->paid_amount);
@@ -108,6 +125,23 @@ class FinanceConsistencyTest extends TestCase
                 'total_revenue' => 340.5,
                 'total_project_expenses' => 100.5,
             ]);
+
+        $this->getJson('/api/dashboard/summary?project_id=' . $project->id)
+            ->assertOk()
+            ->assertJsonPath('scope', 'project')
+            ->assertJsonPath('total_contract_amount', 1200)
+            ->assertJsonPath('total_revenue', 300.5)
+            ->assertJsonPath('total_project_expenses', 100.5)
+            ->assertJsonPath('actual_profit', 200)
+            ->assertJsonPath('unmatched_supplier_payments', 500)
+            ->assertJsonPath('cash_left', -300);
+
+        $this->getJson('/api/projects/' . $project->id . '/finance-summary')
+            ->assertOk()
+            ->assertJsonPath('contract_snapshot.contract_amount', 1200)
+            ->assertJsonPath('metrics.paid_amount', 300.5)
+            ->assertJsonPath('metrics.actual_cost', 100.5)
+            ->assertJsonPath('metrics.actual_profit', 200);
 
         $this->postJson('/api/clients', [
             'name' => 'Portal Client',
