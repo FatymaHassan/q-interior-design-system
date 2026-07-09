@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ProjectDocumentFileService
 {
-    private const DATABASE_FILE_BACKUP_MAX_BYTES = 52428800;
+    private const DATABASE_FILE_BACKUP_MAX_BYTES = 1048576;
 
     public function storeUploadedFile(UploadedFile $file): array
     {
