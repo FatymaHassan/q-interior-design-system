@@ -242,6 +242,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const selectedProject = projects.find((project) => String(project.id) === String(selectedProjectId));
   const visibleDocuments = documents.filter((document) => {
     const matchesProject = selectedProjectId ? String(document.projectId) === String(selectedProjectId) : true;
@@ -251,9 +252,23 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     return matchesProject && matchesMode && matchesQuery;
   });
 
+  useEffect(() => {
+    if (!form.project_id && projects[0]?.id) {
+      setForm((current) => ({ ...current, project_id: String(projects[0].id) }));
+    }
+  }, [form.project_id, projects]);
+
   const submit = async (event) => {
     event.preventDefault();
-    if (!form.file || !form.project_id) return;
+    if (!form.project_id) {
+      setUploadError("Please choose a project before uploading.");
+      return;
+    }
+    if (!form.file) {
+      setUploadError("Please choose a file before uploading.");
+      return;
+    }
+    setUploadError("");
     setSaving(true);
     const payload = new FormData();
     payload.append("title", form.title || form.file.name);
@@ -265,6 +280,8 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
       setForm({ title: "", project_id: selectedProjectId || "", document_category: isPhotos ? "Photo" : "Design File", file: null });
       event.target.reset();
       onDone();
+    } catch (error) {
+      setUploadError(apiErrorMessage(error, `${isPhotos ? "Photo" : "Document"} could not be uploaded.`));
     } finally {
       setSaving(false);
     }
@@ -293,6 +310,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
 
     <PortalCard className="p-5">
       <PortalSectionHeader title={`Upload ${isPhotos ? "Photo" : "Document"}`} subtitle="Choose the project this file belongs to before uploading." />
+      {uploadError && <p className="mb-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{uploadError}</p>}
       <form onSubmit={submit} className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_170px_1fr_auto]">
         <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={isPhotos ? "Photo title" : "Document title"} className={inputClass} />
         <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value })} className={inputClass} required>
@@ -405,5 +423,11 @@ function InfoTile({ label, value }) {
     <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</p>
     <div className="mt-1 font-black text-slate-950">{value}</div>
   </div>;
+}
+
+function apiErrorMessage(error, fallback) {
+  const data = error.response?.data;
+  const firstFieldError = data?.errors ? Object.values(data.errors)[0]?.[0] : "";
+  return firstFieldError || data?.message || fallback;
 }
 

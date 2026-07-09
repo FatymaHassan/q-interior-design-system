@@ -232,15 +232,18 @@ class EmployeePortalController extends Controller
             'title' => 'required|string|max:255',
             'document_category' => 'nullable|string|max:255',
             'visibility' => 'nullable|in:internal,client',
-            'file' => 'required|file|max:51200',
+            'file' => 'required|file|max:102400',
         ]);
+
+        $filePath = $request->file('file')->store('documents', 'public');
+        abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
 
         $document = Document::create([
             'project_id' => $data['project_id'],
             'title' => $data['title'],
             'document_category' => $data['document_category'] ?? 'Design File',
             'visibility' => $data['visibility'] ?? 'internal',
-            'file_path' => $request->file('file')->store('documents', 'public'),
+            'file_path' => $filePath,
             'file_type' => $request->file('file')->getClientMimeType(),
             'uploaded_by' => $request->user()?->id,
         ]);
