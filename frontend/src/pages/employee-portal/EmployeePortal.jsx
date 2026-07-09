@@ -238,7 +238,7 @@ function AttendanceCard({ row }) {
 
 function DocumentsPanel({ mode, documents, projects, onDone }) {
   const isPhotos = mode === "photos";
-  const [form, setForm] = useState({ title: "", project_id: "", document_category: isPhotos ? "Photo" : "Design File", visibility: "internal", file: null });
+  const [form, setForm] = useState({ title: "", project_id: "", document_category: isPhotos ? "Photo" : "Design File", file: null });
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -259,11 +259,10 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     payload.append("title", form.title || form.file.name);
     payload.append("project_id", form.project_id);
     payload.append("document_category", isPhotos ? "Photo" : form.document_category);
-    payload.append("visibility", form.visibility);
     payload.append("file", form.file);
     try {
       await createEmployeePortalProjectDocument(payload);
-      setForm({ title: "", project_id: selectedProjectId || "", document_category: isPhotos ? "Photo" : "Design File", visibility: "internal", file: null });
+      setForm({ title: "", project_id: selectedProjectId || "", document_category: isPhotos ? "Photo" : "Design File", file: null });
       event.target.reset();
       onDone();
     } finally {
@@ -294,7 +293,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
 
     <PortalCard className="p-5">
       <PortalSectionHeader title={`Upload ${isPhotos ? "Photo" : "Document"}`} subtitle="Choose the project this file belongs to before uploading." />
-      <form onSubmit={submit} className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_170px_150px_1fr_auto]">
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_170px_1fr_auto]">
         <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={isPhotos ? "Photo title" : "Document title"} className={inputClass} />
         <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value })} className={inputClass} required>
           <option value="">Select project</option>
@@ -308,10 +307,6 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
           <option>Receipt</option>
           <option>Other</option>
         </select> : <div className="flex items-center rounded-lg border border-slate-200 bg-blue-50 px-3 py-2.5 text-sm font-black text-blue-700">Photo</div>}
-        <select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })} className={inputClass}>
-          <option value="internal">Internal</option>
-          <option value="client">Client</option>
-        </select>
         <input type="file" accept={isPhotos ? "image/*" : undefined} onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} className={inputClass} />
         <Button disabled={saving || !form.file || !form.project_id} className="gap-2"><Upload size={16} />{saving ? "Uploading..." : "Upload"}</Button>
       </form>
