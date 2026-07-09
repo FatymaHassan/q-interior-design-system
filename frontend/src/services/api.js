@@ -383,6 +383,25 @@ export function mapDocument(document) {
   };
 }
 
+export function mapEmployeeDocument(document) {
+  const filePath = document.file_path || "";
+  const fileType = document.file_type || "file";
+  const documentType = document.document_type || "Other";
+  const isPhoto = documentType.toLowerCase() === "photo" || fileType.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filePath);
+
+  return {
+    id: document.id,
+    title: document.title,
+    documentType,
+    filePath,
+    fileType,
+    isPhoto,
+    uploadedBy: document.uploader?.name || "-",
+    createdAt: document.created_at ? new Date(document.created_at).toLocaleString() : "-",
+    raw: document,
+  };
+}
+
 export function mapTask(task) {
   const employee = task.assignee_employee || task.assigneeEmployee;
   return {
@@ -1083,7 +1102,21 @@ export async function deleteEmployee(id) {
 
 export async function uploadEmployeeDocument(id, payload) {
   const response = await api.post(`/employees/${id}/documents`, payload);
-  return response.data;
+  return mapEmployeeDocument(response.data);
+}
+
+export async function downloadEmployeeDocument(employeeId, documentRecord) {
+  const id = typeof documentRecord === "object" ? documentRecord.id : documentRecord;
+  const title = typeof documentRecord === "object" ? documentRecord.title || `employee-document-${id}` : `employee-document-${id}`;
+  const filePath = typeof documentRecord === "object" ? documentRecord.filePath || documentRecord.file_path || "" : "";
+  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
+  const response = await api.get(`/employees/${employeeId}/documents/${id}/download`, { responseType: "blob" });
+  saveBlob(response.data, `${title}${extension}`);
+}
+
+export async function getEmployeeDocumentPreviewBlobUrl(employeeId, id) {
+  const response = await api.get(`/employees/${employeeId}/documents/${id}/download`, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
 }
 
 export async function getDepartments() {
@@ -1374,12 +1407,12 @@ export async function downloadDocumentFile(fileRecord) {
   const filePath = typeof fileRecord === "object" ? fileRecord.filePath || fileRecord.file_path || "" : "";
   const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
   const response = await api.get(`/documents/${id}/download`, { responseType: "blob" });
-  const url = URL.createObjectURL(response.data);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${title}${extension}`;
-  link.click();
-  URL.revokeObjectURL(url);
+  saveBlob(response.data, `${title}${extension}`);
+}
+
+export async function getDocumentPreviewBlobUrl(id) {
+  const response = await api.get(`/documents/${id}/download`, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
 }
 
 export function getDocumentStorageUrl(filePath) {
@@ -1645,6 +1678,30 @@ export async function getEmployeePortalAttendance(params = {}) {
   return response.data;
 }
 
+export async function getEmployeePortalDocuments() {
+  const response = await employeeApi.get("/employee/documents");
+  return response.data.map(mapEmployeeDocument);
+}
+
+export async function createEmployeePortalDocument(payload) {
+  const response = await employeeApi.post("/employee/documents", payload);
+  return mapEmployeeDocument(response.data);
+}
+
+export async function downloadEmployeePortalDocument(documentRecord) {
+  const id = typeof documentRecord === "object" ? documentRecord.id : documentRecord;
+  const title = typeof documentRecord === "object" ? documentRecord.title || `employee-document-${id}` : `employee-document-${id}`;
+  const filePath = typeof documentRecord === "object" ? documentRecord.filePath || documentRecord.file_path || "" : "";
+  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
+  const response = await employeeApi.get(`/employee/documents/${id}/download`, { responseType: "blob" });
+  saveBlob(response.data, `${title}${extension}`);
+}
+
+export async function getEmployeePortalDocumentPreviewBlobUrl(id) {
+  const response = await employeeApi.get(`/employee/documents/${id}/download`, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
+}
+
 export async function getEmployeePortalLeaveRequests() {
   const response = await employeeApi.get("/employee/leave-requests");
   return response.data;
@@ -1668,6 +1725,15 @@ export async function getEmployeePortalPayslips() {
 export async function getEmployeePortalReviews() {
   const response = await employeeApi.get("/employee/performance-reviews");
   return response.data;
+}
+
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export default api;

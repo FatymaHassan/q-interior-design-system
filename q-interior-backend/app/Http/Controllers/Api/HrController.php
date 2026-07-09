@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeDocument;
 use App\Models\EmployeeGoal;
 use App\Models\Holiday;
 use App\Models\LeaveBalance;
@@ -25,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -172,20 +174,30 @@ class HrController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'document_type' => 'required|string|max:255',
-            'file' => 'required|file|max:25600',
+            'file' => 'required|file|max:51200',
         ]);
 
         $document = $employee->documents()->create([
             'title' => $data['title'],
             'document_type' => $data['document_type'],
             'file_path' => $request->file('file')->store('employee-documents', 'public'),
-            'file_type' => $request->file('file')->getClientOriginalExtension(),
+            'file_type' => $request->file('file')->getClientMimeType(),
             'uploaded_by' => $request->user()?->id,
         ]);
 
         $this->notify('Employee document uploaded', $employee->name . ': ' . $document->title, 'employee_document_uploaded', '/hr/employees/' . $employee->id);
 
         return $document->load('uploader');
+    }
+
+    public function downloadEmployeeDocument(Employee $employee, EmployeeDocument $employeeDocument)
+    {
+        abort_unless($employeeDocument->employee_id === $employee->id, 404);
+        abort_unless($employeeDocument->file_path && Storage::disk('public')->exists($employeeDocument->file_path), 404);
+
+        return Storage::disk('public')->download($employeeDocument->file_path, basename($employeeDocument->file_path), [
+            'Content-Type' => $employeeDocument->file_type ?: 'application/octet-stream',
+        ]);
     }
 
     public function departments()

@@ -1,23 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, CalendarDays, CheckCircle2, Clock, FileText, Home, MapPin } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, FileText, Home, Image, MapPin, Upload } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { PortalCard, PortalEmptyState, PortalSectionHeader, PortalShell, PortalSkeleton, PortalStatCard, PortalStatusBadge } from "../../components/portal/PortalShell";
-import { employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalReviews } from "../../services/api";
+import { createEmployeePortalDocument, downloadEmployeePortalDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalDocumentPreviewBlobUrl, getEmployeePortalDocuments, getEmployeePortalReviews } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
 
 const navItems = [
   { key: "Dashboard", label: "Home", icon: Home },
   { key: "Check In", label: "Check In", icon: MapPin },
   { key: "Attendance", label: "Attendance", icon: CalendarDays },
+  { key: "Documents", label: "Documents", icon: FileText },
   { key: "Reviews", label: "Reviews", icon: FileText },
 ];
+
+const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
 export default function EmployeePortal() {
   const navigate = useNavigate();
   const [active, setActive] = useState("Dashboard");
   const [data, setData] = useState(null);
   const [attendance, setAttendance] = useState(null);
+  const [documents, setDocuments] = useState([]);
   const [reviews, setReviews] = useState({ reviews: [], goals: [] });
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -27,10 +31,12 @@ export default function EmployeePortal() {
     return Promise.all([
       getEmployeePortalDashboard(),
       getEmployeePortalAttendance(),
+      getEmployeePortalDocuments(),
       getEmployeePortalReviews(),
-    ]).then(([dashboard, attendanceData, reviewData]) => {
+    ]).then(([dashboard, attendanceData, documentData, reviewData]) => {
       setData(dashboard);
       setAttendance(attendanceData);
+      setDocuments(documentData);
       setReviews(reviewData);
       setNotice("");
     }).catch((error) => setNotice(error.response?.data?.message || "Employee portal data could not be loaded."))
@@ -59,6 +65,7 @@ export default function EmployeePortal() {
       {active === "Dashboard" && <Dashboard dashboard={data} />}
       {active === "Check In" && <CheckInPanel today={data?.today_attendance} employee={data?.employee} onDone={load} />}
       {active === "Attendance" && <AttendancePanel attendance={attendance} />}
+      {active === "Documents" && <DocumentsPanel documents={documents} onDone={load} />}
       {active === "Reviews" && <ReviewPanel data={reviews} />}
     </>}
   </PortalShell>;
@@ -222,6 +229,100 @@ function AttendanceCard({ row }) {
     <div className="flex items-center justify-between gap-2"><p className="font-black text-slate-950">{row.date}</p><PortalStatusBadge>{row.status}</PortalStatusBadge></div>
     <div className="mt-3 grid grid-cols-3 gap-2 text-sm"><InfoTile label="In" value={row.check_in || "-"} /><InfoTile label="Out" value={row.check_out || "-"} /><InfoTile label="Hours" value={row.total_hours || "0.00"} /></div>
   </div>;
+}
+
+function DocumentsPanel({ documents, onDone }) {
+  const [form, setForm] = useState({ title: "", document_type: "Photo", file: null });
+  const [saving, setSaving] = useState(false);
+  const photos = documents.filter((document) => document.isPhoto);
+  const files = documents.filter((document) => !document.isPhoto);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.file) return;
+    setSaving(true);
+    const payload = new FormData();
+    payload.append("title", form.title || form.file.name);
+    payload.append("document_type", form.document_type);
+    payload.append("file", form.file);
+    try {
+      await createEmployeePortalDocument(payload);
+      setForm({ title: "", document_type: "Photo", file: null });
+      event.target.reset();
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <div className="space-y-5">
+    <PortalCard className="p-5">
+      <PortalSectionHeader title="Upload Document or Photo" subtitle="Interior design files, drawings, site photos, IDs, PDFs, and any other work file." />
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_180px_1fr_auto]">
+        <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Title" className={inputClass} />
+        <select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value })} className={inputClass}>
+          <option>Photo</option>
+          <option>Design file</option>
+          <option>Drawing</option>
+          <option>ID document</option>
+          <option>Certificate</option>
+          <option>Contract</option>
+          <option>Other</option>
+        </select>
+        <input type="file" onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} className={inputClass} />
+        <Button disabled={saving || !form.file} className="gap-2"><Upload size={16} />{saving ? "Uploading..." : "Upload"}</Button>
+      </form>
+    </PortalCard>
+
+    <PortalCard className="p-5">
+      <PortalSectionHeader title="Photos" subtitle="Uploaded image files" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {photos.map((photo) => <div key={photo.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="aspect-[4/3] bg-slate-100"><EmployeeDocumentImage document={photo} /></div>
+          <div className="p-3">
+            <p className="truncate font-black text-slate-950">{photo.title}</p>
+            <button type="button" onClick={() => downloadEmployeePortalDocument(photo)} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-blue-700"><Download size={15} />Download</button>
+          </div>
+        </div>)}
+      </div>
+      {photos.length === 0 && <PortalEmptyState title="No photos yet" description="Uploaded photos will appear here." />}
+    </PortalCard>
+
+    <PortalCard className="p-5">
+      <PortalSectionHeader title="Documents" subtitle="Uploaded files and documents" />
+      <div className="space-y-2">
+        {files.map((file) => <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+          <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={18} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.documentType}</span></span></span>
+          <Button type="button" variant="outline" className="gap-2 px-3 py-2" onClick={() => downloadEmployeePortalDocument(file)}><Download size={15} />Download</Button>
+        </div>)}
+      </div>
+      {files.length === 0 && <PortalEmptyState title="No documents yet" description="Uploaded documents will appear here." />}
+    </PortalCard>
+  </div>;
+}
+
+function EmployeeDocumentImage({ document }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    getEmployeePortalDocumentPreviewBlobUrl(document.id)
+      .then((url) => {
+        objectUrl = url;
+        if (active) setSrc(url);
+      })
+      .catch(() => {
+        if (active) setSrc("");
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [document.id]);
+
+  return src ? <img src={src} alt={document.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
 }
 
 function ReviewPanel({ data }) {

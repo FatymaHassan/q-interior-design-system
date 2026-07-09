@@ -4,7 +4,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
-import { createDocument, deleteDocument, downloadDocumentFile, getDocuments, getDocumentStorageUrl, getProjects, updateDocument } from "../../services/api";
+import { createDocument, deleteDocument, downloadDocumentFile, getDocumentPreviewBlobUrl, getDocuments, getProjects, updateDocument } from "../../services/api";
 
 const fieldInputClass = "w-full rounded-xl border border-brand-border bg-white px-4 py-3 text-sm outline-none focus:border-brand-gold";
 
@@ -238,7 +238,7 @@ function PhotoGrid({ photos, onEdit, onDelete }) {
   return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
     {photos.map((photo) => <article key={photo.id} className="overflow-hidden rounded-xl border border-brand-border bg-white">
       <div className="aspect-[4/3] bg-brand-soft">
-        {photo.filePath ? <img src={getDocumentStorageUrl(photo.filePath)} alt={photo.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>}
+        {photo.filePath ? <DocumentImage document={photo} /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>}
       </div>
       <div className="space-y-3 p-4">
         <div>
@@ -256,6 +256,30 @@ function PhotoGrid({ photos, onEdit, onDelete }) {
       </div>
     </article>)}
   </div>;
+}
+
+function DocumentImage({ document }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    getDocumentPreviewBlobUrl(document.id)
+      .then((url) => {
+        objectUrl = url;
+        if (active) setSrc(url);
+      })
+      .catch(() => {
+        if (active) setSrc("");
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [document.id]);
+
+  return src ? <img src={src} alt={document.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
 }
 
 function DocumentTable({ documents, onEdit, onDelete }) {

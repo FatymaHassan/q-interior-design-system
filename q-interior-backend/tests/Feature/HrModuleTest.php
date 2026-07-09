@@ -11,7 +11,9 @@ use App\Models\Payroll;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -253,5 +255,48 @@ class HrModuleTest extends TestCase
 
         $this->deleteJson('/api/attendances/' . $attendance['id'])->assertOk();
         $this->assertSame(0, Attendance::where('employee_id', $employee->id)->whereDate('date', '2026-07-09')->count());
+    }
+
+    public function test_admin_and_employee_can_upload_and_download_employee_documents(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $employeeUser = User::factory()->create(['role' => 'staff']);
+        $employee = Employee::create([
+            'user_id' => $employeeUser->id,
+            'name' => 'Document Portal Employee',
+            'email' => $employeeUser->email,
+            'position' => 'Designer',
+            'status' => 'Active',
+        ]);
+
+        Sanctum::actingAs($admin);
+        $adminDocument = $this->postJson('/api/employees/' . $employee->id . '/documents', [
+            'title' => 'Admin Uploaded Photo',
+            'document_type' => 'Photo',
+            'file' => UploadedFile::fake()->create('site-photo.jpg', 12, 'image/jpeg'),
+        ])->assertCreated()
+            ->assertJsonPath('title', 'Admin Uploaded Photo')
+            ->assertJsonPath('file_type', 'image/jpeg')
+            ->json();
+
+        Storage::disk('public')->assertExists($adminDocument['file_path']);
+        $this->getJson('/api/employees/' . $employee->id . '/documents/' . $adminDocument['id'] . '/download')->assertOk();
+
+        Sanctum::actingAs($employeeUser);
+        $employeeDocument = $this->postJson('/api/employee/documents', [
+            'title' => 'Employee Design File',
+            'document_type' => 'Design file',
+            'file' => UploadedFile::fake()->create('joinery.dwg', 12, 'application/octet-stream'),
+        ])->assertCreated()
+            ->assertJsonPath('title', 'Employee Design File')
+            ->json();
+
+        Storage::disk('public')->assertExists($employeeDocument['file_path']);
+        $this->getJson('/api/employee/documents')
+            ->assertOk()
+            ->assertJsonFragment(['title' => 'Employee Design File']);
+        $this->getJson('/api/employee/documents/' . $employeeDocument['id'] . '/download')->assertOk();
     }
 }

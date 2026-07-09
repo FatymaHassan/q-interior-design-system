@@ -8,6 +8,7 @@ use App\Models\AttendanceAttemptLog;
 use App\Models\AttendanceQrCode;
 use App\Models\AttendanceScanLog;
 use App\Models\Employee;
+use App\Models\EmployeeDocument;
 use App\Models\EmployeeGoal;
 use App\Models\Holiday;
 use App\Models\LeaveBalance;
@@ -21,6 +22,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -189,6 +191,53 @@ class EmployeePortalController extends Controller
     public function attendance(Request $request)
     {
         return Attendance::with('officeLocation')->where('employee_id', $this->employee($request)->id)->latest('date')->get();
+    }
+
+    public function documents(Request $request)
+    {
+        return EmployeeDocument::with('uploader')
+            ->where('employee_id', $this->employee($request)->id)
+            ->latest()
+            ->get();
+    }
+
+    public function storeDocument(Request $request)
+    {
+        $employee = $this->employee($request);
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'document_type' => 'required|string|max:255',
+            'file' => 'required|file|max:51200',
+        ]);
+
+        $document = $employee->documents()->create([
+            'title' => $data['title'],
+            'document_type' => $data['document_type'],
+            'file_path' => $request->file('file')->store('employee-documents', 'public'),
+            'file_type' => $request->file('file')->getClientMimeType(),
+            'uploaded_by' => $request->user()?->id,
+        ]);
+
+        Notification::create([
+            'title' => 'Employee document uploaded',
+            'message' => $employee->name . ': ' . $document->title,
+            'type' => 'employee_document_uploaded',
+            'module' => 'hr',
+            'link' => '/hr/employees/' . $employee->id,
+            'is_read' => false,
+        ]);
+
+        return $document->load('uploader');
+    }
+
+    public function downloadDocument(Request $request, EmployeeDocument $employeeDocument)
+    {
+        abort_unless($employeeDocument->employee_id === $this->employee($request)->id, 404);
+        abort_unless($employeeDocument->file_path && Storage::disk('public')->exists($employeeDocument->file_path), 404);
+
+        return Storage::disk('public')->download($employeeDocument->file_path, basename($employeeDocument->file_path), [
+            'Content-Type' => $employeeDocument->file_type ?: 'application/octet-stream',
+        ]);
     }
 
     public function monthlyAttendance(Request $request)

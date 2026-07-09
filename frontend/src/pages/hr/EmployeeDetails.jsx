@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarDays, FileText, Mail, Phone, Shield, Wallet } from "lucide-react";
+import { CalendarDays, Download, FileText, Image, Wallet } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import PasswordResetModal from "../../components/ui/PasswordResetModal";
 import Table from "../../components/ui/Table";
 import TemporaryPasswordNotice from "../../components/ui/TemporaryPasswordNotice";
-import { getDocumentStorageUrl, getEmployee, resetEmployeePassword, uploadEmployeeDocument } from "../../services/api";
+import { downloadEmployeeDocument, getDocumentStorageUrl, getEmployee, getEmployeeDocumentPreviewBlobUrl, mapEmployeeDocument, resetEmployeePassword, uploadEmployeeDocument } from "../../services/api";
 import { fieldInputClass, HRPageHeader, Info } from "./hrShared";
 
 export default function EmployeeDetails() {
@@ -68,7 +68,7 @@ export default function EmployeeDetails() {
     }
   };
 
-  const documents = employee.documents || [];
+  const documents = (employee.documents || []).map(mapEmployeeDocument);
   const attendances = employee.attendances || [];
   const leaveBalances = employee.leave_balances || [];
   const payrolls = employee.payrolls || [];
@@ -124,15 +124,16 @@ export default function EmployeeDetails() {
         {documentError && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-brand-danger">{documentError}</p>}
         <form onSubmit={submitDocument} className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
           <input placeholder="Document title" value={documentForm.title} onChange={(e) => setDocumentForm({ ...documentForm, title: e.target.value })} className={fieldInputClass} />
-          <select value={documentForm.document_type} onChange={(e) => setDocumentForm({ ...documentForm, document_type: e.target.value })} className={fieldInputClass}><option>Contract</option><option>ID document</option><option>Certificates</option><option>CV</option><option>Warning letter</option><option>Promotion letter</option><option>Other</option></select>
+          <select value={documentForm.document_type} onChange={(e) => setDocumentForm({ ...documentForm, document_type: e.target.value })} className={fieldInputClass}><option>Photo</option><option>Contract</option><option>ID document</option><option>Certificates</option><option>CV</option><option>Design file</option><option>Drawing</option><option>Warning letter</option><option>Promotion letter</option><option>Other</option></select>
           <input type="file" onChange={(e) => setDocumentForm({ ...documentForm, file: e.target.files?.[0] || null })} className={fieldInputClass} />
           <Button disabled={documentSaving || !documentForm.file}>{documentSaving ? "Uploading..." : "Upload"}</Button>
         </form>
         <Table columns={[
-          { key: "title", label: "Document", render: (row) => <span className="flex items-center gap-2 font-semibold"><FileText size={16} />{row.title}</span> },
-          { key: "document_type", label: "Type" },
-          { key: "file_type", label: "File" },
-          { key: "file_path", label: "Open", render: (row) => row.file_path ? <a className="font-semibold text-brand-primary underline" href={getDocumentStorageUrl(row.file_path)} target="_blank" rel="noreferrer">Open</a> : "-" },
+          { key: "preview", label: "Preview", render: (row) => row.isPhoto ? <EmployeeDocumentPreview employeeId={employee.id} document={row} /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-soft text-brand-primary"><FileText size={18} /></span> },
+          { key: "title", label: "Document", render: (row) => <span className="flex items-center gap-2 font-semibold">{row.isPhoto ? <Image size={16} /> : <FileText size={16} />}{row.title}</span> },
+          { key: "documentType", label: "Type" },
+          { key: "fileType", label: "File" },
+          { key: "filePath", label: "Action", render: (row) => row.filePath ? <Button type="button" variant="outline" className="gap-2 px-3 py-2" onClick={() => downloadEmployeeDocument(employee.id, row)}><Download size={15} />Download</Button> : "-" },
         ]} rows={documents} empty="No employee documents yet." />
       </Card>
       <Card className="p-5">
@@ -175,6 +176,30 @@ export default function EmployeeDetails() {
       </Card>
     </div>
   </div>;
+}
+
+function EmployeeDocumentPreview({ employeeId, document }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    getEmployeeDocumentPreviewBlobUrl(employeeId, document.id)
+      .then((url) => {
+        objectUrl = url;
+        if (active) setSrc(url);
+      })
+      .catch(() => {
+        if (active) setSrc("");
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [employeeId, document.id]);
+
+  return src ? <img src={src} alt={document.title} className="h-12 w-12 rounded-lg object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-soft text-brand-primary"><Image size={18} /></span>;
 }
 
 function apiErrorMessage(error, fallback) {

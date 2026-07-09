@@ -150,6 +150,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/attendance/analytics', [EmployeePortalController::class, 'attendanceAnalytics']);
     Route::get('/employee/attendance', [EmployeePortalController::class, 'attendance']);
     Route::get('/employee/attendance/monthly', [EmployeePortalController::class, 'monthlyAttendance']);
+    Route::get('/employee/documents', [EmployeePortalController::class, 'documents']);
+    Route::post('/employee/documents', [EmployeePortalController::class, 'storeDocument']);
+    Route::get('/employee/documents/{employeeDocument}/download', [EmployeePortalController::class, 'downloadDocument']);
     Route::get('/employee/leave-requests', [EmployeePortalController::class, 'leaveRequests']);
     Route::post('/employee/leave-requests', [EmployeePortalController::class, 'storeLeaveRequest']);
     Route::get('/employee/leave-balances', [EmployeePortalController::class, 'leaveBalances']);
@@ -302,6 +305,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employees/{employee}/reset-password', [HrController::class, 'resetEmployeePassword'])->middleware('role:admin,manager,hr');
     Route::delete('/employees/{employee}', [HrController::class, 'destroyEmployee'])->middleware('role:admin,manager,hr');
     Route::post('/employees/{employee}/documents', [HrController::class, 'uploadEmployeeDocument'])->middleware('role:admin,manager,hr');
+    Route::get('/employees/{employee}/documents/{employeeDocument}/download', [HrController::class, 'downloadEmployeeDocument'])->middleware('role:admin,manager,hr');
     Route::get('/departments', [HrController::class, 'departments'])->middleware('role:admin,manager,hr');
     Route::post('/departments', [HrController::class, 'storeDepartment'])->middleware('role:admin,manager,hr');
     Route::put('/departments/{department}', [HrController::class, 'updateDepartment'])->middleware('role:admin,manager,hr');
