@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Attendance;
 use App\Models\LeaveBalance;
 use App\Models\OfficeLocation;
 use App\Models\Payroll;
@@ -208,5 +209,49 @@ class HrModuleTest extends TestCase
             ->assertJsonPath('attendance.check_out', '10:00:00');
 
         Carbon::setTestNow();
+    }
+
+    public function test_admin_can_list_create_edit_and_delete_attendance_records(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+
+        $employee = Employee::create([
+            'name' => 'Attendance Admin Employee',
+            'email' => 'attendance-admin@example.com',
+            'position' => 'Designer',
+            'status' => 'Active',
+        ]);
+
+        $attendance = $this->postJson('/api/attendances/manual', [
+            'employee_id' => $employee->id,
+            'date' => '2026-07-09',
+            'check_in' => '08:30',
+            'check_out' => '17:15',
+            'status' => 'Present',
+            'method' => 'Manual',
+        ])->assertCreated()
+            ->assertJsonPath('employee.id', $employee->id)
+            ->assertJsonPath('date', '2026-07-09')
+            ->json();
+
+        $this->getJson('/api/attendances')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $attendance['id']]);
+
+        $this->putJson('/api/attendances/' . $attendance['id'], [
+            'employee_id' => $employee->id,
+            'date' => '2026-07-09',
+            'check_in' => '09:00',
+            'check_out' => '17:00',
+            'status' => 'Late',
+            'method' => 'Manual',
+            'notes' => 'Corrected by admin',
+        ])->assertOk()
+            ->assertJsonPath('check_in', '09:00')
+            ->assertJsonPath('status', 'Late')
+            ->assertJsonPath('notes', 'Corrected by admin');
+
+        $this->deleteJson('/api/attendances/' . $attendance['id'])->assertOk();
+        $this->assertSame(0, Attendance::where('employee_id', $employee->id)->whereDate('date', '2026-07-09')->count());
     }
 }

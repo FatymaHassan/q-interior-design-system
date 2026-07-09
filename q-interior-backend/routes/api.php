@@ -290,6 +290,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/hr/attendance', [HrController::class, 'attendances'])->middleware('role:admin,manager,hr');
     Route::get('/hr/attendance/daily', [HrController::class, 'attendances'])->middleware('role:admin,manager,hr');
     Route::post('/hr/attendance/manual', [HrController::class, 'manualAttendance'])->middleware('role:admin,manager,hr');
+    Route::put('/hr/attendance/{attendance}', [HrController::class, 'updateAttendance'])->middleware('role:admin,manager,hr');
+    Route::delete('/hr/attendance/{attendance}', [HrController::class, 'destroyAttendance'])->middleware('role:admin,manager,hr');
     Route::get('/hr/office-locations', [HrController::class, 'officeLocations'])->middleware('role:admin,manager,hr');
     Route::post('/hr/office-locations', [HrController::class, 'storeOfficeLocation'])->middleware('role:admin,manager,hr');
     Route::put('/hr/office-locations/{officeLocation}', [HrController::class, 'updateOfficeLocation'])->middleware('role:admin,manager,hr');
@@ -308,6 +310,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attendances/check-in', [HrController::class, 'checkIn']);
     Route::post('/attendances/check-out', [HrController::class, 'checkOut']);
     Route::post('/attendances/manual', [HrController::class, 'manualAttendance'])->middleware('role:admin,manager,hr');
+    Route::put('/attendances/{attendance}', [HrController::class, 'updateAttendance'])->middleware('role:admin,manager,hr');
+    Route::delete('/attendances/{attendance}', [HrController::class, 'destroyAttendance'])->middleware('role:admin,manager,hr');
     Route::get('/leave-requests', [HrController::class, 'leaveRequests']);
     Route::post('/leave-requests', [HrController::class, 'storeLeaveRequest']);
     Route::post('/leave-requests/{leaveRequest}/approve', [HrController::class, 'approveLeave'])->middleware('role:admin,manager,hr');

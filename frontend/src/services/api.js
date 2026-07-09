@@ -1116,6 +1116,15 @@ export async function createManualAttendance(payload) {
   return response.data;
 }
 
+export async function updateAttendance(id, payload) {
+  const response = await api.put(`/attendances/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteAttendance(id) {
+  await api.delete(`/attendances/${id}`);
+}
+
 export async function getLeaveRequests(params = {}) {
   const response = await api.get("/leave-requests", { params });
   return response.data;

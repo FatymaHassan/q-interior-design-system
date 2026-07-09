@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -274,32 +275,24 @@ class HrController extends Controller
 
     public function manualAttendance(Request $request)
     {
-        $data = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'office_location_id' => 'nullable|exists:office_locations,id',
-            'date' => 'required|date',
-            'check_in' => 'nullable|date_format:H:i',
-            'check_out' => 'nullable|date_format:H:i',
-            'status' => 'required|in:Present,Late,Early Out,Late / Early Out,Absent,Half Day,On Leave',
-            'method' => 'nullable|in:Manual,QR,System,Portal GPS',
-            'notes' => 'nullable|string',
-        ]);
-        $data['created_by'] = $request->user()?->id;
-        $end = Setting::where('key', 'hr_end_time')->value('value') ?: '17:00';
-        if (! empty($data['check_in']) && ! empty($data['check_out'])) {
-            $checkIn = Carbon::parse($data['date'] . ' ' . $data['check_in']);
-            $checkOut = Carbon::parse($data['date'] . ' ' . $data['check_out']);
-            $workEnd = Carbon::parse($data['date'] . ' ' . $end);
-            if ($checkIn->greaterThanOrEqualTo($checkOut)) {
-                return response()->json(['message' => 'Check out cannot be the same time as check in.'], 422);
-            }
-            if ($checkOut->lt($workEnd)) {
-                $data['status'] = $this->checkoutStatus($data['status'], true);
-            }
-        }
-        $data['total_hours'] = $this->hours($data['date'], $data['check_in'] ?? null, $data['check_out'] ?? null);
+        $data = $this->attendanceData($request);
 
         return Attendance::updateOrCreate(['employee_id' => $data['employee_id'], 'date' => $data['date']], $data)->load(['employee', 'officeLocation']);
+    }
+
+    public function updateAttendance(Request $request, Attendance $attendance)
+    {
+        $data = $this->attendanceData($request, $attendance);
+        $attendance->update($data);
+
+        return $attendance->fresh(['employee.department', 'officeLocation']);
+    }
+
+    public function destroyAttendance(Attendance $attendance)
+    {
+        $attendance->delete();
+
+        return response()->json(['message' => 'Attendance record deleted successfully']);
     }
 
     public function leaveRequests(Request $request)
@@ -751,6 +744,43 @@ class HrController extends Controller
         }
 
         return round(Carbon::parse($date . ' ' . $checkIn)->floatDiffInHours(Carbon::parse($date . ' ' . $checkOut)), 2);
+    }
+
+    private function attendanceData(Request $request, ?Attendance $attendance = null): array
+    {
+        $data = $request->validate([
+            'employee_id' => ($attendance ? 'sometimes|required' : 'required') . '|exists:employees,id',
+            'office_location_id' => 'nullable|exists:office_locations,id',
+            'date' => ($attendance ? 'sometimes|required' : 'required') . '|date',
+            'check_in' => 'nullable|date_format:H:i',
+            'check_out' => 'nullable|date_format:H:i',
+            'status' => ($attendance ? 'sometimes|required' : 'required') . '|in:Present,Late,Early Out,Late / Early Out,Absent,Half Day,On Leave',
+            'method' => 'nullable|in:Manual,QR,System,Portal GPS',
+            'notes' => 'nullable|string',
+        ]);
+
+        $data['employee_id'] = $data['employee_id'] ?? $attendance?->employee_id;
+        $data['date'] = $data['date'] ?? $attendance?->date?->toDateString();
+        $data['status'] = $data['status'] ?? $attendance?->status ?? 'Present';
+        $data['method'] = $data['method'] ?? $attendance?->method ?? 'Manual';
+        $data['created_by'] = $request->user()?->id ?? $attendance?->created_by;
+        $end = Setting::where('key', 'hr_end_time')->value('value') ?: '17:00';
+
+        if (! empty($data['check_in']) && ! empty($data['check_out'])) {
+            $checkIn = Carbon::parse($data['date'] . ' ' . $data['check_in']);
+            $checkOut = Carbon::parse($data['date'] . ' ' . $data['check_out']);
+            $workEnd = Carbon::parse($data['date'] . ' ' . $end);
+            if ($checkIn->greaterThanOrEqualTo($checkOut)) {
+                throw ValidationException::withMessages(['check_out' => 'Check out cannot be the same time as check in.']);
+            }
+            if ($checkOut->lt($workEnd)) {
+                $data['status'] = $this->checkoutStatus($data['status'], true);
+            }
+        }
+
+        $data['total_hours'] = $this->hours($data['date'], $data['check_in'] ?? null, $data['check_out'] ?? null);
+
+        return $data;
     }
 
     private function leaveDays(string $start, string $end): int
