@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\AttendanceAttemptLog;
 use App\Models\AttendanceQrCode;
 use App\Models\AttendanceScanLog;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
 use App\Models\EmployeeGoal;
@@ -17,6 +18,7 @@ use App\Models\Notification;
 use App\Models\OfficeLocation;
 use App\Models\Payroll;
 use App\Models\PerformanceReview;
+use App\Models\Project;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -201,6 +203,76 @@ class EmployeePortalController extends Controller
             ->get();
     }
 
+    public function projects(Request $request)
+    {
+        return $this->employeeProjects($request)
+            ->with('stage')
+            ->latest()
+            ->get();
+    }
+
+    public function projectDocuments(Request $request)
+    {
+        $employee = $this->employee($request);
+        $query = Document::with(['project', 'uploader'])
+            ->whereHas('project.members', fn ($builder) => $this->employeeProjectMemberScope($builder, $employee));
+
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->integer('project_id'));
+        }
+
+        $this->applyDocumentKindFilter($query, $request->query('kind'));
+
+        return $query->latest()->get();
+    }
+
+    public function storeProjectDocument(Request $request)
+    {
+        $employee = $this->employee($request);
+        $data = $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'title' => 'required|string|max:255',
+            'document_category' => 'nullable|string|max:255',
+            'visibility' => 'nullable|in:internal,client',
+            'file' => 'required|file|max:51200',
+        ]);
+
+        abort_unless($this->employeeCanAccessProject($employee, (int) $data['project_id']), 403);
+
+        $document = Document::create([
+            'project_id' => $data['project_id'],
+            'title' => $data['title'],
+            'document_category' => $data['document_category'] ?? 'Design File',
+            'visibility' => $data['visibility'] ?? 'internal',
+            'file_path' => $request->file('file')->store('documents', 'public'),
+            'file_type' => $request->file('file')->getClientMimeType(),
+            'uploaded_by' => $request->user()?->id,
+        ]);
+
+        Notification::create([
+            'project_id' => $document->project_id,
+            'title' => 'Project document uploaded',
+            'message' => $employee->name . ': ' . $document->title,
+            'type' => 'project_document_uploaded',
+            'module' => 'projects',
+            'link' => '/projects/' . $document->project_id,
+            'is_read' => false,
+        ]);
+
+        return $document->load(['project', 'uploader']);
+    }
+
+    public function downloadProjectDocument(Request $request, Document $document)
+    {
+        $employee = $this->employee($request);
+        abort_unless($document->project_id && $this->employeeCanAccessProject($employee, (int) $document->project_id), 404);
+        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
+
+        return Storage::disk('public')->download($document->file_path, basename($document->file_path), [
+            'Content-Type' => $document->file_type ?: 'application/octet-stream',
+        ]);
+    }
+
     public function storeDocument(Request $request)
     {
         $employee = $this->employee($request);
@@ -302,6 +374,57 @@ class EmployeePortalController extends Controller
     private function employee(Request $request): Employee
     {
         return Employee::where('user_id', $request->user()?->id)->firstOrFail();
+    }
+
+    private function employeeProjects(Request $request)
+    {
+        $employee = $this->employee($request);
+
+        return Project::whereHas('members', fn ($builder) => $this->employeeProjectMemberScope($builder, $employee));
+    }
+
+    private function employeeProjectMemberScope($builder, Employee $employee): void
+    {
+        $builder->where('employee_id', $employee->id);
+
+        if ($employee->user_id) {
+            $builder->orWhere('user_id', $employee->user_id);
+        }
+    }
+
+    private function employeeCanAccessProject(Employee $employee, int $projectId): bool
+    {
+        return Project::whereKey($projectId)
+            ->whereHas('members', fn ($builder) => $this->employeeProjectMemberScope($builder, $employee))
+            ->exists();
+    }
+
+    private function applyDocumentKindFilter($query, ?string $kind): void
+    {
+        if ($kind === 'photo') {
+            $query->where(function ($builder) {
+                $builder
+                    ->where('document_category', 'Photo')
+                    ->orWhere('file_type', 'like', 'image/%')
+                    ->orWhere('file_path', 'regexp', '\\.(jpg|jpeg|png|gif|webp|bmp|svg)$');
+            });
+        }
+
+        if ($kind === 'document') {
+            $query->where(function ($builder) {
+                $builder
+                    ->whereNull('document_category')
+                    ->orWhere('document_category', '!=', 'Photo');
+            })->where(function ($builder) {
+                $builder
+                    ->whereNull('file_type')
+                    ->orWhere('file_type', 'not like', 'image/%');
+            })->where(function ($builder) {
+                $builder
+                    ->whereNull('file_path')
+                    ->orWhere('file_path', 'not regexp', '\\.(jpg|jpeg|png|gif|webp|bmp|svg)$');
+            });
+        }
     }
 
     private function portalAttendance(Request $request, string $type)

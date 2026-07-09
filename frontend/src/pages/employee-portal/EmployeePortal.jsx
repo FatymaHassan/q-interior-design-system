@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, FileText, Home, Image, MapPin, Upload } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, FileText, Home, Image, MapPin, Search, Upload } from "lucide-react";
 import Button from "../../components/ui/Button";
 import { PortalCard, PortalEmptyState, PortalSectionHeader, PortalShell, PortalSkeleton, PortalStatCard, PortalStatusBadge } from "../../components/portal/PortalShell";
-import { createEmployeePortalDocument, downloadEmployeePortalDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalDocumentPreviewBlobUrl, getEmployeePortalDocuments, getEmployeePortalReviews } from "../../services/api";
+import { createEmployeePortalProjectDocument, downloadEmployeePortalProjectDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalProjectDocumentPreviewBlobUrl, getEmployeePortalProjectDocuments, getEmployeePortalProjects, getEmployeePortalReviews } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
 
 const navItems = [
@@ -22,6 +22,7 @@ export default function EmployeePortal() {
   const [data, setData] = useState(null);
   const [attendance, setAttendance] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [reviews, setReviews] = useState({ reviews: [], goals: [] });
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,11 +32,13 @@ export default function EmployeePortal() {
     return Promise.all([
       getEmployeePortalDashboard(),
       getEmployeePortalAttendance(),
-      getEmployeePortalDocuments(),
+      getEmployeePortalProjects(),
+      getEmployeePortalProjectDocuments(),
       getEmployeePortalReviews(),
-    ]).then(([dashboard, attendanceData, documentData, reviewData]) => {
+    ]).then(([dashboard, attendanceData, projectData, documentData, reviewData]) => {
       setData(dashboard);
       setAttendance(attendanceData);
+      setProjects(projectData);
       setDocuments(documentData);
       setReviews(reviewData);
       setNotice("");
@@ -65,7 +68,7 @@ export default function EmployeePortal() {
       {active === "Dashboard" && <Dashboard dashboard={data} />}
       {active === "Check In" && <CheckInPanel today={data?.today_attendance} employee={data?.employee} onDone={load} />}
       {active === "Attendance" && <AttendancePanel attendance={attendance} />}
-      {active === "Documents" && <DocumentsPanel documents={documents} onDone={load} />}
+      {active === "Documents" && <DocumentsPanel documents={documents} projects={projects} onDone={load} />}
       {active === "Reviews" && <ReviewPanel data={reviews} />}
     </>}
   </PortalShell>;
@@ -231,23 +234,34 @@ function AttendanceCard({ row }) {
   </div>;
 }
 
-function DocumentsPanel({ documents, onDone }) {
-  const [form, setForm] = useState({ title: "", document_type: "Photo", file: null });
+function DocumentsPanel({ documents, projects, onDone }) {
+  const [form, setForm] = useState({ title: "", project_id: "", document_category: "Photo", visibility: "internal", file: null });
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const photos = documents.filter((document) => document.isPhoto);
-  const files = documents.filter((document) => !document.isPhoto);
+  const selectedProject = projects.find((project) => String(project.id) === String(selectedProjectId));
+  const visibleDocuments = documents.filter((document) => {
+    const matchesProject = selectedProjectId ? String(document.projectId) === String(selectedProjectId) : true;
+    const needle = query.trim().toLowerCase();
+    const matchesQuery = !needle || [document.title, document.project, document.category, document.fileType].join(" ").toLowerCase().includes(needle);
+    return matchesProject && matchesQuery;
+  });
+  const photos = visibleDocuments.filter((document) => document.isPhoto);
+  const files = visibleDocuments.filter((document) => !document.isPhoto);
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!form.file) return;
+    if (!form.file || !form.project_id) return;
     setSaving(true);
     const payload = new FormData();
     payload.append("title", form.title || form.file.name);
-    payload.append("document_type", form.document_type);
+    payload.append("project_id", form.project_id);
+    payload.append("document_category", form.document_category);
+    payload.append("visibility", form.visibility);
     payload.append("file", form.file);
     try {
-      await createEmployeePortalDocument(payload);
-      setForm({ title: "", document_type: "Photo", file: null });
+      await createEmployeePortalProjectDocument(payload);
+      setForm({ title: "", project_id: selectedProjectId || "", document_category: "Photo", visibility: "internal", file: null });
       event.target.reset();
       onDone();
     } finally {
@@ -257,57 +271,84 @@ function DocumentsPanel({ documents, onDone }) {
 
   return <div className="space-y-5">
     <PortalCard className="p-5">
-      <PortalSectionHeader title="Upload Document or Photo" subtitle="Interior design files, drawings, site photos, IDs, PDFs, and any other work file." />
-      <form onSubmit={submit} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_180px_1fr_auto]">
+      <PortalSectionHeader title="Upload Project Document or Photo" subtitle="Interior design files, drawings, site photos, PDFs, documents, and any project work file." />
+      <form onSubmit={submit} className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_170px_150px_1fr_auto]">
         <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Title" className={inputClass} />
-        <select value={form.document_type} onChange={(event) => setForm({ ...form, document_type: event.target.value })} className={inputClass}>
+        <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value })} className={inputClass} required>
+          <option value="">Select project</option>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+        </select>
+        <select value={form.document_category} onChange={(event) => setForm({ ...form, document_category: event.target.value })} className={inputClass}>
           <option>Photo</option>
-          <option>Design file</option>
+          <option>Design File</option>
           <option>Drawing</option>
-          <option>ID document</option>
-          <option>Certificate</option>
           <option>Contract</option>
+          <option>Invoice</option>
+          <option>Receipt</option>
           <option>Other</option>
         </select>
+        <select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })} className={inputClass}>
+          <option value="internal">Internal</option>
+          <option value="client">Client</option>
+        </select>
         <input type="file" onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} className={inputClass} />
-        <Button disabled={saving || !form.file} className="gap-2"><Upload size={16} />{saving ? "Uploading..." : "Upload"}</Button>
+        <Button disabled={saving || !form.file || !form.project_id} className="gap-2"><Upload size={16} />{saving ? "Uploading..." : "Upload"}</Button>
       </form>
+      {projects.length === 0 && <p className="mt-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm font-bold text-amber-700">No assigned project found. Ask admin to add this employee to the project team before uploading project files.</p>}
     </PortalCard>
 
     <PortalCard className="p-5">
-      <PortalSectionHeader title="Photos" subtitle="Uploaded image files" />
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <PortalSectionHeader title="Project Files" subtitle={selectedProject ? selectedProject.name : "All assigned projects"} />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search files..." className={`${inputClass} pl-9`} />
+          </div>
+          <select value={selectedProjectId} onChange={(event) => {
+            setSelectedProjectId(event.target.value);
+            setForm((current) => ({ ...current, project_id: event.target.value || current.project_id }));
+          }} className={inputClass}>
+            <option value="">All projects</option>
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <PortalSectionHeader title="Photos" subtitle="Project gallery" />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {photos.map((photo) => <div key={photo.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="aspect-[4/3] bg-slate-100"><EmployeeDocumentImage document={photo} /></div>
+          <div className="aspect-[4/3] bg-slate-100"><EmployeeProjectDocumentImage document={photo} /></div>
           <div className="p-3">
             <p className="truncate font-black text-slate-950">{photo.title}</p>
-            <button type="button" onClick={() => downloadEmployeePortalDocument(photo)} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-blue-700"><Download size={15} />Download</button>
+            <p className="mt-1 truncate text-sm text-slate-500">{photo.project}</p>
+            <button type="button" onClick={() => downloadEmployeePortalProjectDocument(photo)} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-blue-700"><Download size={15} />Download</button>
           </div>
         </div>)}
       </div>
-      {photos.length === 0 && <PortalEmptyState title="No photos yet" description="Uploaded photos will appear here." />}
-    </PortalCard>
+      {photos.length === 0 && <PortalEmptyState title="No photos yet" description="Project photos will appear here." />}
 
-    <PortalCard className="p-5">
-      <PortalSectionHeader title="Documents" subtitle="Uploaded files and documents" />
+      <div className="mt-6">
+        <PortalSectionHeader title="Documents" subtitle="Project documents and design files" />
+      </div>
       <div className="space-y-2">
         {files.map((file) => <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={18} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.documentType}</span></span></span>
-          <Button type="button" variant="outline" className="gap-2 px-3 py-2" onClick={() => downloadEmployeePortalDocument(file)}><Download size={15} />Download</Button>
+          <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={18} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.project} - {file.category}</span></span></span>
+          <Button type="button" variant="outline" className="gap-2 px-3 py-2" onClick={() => downloadEmployeePortalProjectDocument(file)}><Download size={15} />Download</Button>
         </div>)}
       </div>
-      {files.length === 0 && <PortalEmptyState title="No documents yet" description="Uploaded documents will appear here." />}
+      {files.length === 0 && <PortalEmptyState title="No documents yet" description="Project documents will appear here." />}
     </PortalCard>
   </div>;
 }
 
-function EmployeeDocumentImage({ document }) {
+function EmployeeProjectDocumentImage({ document }) {
   const [src, setSrc] = useState("");
 
   useEffect(() => {
     let active = true;
     let objectUrl = "";
-    getEmployeePortalDocumentPreviewBlobUrl(document.id)
+    getEmployeePortalProjectDocumentPreviewBlobUrl(document.id)
       .then((url) => {
         objectUrl = url;
         if (active) setSrc(url);

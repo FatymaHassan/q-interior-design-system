@@ -1678,6 +1678,35 @@ export async function getEmployeePortalAttendance(params = {}) {
   return response.data;
 }
 
+export async function getEmployeePortalProjects() {
+  const response = await employeeApi.get("/employee/projects");
+  return response.data.map(mapProject);
+}
+
+export async function getEmployeePortalProjectDocuments(params = {}) {
+  const response = await employeeApi.get("/employee/project-documents", { params });
+  return response.data.map(mapDocument);
+}
+
+export async function createEmployeePortalProjectDocument(payload) {
+  const response = await employeeApi.post("/employee/project-documents", payload);
+  return mapDocument(response.data);
+}
+
+export async function downloadEmployeePortalProjectDocument(documentRecord) {
+  const id = typeof documentRecord === "object" ? documentRecord.id : documentRecord;
+  const title = typeof documentRecord === "object" ? documentRecord.title || `project-document-${id}` : `project-document-${id}`;
+  const filePath = typeof documentRecord === "object" ? documentRecord.filePath || documentRecord.file_path || "" : "";
+  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
+  const response = await employeeApi.get(`/employee/project-documents/${id}/download`, { responseType: "blob" });
+  saveBlob(response.data, `${title}${extension}`);
+}
+
+export async function getEmployeePortalProjectDocumentPreviewBlobUrl(id) {
+  const response = await employeeApi.get(`/employee/project-documents/${id}/download`, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
+}
+
 export async function getEmployeePortalDocuments() {
   const response = await employeeApi.get("/employee/documents");
   return response.data.map(mapEmployeeDocument);

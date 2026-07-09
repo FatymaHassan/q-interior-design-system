@@ -150,6 +150,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/employee/attendance/analytics', [EmployeePortalController::class, 'attendanceAnalytics']);
     Route::get('/employee/attendance', [EmployeePortalController::class, 'attendance']);
     Route::get('/employee/attendance/monthly', [EmployeePortalController::class, 'monthlyAttendance']);
+    Route::get('/employee/projects', [EmployeePortalController::class, 'projects']);
+    Route::get('/employee/project-documents', [EmployeePortalController::class, 'projectDocuments']);
+    Route::post('/employee/project-documents', [EmployeePortalController::class, 'storeProjectDocument']);
+    Route::get('/employee/project-documents/{document}/download', [EmployeePortalController::class, 'downloadProjectDocument']);
     Route::get('/employee/documents', [EmployeePortalController::class, 'documents']);
     Route::post('/employee/documents', [EmployeePortalController::class, 'storeDocument']);
     Route::get('/employee/documents/{employeeDocument}/download', [EmployeePortalController::class, 'downloadDocument']);
