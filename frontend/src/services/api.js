@@ -4,13 +4,10 @@ import { formatDateOnly } from "../utils/dateTime";
 const defaultApiUrl =
   typeof window !== "undefined" && window.location.hostname.includes("localhost")
     ? "/api"
-    : "/api";
+    : "https://q-interior-design-system.onrender.com/api";
 
 const envApiUrl = import.meta.env.VITE_API_URL;
-const apiBaseUrl =
-  typeof window !== "undefined" && window.location.hostname.includes("vercel.app")
-    ? defaultApiUrl
-    : envApiUrl || defaultApiUrl;
+const apiBaseUrl = envApiUrl || defaultApiUrl;
 
 const api = axios.create({
   baseURL: apiBaseUrl,
