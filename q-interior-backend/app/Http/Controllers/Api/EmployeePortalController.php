@@ -30,6 +30,8 @@ use Illuminate\Validation\ValidationException;
 
 class EmployeePortalController extends Controller
 {
+    private const DATABASE_FILE_BACKUP_MAX_BYTES = 52428800;
+
     public function login(Request $request)
     {
         $credentials = $request->validate(['email' => 'required|email', 'password' => 'required|string']);
@@ -235,17 +237,15 @@ class EmployeePortalController extends Controller
             'file' => 'required|file|max:204800',
         ]);
 
-        $filePath = $request->file('file')->store('documents', 'public');
-        abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
+        $filePayload = $this->storeProjectUploadedFile($request->file('file'));
 
         $document = Document::create([
             'project_id' => $data['project_id'],
             'title' => $data['title'],
             'document_category' => $data['document_category'] ?? 'Design File',
             'visibility' => $data['visibility'] ?? 'internal',
-            'file_path' => $filePath,
-            'file_type' => $request->file('file')->getClientMimeType(),
             'uploaded_by' => $request->user()?->id,
+            ...$filePayload,
         ]);
 
         Notification::create([
@@ -276,11 +276,7 @@ class EmployeePortalController extends Controller
                 Storage::disk('public')->delete($document->file_path);
             }
 
-            $filePath = $request->file('file')->store('documents', 'public');
-            abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
-
-            $data['file_path'] = $filePath;
-            $data['file_type'] = $request->file('file')->getClientMimeType();
+            $data = [...$data, ...$this->storeProjectUploadedFile($request->file('file'))];
         }
 
         $data['visibility'] = 'internal';
@@ -317,22 +313,60 @@ class EmployeePortalController extends Controller
     public function downloadProjectDocument(Request $request, Document $document)
     {
         $this->employee($request);
-        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
-
-        return Storage::disk('public')->download($document->file_path, $this->projectDocumentDownloadName($document), [
-            'Content-Type' => $document->file_type ?: 'application/octet-stream',
-        ]);
+        return $this->projectDocumentFileResponse($document, true);
     }
 
     public function previewProjectDocument(Request $request, Document $document)
     {
         $this->employee($request);
-        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
+        return $this->projectDocumentFileResponse($document, false);
+    }
 
-        return Storage::disk('public')->response($document->file_path, $this->projectDocumentDownloadName($document), [
-            'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
+    private function storeProjectUploadedFile($file): array
+    {
+        $filePath = $file->store('documents', 'public');
+        abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
+
+        $payload = [
+            'file_path' => $filePath,
+            'file_type' => $file->getClientMimeType(),
+            'file_size' => $file->getSize(),
+            'file_content' => null,
+        ];
+
+        if ($file->getSize() <= self::DATABASE_FILE_BACKUP_MAX_BYTES) {
+            $payload['file_content'] = base64_encode(file_get_contents($file->getRealPath()));
+        }
+
+        return $payload;
+    }
+
+    private function projectDocumentFileResponse(Document $document, bool $download)
+    {
+        abort_unless($document->file_path || $document->file_content, 404);
+
+        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+            return $download
+                ? Storage::disk('public')->download($document->file_path, $this->projectDocumentDownloadName($document), [
+                    'Content-Type' => $document->file_type ?: 'application/octet-stream',
+                ])
+                : Storage::disk('public')->response($document->file_path, $this->projectDocumentDownloadName($document), [
+                    'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
+                    'Cache-Control' => 'private, max-age=300',
+                ], 'inline');
+        }
+
+        abort_unless($document->file_content, 404);
+
+        $content = base64_decode($document->file_content, true);
+        abort_unless($content !== false, 404);
+
+        return response($content, 200, [
+            'Content-Type' => $document->file_type ?: 'application/octet-stream',
+            'Content-Length' => (string) strlen($content),
+            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . addslashes($this->projectDocumentDownloadName($document)) . '"',
             'Cache-Control' => 'private, max-age=300',
-        ], 'inline');
+        ]);
     }
 
     public function storeDocument(Request $request)

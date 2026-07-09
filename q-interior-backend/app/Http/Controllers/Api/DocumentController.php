@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 
 class DocumentController extends Controller
 {
+    private const DATABASE_FILE_BACKUP_MAX_BYTES = 52428800;
+
     public function index(Request $request)
     {
         $query = Document::with(['project', 'uploader']);
@@ -61,8 +63,7 @@ class DocumentController extends Controller
         ]);
 
         if ($request->hasFile('file')) {
-            $data['file_path'] = $request->file('file')->store('documents', 'public');
-            $data['file_type'] = $request->file('file')->getClientMimeType();
+            $data = [...$data, ...$this->storeUploadedFile($request->file('file'))];
         }
 
         $data['file_path'] = $data['file_path'] ?? '';
@@ -104,8 +105,7 @@ class DocumentController extends Controller
             if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
                 Storage::disk('public')->delete($document->file_path);
             }
-            $data['file_path'] = $request->file('file')->store('documents', 'public');
-            $data['file_type'] = $request->file('file')->getClientMimeType();
+            $data = [...$data, ...$this->storeUploadedFile($request->file('file'))];
         }
 
         $data['uploaded_by'] = $data['uploaded_by'] ?? $request->user()?->id;
@@ -128,21 +128,59 @@ class DocumentController extends Controller
 
     public function download(Request $request, Document $document)
     {
-        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
-
-        return Storage::disk('public')->download($document->file_path, $this->downloadName($document), [
-            'Content-Type' => $document->file_type ?: 'application/octet-stream',
-        ]);
+        return $this->fileResponse($document, true);
     }
 
     public function preview(Request $request, Document $document)
     {
-        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
+        return $this->fileResponse($document, false);
+    }
 
-        return Storage::disk('public')->response($document->file_path, $this->downloadName($document), [
-            'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
+    private function storeUploadedFile($file): array
+    {
+        $filePath = $file->store('documents', 'public');
+        abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
+
+        $payload = [
+            'file_path' => $filePath,
+            'file_type' => $file->getClientMimeType(),
+            'file_size' => $file->getSize(),
+            'file_content' => null,
+        ];
+
+        if ($file->getSize() <= self::DATABASE_FILE_BACKUP_MAX_BYTES) {
+            $payload['file_content'] = base64_encode(file_get_contents($file->getRealPath()));
+        }
+
+        return $payload;
+    }
+
+    private function fileResponse(Document $document, bool $download)
+    {
+        abort_unless($document->file_path || $document->file_content, 404);
+
+        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+            return $download
+                ? Storage::disk('public')->download($document->file_path, $this->downloadName($document), [
+                    'Content-Type' => $document->file_type ?: 'application/octet-stream',
+                ])
+                : Storage::disk('public')->response($document->file_path, $this->downloadName($document), [
+                    'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
+                    'Cache-Control' => 'private, max-age=300',
+                ], 'inline');
+        }
+
+        abort_unless($document->file_content, 404);
+
+        $content = base64_decode($document->file_content, true);
+        abort_unless($content !== false, 404);
+
+        return response($content, 200, [
+            'Content-Type' => $document->file_type ?: 'application/octet-stream',
+            'Content-Length' => (string) strlen($content),
+            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . addslashes($this->downloadName($document)) . '"',
             'Cache-Control' => 'private, max-age=300',
-        ], 'inline');
+        ]);
     }
 
     private function downloadName(Document $document): string
