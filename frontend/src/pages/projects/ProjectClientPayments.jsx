@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Edit3, Trash2 } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { createPayment, getClients, getPayments, getProjects } from "../../services/api";
+import { createPayment, deletePayment, getClients, getPayments, getProjects } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
 
 const methods = ["cash", "bank transfer", "EVC Plus", "card", "other"];
@@ -16,6 +18,7 @@ export default function ProjectClientPayments() {
   const [clients, setClients] = useState([]);
   const [payments, setPayments] = useState([]);
   const [form, setForm] = useState({ project_id: "", client_id: "", payment_date: new Date().toISOString().slice(0, 10), amount: "", payment_method: "cash", payment_type: "Custom Payment", related_stage: "", reference_number: "", notes: "", receipt: null });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const selectedProject = useMemo(() => projects.find((project) => String(project.id) === String(form.project_id)), [projects, form.project_id]);
 
   const load = () => Promise.all([getProjects(), getClients(), getPayments()]).then(([projectRows, clientRows, paymentRows]) => {
@@ -36,27 +39,39 @@ export default function ProjectClientPayments() {
   const updateFile = (event) => setForm((current) => ({ ...current, receipt: event.target.files?.[0] || null }));
   const submit = async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const payload = new FormData();
-    payload.append("type", "client");
-    payload.append("project_id", Number(form.project_id));
-    if (form.client_id) payload.append("client_id", Number(form.client_id));
-    payload.append("amount", toNumber(form.amount));
-    payload.append("payment_date", form.payment_date);
-    payload.append("payment_method", form.payment_method);
-    payload.append("payment_type", form.payment_type);
-    if (form.related_stage) payload.append("related_stage", form.related_stage);
-    payload.append("reference_number", form.reference_number);
-    payload.append("status", "paid");
-    payload.append("notes", form.notes);
-    if (form.receipt) payload.append("receipt", form.receipt);
-    await createPayment(payload);
-    setForm((current) => ({ ...current, amount: "", reference_number: "", notes: "", receipt: null }));
+    try {
+      payload.append("type", "client");
+      payload.append("project_id", Number(form.project_id));
+      if (form.client_id) payload.append("client_id", Number(form.client_id));
+      payload.append("amount", toNumber(form.amount));
+      payload.append("payment_date", form.payment_date);
+      payload.append("payment_method", form.payment_method);
+      payload.append("payment_type", form.payment_type);
+      if (form.related_stage) payload.append("related_stage", form.related_stage);
+      payload.append("reference_number", form.reference_number);
+      payload.append("status", "paid");
+      payload.append("notes", form.notes);
+      if (form.receipt) payload.append("receipt", form.receipt);
+      await createPayment(payload);
+      setForm((current) => ({ ...current, amount: "", reference_number: "", notes: "", receipt: null }));
+      load();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const removePayment = async (payment) => {
+    if (!window.confirm("Delete this client payment?")) return;
+    await deletePayment(payment.id);
     load();
   };
 
   return <div className="space-y-6">
     <div className="flex justify-end">
-      <Button form="client-payment-form">Add Payment</Button>
+      <Button form="client-payment-form" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Add Payment"}</Button>
     </div>
     <Card className="p-5">
       <h2 className="mb-4 text-lg font-bold">Add Client Payment</h2>
@@ -71,7 +86,7 @@ export default function ProjectClientPayments() {
         <FormField label="Reference number"><input name="reference_number" value={form.reference_number} onChange={updateField} className={fieldInputClass} /></FormField>
         <FormField label="Receipt"><input type="file" onChange={updateFile} className={fieldInputClass} /></FormField>
         <FormField label="Notes" className="lg:col-span-3"><input name="notes" value={form.notes} onChange={updateField} className={fieldInputClass} /></FormField>
-        <div className="lg:col-span-3"><Button disabled={!selectedProject || !form.amount}>Save Payment</Button></div>
+        <div className="lg:col-span-3"><Button disabled={!selectedProject || !form.amount || isSubmitting}>{isSubmitting ? "Saving..." : "Save Payment"}</Button></div>
       </form>
     </Card>
     <Card className="p-5">
@@ -86,6 +101,10 @@ export default function ProjectClientPayments() {
         { key: "method", label: "Method" },
         { key: "referenceNumber", label: "Reference" },
         { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
+        { key: "actions", label: "Actions", render: (row) => <div className="flex flex-wrap gap-2">
+          <Link to={`/payments/${row.id}/edit`}><Button variant="outline" className="gap-2 px-3 py-2 text-xs"><Edit3 size={14} />Edit</Button></Link>
+          <Button type="button" variant="danger" onClick={() => removePayment(row)} className="gap-2 px-3 py-2 text-xs"><Trash2 size={14} />Delete</Button>
+        </div> },
       ]} rows={payments} empty="No client payments yet." />
     </Card>
   </div>;

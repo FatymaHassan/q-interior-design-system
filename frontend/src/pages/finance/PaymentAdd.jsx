@@ -30,6 +30,7 @@ export default function PaymentAdd() {
   const [invoices, setInvoices] = useState([]);
   const [form, setForm] = useState(emptyPayment);
   const [status, setStatus] = useState("loading");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     Promise.all([getProjects(), getClients(), getSuppliers(), getInvoices()]).then(([projectData, clientData, supplierData, invoiceData]) => {
@@ -46,15 +47,21 @@ export default function PaymentAdd() {
 
   const submitPayment = async (event) => {
     event.preventDefault();
-    await createPayment({
-      ...form,
-      project_id: form.project_id ? Number(form.project_id) : null,
-      client_id: isClientPayment(form.type) && form.client_id ? Number(form.client_id) : null,
-      supplier_id: isSupplierPayment(form.type) && form.supplier_id ? Number(form.supplier_id) : null,
-      invoice_id: form.invoice_id ? Number(form.invoice_id) : null,
-      amount: toNumber(form.amount),
-    });
-    navigate("/payments");
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await createPayment({
+        ...form,
+        project_id: form.project_id ? Number(form.project_id) : null,
+        client_id: isClientPayment(form.type) && form.client_id ? Number(form.client_id) : null,
+        supplier_id: isSupplierPayment(form.type) && form.supplier_id ? Number(form.supplier_id) : null,
+        invoice_id: form.invoice_id ? Number(form.invoice_id) : null,
+        amount: toNumber(form.amount),
+      });
+      navigate("/payments");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const previewAmount = toNumber(form.amount);
@@ -85,7 +92,7 @@ export default function PaymentAdd() {
         <FormField label="Reference number"><input name="reference_number" value={form.reference_number} onChange={updateField} placeholder="Receipt, transfer, or invoice reference" className={fieldInputClass} /></FormField>
         <FormField label="Status"><select name="status" value={form.status} onChange={updateField} className={fieldInputClass}><option value="paid">Paid</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option></select></FormField>
         <FormField label="Notes" className="lg:col-span-2"><textarea name="notes" value={form.notes} onChange={updateField} rows="3" className={fieldInputClass} /></FormField>
-        <div className="lg:col-span-2"><FinanceFormActions cancelTo="/payments" submitLabel="Save Payment" disabled={status !== "connected"} /></div>
+        <div className="lg:col-span-2"><FinanceFormActions cancelTo="/payments" submitLabel={isSubmitting ? "Saving..." : "Save Payment"} disabled={status !== "connected" || isSubmitting} /></div>
       </form>
     </FinanceSection>
   </div>;

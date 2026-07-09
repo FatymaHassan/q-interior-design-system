@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
+use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\User;
@@ -49,14 +50,18 @@ class FinanceConsistencyTest extends TestCase
         $this->assertSame(20.0, (float) $snapshotProject->contractSnapshot->profit_percentage);
         $this->assertSame(25.0, (float) $snapshotProject->contractSnapshot->deposit_percentage);
 
-        $this->postJson('/api/payments', [
+        $clientPaymentPayload = [
             'project_id' => $project['id'],
             'client_id' => $client->id,
             'type' => 'client',
             'amount' => 300.50,
             'status' => 'paid',
             'payment_date' => now()->toDateString(),
-        ])->assertSuccessful();
+        ];
+
+        $this->postJson('/api/payments', $clientPaymentPayload)->assertSuccessful();
+        $this->postJson('/api/payments', $clientPaymentPayload)->assertSuccessful();
+        $this->assertSame(1, Payment::clientRevenue()->where('project_id', $project['id'])->where('amount', 300.50)->count());
 
         $this->postJson('/api/expenses', [
             'project_id' => $project['id'],

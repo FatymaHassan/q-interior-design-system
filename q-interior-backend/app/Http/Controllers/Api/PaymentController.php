@@ -57,6 +57,10 @@ class PaymentController extends Controller
         }
         unset($data['receipt']);
 
+        if ($duplicate = $this->recentDuplicate($data)) {
+            return $duplicate->fresh(['project', 'client', 'supplier', 'invoice']);
+        }
+
         $payment = Payment::create($data);
         $this->refreshRelated($payment, $finance);
 
@@ -149,5 +153,23 @@ class PaymentController extends Controller
         if ($payment->supplier) {
             $finance->refreshSupplier($payment->supplier);
         }
+    }
+
+    private function recentDuplicate(array $data): ?Payment
+    {
+        return Payment::query()
+            ->where('type', $data['type'])
+            ->where('amount', $data['amount'])
+            ->where('status', $data['status'] ?? null)
+            ->where('payment_date', $data['payment_date'] ?? null)
+            ->where('project_id', $data['project_id'] ?? null)
+            ->where('client_id', $data['client_id'] ?? null)
+            ->where('supplier_id', $data['supplier_id'] ?? null)
+            ->where('invoice_id', $data['invoice_id'] ?? null)
+            ->where('payment_method', $data['payment_method'] ?? null)
+            ->where('reference_number', $data['reference_number'] ?? null)
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->latest()
+            ->first();
     }
 }
