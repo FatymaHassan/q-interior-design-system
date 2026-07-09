@@ -454,8 +454,17 @@ class EmployeePortalController extends Controller
             $query->where(function ($builder) {
                 $builder
                     ->where('document_category', 'Photo')
-                    ->orWhere('file_type', 'like', 'image/%')
-                    ->orWhere('file_path', 'regexp', '\\.(jpg|jpeg|png|gif|webp|bmp|svg)$');
+                    ->orWhere(function ($imageBuilder) {
+                        $imageBuilder
+                            ->where(function ($categoryBuilder) {
+                                $categoryBuilder->whereNull('document_category')->orWhere('document_category', 'Other');
+                            })
+                            ->where(function ($fileBuilder) {
+                                $fileBuilder
+                                    ->where('file_type', 'like', 'image/%')
+                                    ->orWhere('file_path', 'regexp', '\\.(jpg|jpeg|png|gif|webp|bmp|svg)$');
+                            });
+                    });
             });
         }
 
@@ -464,14 +473,6 @@ class EmployeePortalController extends Controller
                 $builder
                     ->whereNull('document_category')
                     ->orWhere('document_category', '!=', 'Photo');
-            })->where(function ($builder) {
-                $builder
-                    ->whereNull('file_type')
-                    ->orWhere('file_type', 'not like', 'image/%');
-            })->where(function ($builder) {
-                $builder
-                    ->whereNull('file_path')
-                    ->orWhere('file_path', 'not regexp', '\\.(jpg|jpeg|png|gif|webp|bmp|svg)$');
             });
         }
     }

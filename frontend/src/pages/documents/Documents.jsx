@@ -275,6 +275,7 @@ function PhotoGrid({ photos, onEdit, onDelete }) {
 
 function DocumentImage({ document }) {
   const [src, setSrc] = useState("");
+  const [fallbackSrc, setFallbackSrc] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -285,7 +286,11 @@ function DocumentImage({ document }) {
         if (active) setSrc(url);
       })
       .catch(() => {
-        if (active) setSrc(getDocumentStorageUrl(document.filePath));
+        if (active) {
+          const storageUrl = getDocumentStorageUrl(document.filePath);
+          setFallbackSrc(storageUrl);
+          setSrc(storageUrl);
+        }
       });
 
     return () => {
@@ -294,13 +299,14 @@ function DocumentImage({ document }) {
     };
   }, [document.id]);
 
-  return src ? <img src={src} alt={document.title} onError={() => setSrc("")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
+  return src ? <img src={src} alt={document.title} onError={() => setSrc(src !== fallbackSrc ? fallbackSrc : "")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
 }
 
 function DocumentTable({ documents, onEdit, onDelete }) {
   return <Table
     columns={[
-      { key: "title", label: "Title", render: (document) => <span className="flex items-center gap-2 font-semibold"><FileText size={16} />{document.title}</span> },
+      { key: "preview", label: "Preview", render: (document) => document.isImage ? <span className="block h-12 w-12 overflow-hidden rounded-lg bg-brand-soft"><DocumentImage document={document} /></span> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-soft text-brand-primary"><FileText size={18} /></span> },
+      { key: "title", label: "Title", render: (document) => <span className="flex items-center gap-2 font-semibold">{document.isImage ? <Image size={16} /> : <FileText size={16} />}{document.title}</span> },
       { key: "project", label: "Project" },
       { key: "category", label: "Category" },
       { key: "visibility", label: "Visibility", render: (document) => <Badge>{document.visibility}</Badge> },

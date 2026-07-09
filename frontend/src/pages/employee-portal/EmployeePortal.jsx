@@ -412,7 +412,12 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
         </div>)}
       </div> : <div className="space-y-2">
         {visibleDocuments.map((file) => <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={18} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.project} - {file.category}</span></span></span>
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-50 text-blue-700">
+              {file.isImage ? <EmployeeProjectDocumentImage document={file} /> : <FileText size={18} />}
+            </span>
+            <span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.project} - {file.category}</span></span>
+          </span>
           <span className="flex shrink-0 items-center gap-2">
             <IconButton label="Edit document" onClick={() => startEdit(file)}><Edit3 size={15} /></IconButton>
             <IconButton label="Download document" onClick={() => downloadEmployeePortalProjectDocument(file)}><Download size={15} /></IconButton>
@@ -427,6 +432,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
 
 function EmployeeProjectDocumentImage({ document }) {
   const [src, setSrc] = useState("");
+  const [fallbackSrc, setFallbackSrc] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -437,7 +443,11 @@ function EmployeeProjectDocumentImage({ document }) {
         if (active) setSrc(url);
       })
       .catch(() => {
-        if (active) setSrc(getDocumentStorageUrl(document.filePath));
+        if (active) {
+          const storageUrl = getDocumentStorageUrl(document.filePath);
+          setFallbackSrc(storageUrl);
+          setSrc(storageUrl);
+        }
       });
 
     return () => {
@@ -446,7 +456,7 @@ function EmployeeProjectDocumentImage({ document }) {
     };
   }, [document.id]);
 
-  return src ? <img src={src} alt={document.title} onError={() => setSrc("")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
+  return src ? <img src={src} alt={document.title} onError={() => setSrc(src !== fallbackSrc ? fallbackSrc : "")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
 }
 
 function IconButton({ label, tone = "default", onClick, children }) {

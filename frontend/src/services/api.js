@@ -362,7 +362,9 @@ export function mapDocument(document) {
   const filePath = document.file_path || "";
   const fileType = document.file_type || "file";
   const category = document.document_category || "other";
-  const isPhoto = category.toLowerCase() === "photo" || fileType.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filePath);
+  const normalizedCategory = category.toLowerCase();
+  const isImage = fileType.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filePath);
+  const isPhoto = normalizedCategory === "photo" || (isImage && ["", "other"].includes(normalizedCategory));
 
   return {
     id: document.id,
@@ -372,6 +374,7 @@ export function mapDocument(document) {
     filePath,
     fileType,
     category,
+    isImage,
     isPhoto,
     visibility: document.visibility || "internal",
     uploadedBy: document.uploader?.name || "-",
