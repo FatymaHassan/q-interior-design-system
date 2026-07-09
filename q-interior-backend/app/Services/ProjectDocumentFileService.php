@@ -43,14 +43,10 @@ class ProjectDocumentFileService
         $fileName = $this->downloadName($document);
 
         if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            return $download
-                ? Storage::disk('public')->download($document->file_path, $fileName, [
-                    'Content-Type' => $document->file_type ?: 'application/octet-stream',
-                ])
-                : Storage::disk('public')->response($document->file_path, $fileName, [
-                    'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
-                    'Cache-Control' => 'private, max-age=300',
-                ], 'inline');
+            $content = Storage::disk('public')->get($document->file_path);
+            $mimeType = $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream';
+
+            return $this->binaryResponse($content, $mimeType, $fileName, $download);
         }
 
         abort_unless($document->file_content, 404);
@@ -58,8 +54,13 @@ class ProjectDocumentFileService
         $content = base64_decode($document->file_content, true);
         abort_unless($content !== false, 404);
 
+        return $this->binaryResponse($content, $document->file_type ?: 'application/octet-stream', $fileName, $download);
+    }
+
+    private function binaryResponse(string $content, string $mimeType, string $fileName, bool $download)
+    {
         return response($content, 200, [
-            'Content-Type' => $document->file_type ?: 'application/octet-stream',
+            'Content-Type' => $mimeType,
             'Content-Length' => (string) strlen($content),
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . addslashes($fileName) . '"',
             'Cache-Control' => 'private, max-age=300',

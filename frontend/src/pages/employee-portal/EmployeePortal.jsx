@@ -254,6 +254,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
   const [editingDocument, setEditingDocument] = useState(null);
   const selectedProject = projects.find((project) => String(project.id) === String(selectedProjectId));
   const visibleDocuments = documents.filter((document) => {
@@ -332,6 +333,15 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     onDone();
   };
 
+  const downloadFile = async (document) => {
+    setDownloadError("");
+    try {
+      await downloadEmployeePortalProjectDocument(document);
+    } catch {
+      setDownloadError(`Could not download "${document.title}". The file may be missing from storage.`);
+    }
+  };
+
   return <div className="space-y-5">
     <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
       <PortalCard className="p-5">
@@ -397,6 +407,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
         </div>
       </div>
 
+      {downloadError && <p className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{downloadError}</p>}
       {isPhotos ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleDocuments.map((photo) => <div key={photo.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="aspect-[4/3] bg-slate-100"><EmployeeProjectDocumentImage document={photo} /></div>
@@ -405,7 +416,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
             <p className="mt-1 truncate text-sm text-slate-500">{photo.project}</p>
             <div className="mt-3 flex items-center gap-2">
               <IconButton label="Edit photo" onClick={() => startEdit(photo)}><Edit3 size={15} /></IconButton>
-              <IconButton label="Download photo" onClick={() => downloadEmployeePortalProjectDocument(photo)}><Download size={15} /></IconButton>
+              <IconButton label="Download photo" onClick={() => downloadFile(photo)}><Download size={15} /></IconButton>
               <IconButton label="Delete photo" tone="danger" onClick={() => removeDocument(photo)}><Trash2 size={15} /></IconButton>
             </div>
           </div>
@@ -420,7 +431,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
           </span>
           <span className="flex shrink-0 items-center gap-2">
             <IconButton label="Edit document" onClick={() => startEdit(file)}><Edit3 size={15} /></IconButton>
-            <IconButton label="Download document" onClick={() => downloadEmployeePortalProjectDocument(file)}><Download size={15} /></IconButton>
+            <IconButton label="Download document" onClick={() => downloadFile(file)}><Download size={15} /></IconButton>
             <IconButton label="Delete document" tone="danger" onClick={() => removeDocument(file)}><Trash2 size={15} /></IconButton>
           </span>
         </div>)}

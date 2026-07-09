@@ -17,6 +17,7 @@ export default function Documents({ mode = "documents" }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const [editingDocument, setEditingDocument] = useState(null);
   const confirm = useConfirmDialog();
   const [form, setForm] = useState({
@@ -138,6 +139,15 @@ export default function Documents({ mode = "documents" }) {
     await loadDocuments(selectedProjectId);
   };
 
+  const downloadFile = async (document) => {
+    setDownloadError("");
+    try {
+      await downloadDocumentFile(document);
+    } catch {
+      setDownloadError(`Could not download "${document.title}". The file may be missing from storage.`);
+    }
+  };
+
   const exportCsv = () => {
     const rows = [
       ["Title", "Project", "Category", "File Type", "Path", "Uploaded"],
@@ -236,16 +246,17 @@ export default function Documents({ mode = "documents" }) {
           <option value="">Show all projects</option>
           {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select>
-        {status === "loading" && <span className="text-sm text-brand-muted">Loading {isPhotos ? "photos" : "documents"}...</span>}
-        {status === "error" && <span className="text-sm text-brand-danger">Could not load {isPhotos ? "photos" : "documents"}.</span>}
+      {status === "loading" && <span className="text-sm text-brand-muted">Loading {isPhotos ? "photos" : "documents"}...</span>}
+      {status === "error" && <span className="text-sm text-brand-danger">Could not load {isPhotos ? "photos" : "documents"}.</span>}
       </div>
+      {downloadError && <p className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-brand-danger">{downloadError}</p>}
 
-      {isPhotos ? <PhotoGrid photos={filteredDocuments} onEdit={startEdit} onDelete={removeDocument} /> : <DocumentTable documents={filteredDocuments} onEdit={startEdit} onDelete={removeDocument} />}
+      {isPhotos ? <PhotoGrid photos={filteredDocuments} onEdit={startEdit} onDelete={removeDocument} onDownload={downloadFile} /> : <DocumentTable documents={filteredDocuments} onEdit={startEdit} onDelete={removeDocument} onDownload={downloadFile} />}
     </Card>
   </div>;
 }
 
-function PhotoGrid({ photos, onEdit, onDelete }) {
+function PhotoGrid({ photos, onEdit, onDelete, onDownload }) {
   if (photos.length === 0) {
     return <div className="rounded-xl border border-dashed border-brand-border bg-brand-soft p-10 text-center text-sm text-brand-muted">No project photos uploaded yet.</div>;
   }
@@ -264,7 +275,7 @@ function PhotoGrid({ photos, onEdit, onDelete }) {
           <Badge>{photo.visibility}</Badge>
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => onEdit(photo)} className="inline-flex items-center gap-1 text-sm font-bold text-brand-primary underline"><Edit3 size={15} />Edit</button>
-            <button type="button" onClick={() => downloadDocumentFile(photo)} className="inline-flex items-center gap-1 text-sm font-bold text-brand-primary underline"><Download size={15} />Download</button>
+            <button type="button" onClick={() => onDownload(photo)} className="inline-flex items-center gap-1 text-sm font-bold text-brand-primary underline"><Download size={15} />Download</button>
             <button type="button" onClick={() => onDelete(photo)} className="inline-flex items-center gap-1 text-sm font-bold text-brand-danger underline"><Trash2 size={15} />Delete</button>
           </div>
         </div>
@@ -302,7 +313,7 @@ function DocumentImage({ document }) {
   return src ? <img src={src} alt={document.title} onError={() => setSrc(src !== fallbackSrc ? fallbackSrc : "")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
 }
 
-function DocumentTable({ documents, onEdit, onDelete }) {
+function DocumentTable({ documents, onEdit, onDelete, onDownload }) {
   return <Table
     columns={[
       { key: "preview", label: "Preview", render: (document) => document.isImage ? <span className="block h-12 w-12 overflow-hidden rounded-lg bg-brand-soft"><DocumentImage document={document} /></span> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-soft text-brand-primary"><FileText size={18} /></span> },
@@ -311,7 +322,7 @@ function DocumentTable({ documents, onEdit, onDelete }) {
       { key: "category", label: "Category" },
       { key: "visibility", label: "Visibility", render: (document) => <Badge>{document.visibility}</Badge> },
       { key: "createdAt", label: "Uploaded" },
-      { key: "filePath", label: "File", render: (document) => document.filePath ? <button type="button" onClick={() => downloadDocumentFile(document)} className="font-semibold text-brand-primary underline">Download</button> : "-" },
+      { key: "filePath", label: "File", render: (document) => document.filePath ? <button type="button" onClick={() => onDownload(document)} className="font-semibold text-brand-primary underline">Download</button> : "-" },
       { key: "actions", label: "Actions", render: (document) => <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => onEdit(document)} className="inline-flex items-center gap-1 font-semibold text-brand-primary underline"><Edit3 size={15} />Edit</button>
         <button type="button" onClick={() => onDelete(document)} className="inline-flex items-center gap-1 font-semibold text-brand-danger underline"><Trash2 size={15} />Delete</button>

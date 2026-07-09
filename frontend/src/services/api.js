@@ -1403,11 +1403,7 @@ export function getDocumentDownloadUrl(id) {
 
 export async function downloadDocumentFile(fileRecord) {
   const id = typeof fileRecord === "object" ? fileRecord.id : fileRecord;
-  const title = typeof fileRecord === "object" ? fileRecord.title || `document-${id}` : `document-${id}`;
-  const filePath = typeof fileRecord === "object" ? fileRecord.filePath || fileRecord.file_path || "" : "";
-  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
-  const response = await api.get(`/documents/${id}/download`, { responseType: "blob" });
-  saveBlob(response.data, `${title}${extension}`);
+  await downloadProjectDocumentFile(api, id, fileRecord, `document-${id}`);
 }
 
 export async function getDocumentPreviewBlobUrl(id) {
@@ -1707,11 +1703,7 @@ export async function deleteEmployeePortalProjectDocument(id) {
 
 export async function downloadEmployeePortalProjectDocument(documentRecord) {
   const id = typeof documentRecord === "object" ? documentRecord.id : documentRecord;
-  const title = typeof documentRecord === "object" ? documentRecord.title || `project-document-${id}` : `project-document-${id}`;
-  const filePath = typeof documentRecord === "object" ? documentRecord.filePath || documentRecord.file_path || "" : "";
-  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
-  const response = await employeeApi.get(`/documents/${id}/download`, { responseType: "blob" });
-  saveBlob(response.data, `${title}${extension}`);
+  await downloadProjectDocumentFile(employeeApi, id, documentRecord, `project-document-${id}`);
 }
 
 export async function getEmployeePortalProjectDocumentPreviewBlobUrl(id) {
@@ -1768,15 +1760,48 @@ export async function getEmployeePortalReviews() {
   return response.data;
 }
 
+async function downloadProjectDocumentFile(client, id, fileRecord, fallbackName) {
+  const filename = downloadFileName(fileRecord, fallbackName);
+
+  try {
+    const response = await client.get(`/documents/${id}/download`, { responseType: "blob" });
+    saveBlob(response.data, filename);
+    return;
+  } catch (error) {
+    const filePath = typeof fileRecord === "object" ? fileRecord.filePath || fileRecord.file_path || "" : "";
+    const storageUrl = getDocumentStorageUrl(filePath);
+    if (storageUrl) {
+      triggerBrowserDownload(storageUrl, filename);
+      return;
+    }
+
+    throw error;
+  }
+}
+
+function downloadFileName(fileRecord, fallbackName) {
+  const title = typeof fileRecord === "object" ? fileRecord.title || fallbackName : fallbackName;
+  const filePath = typeof fileRecord === "object" ? fileRecord.filePath || fileRecord.file_path || "" : "";
+  const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
+
+  return extension && !title.toLowerCase().endsWith(extension.toLowerCase()) ? `${title}${extension}` : title;
+}
+
 function saveBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
+  triggerBrowserDownload(url, filename);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function triggerBrowserDownload(url, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default api;
