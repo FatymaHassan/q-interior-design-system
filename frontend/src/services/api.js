@@ -1710,12 +1710,12 @@ export async function downloadEmployeePortalProjectDocument(documentRecord) {
   const title = typeof documentRecord === "object" ? documentRecord.title || `project-document-${id}` : `project-document-${id}`;
   const filePath = typeof documentRecord === "object" ? documentRecord.filePath || documentRecord.file_path || "" : "";
   const extension = filePath.includes(".") ? `.${filePath.split(".").pop()}` : "";
-  const response = await employeeApi.get(`/employee/project-documents/${id}/download`, { responseType: "blob" });
+  const response = await employeeApi.get(`/documents/${id}/download`, { responseType: "blob" });
   saveBlob(response.data, `${title}${extension}`);
 }
 
 export async function getEmployeePortalProjectDocumentPreviewBlobUrl(id) {
-  const response = await employeeApi.get(`/employee/project-documents/${id}/preview`, { responseType: "blob" });
+  const response = await employeeApi.get(`/documents/${id}/preview`, { responseType: "blob" });
   return URL.createObjectURL(response.data);
 }
 
