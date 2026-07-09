@@ -156,8 +156,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employee/project-documents/{document}', [EmployeePortalController::class, 'updateProjectDocument']);
     Route::put('/employee/project-documents/{document}', [EmployeePortalController::class, 'updateProjectDocument']);
     Route::delete('/employee/project-documents/{document}', [EmployeePortalController::class, 'destroyProjectDocument']);
-    Route::get('/employee/project-documents/{document}/preview', [EmployeePortalController::class, 'previewProjectDocument']);
-    Route::get('/employee/project-documents/{document}/download', [EmployeePortalController::class, 'downloadProjectDocument']);
     Route::get('/employee/documents', [EmployeePortalController::class, 'documents']);
     Route::post('/employee/documents', [EmployeePortalController::class, 'storeDocument']);
     Route::get('/employee/documents/{employeeDocument}/download', [EmployeePortalController::class, 'downloadDocument']);

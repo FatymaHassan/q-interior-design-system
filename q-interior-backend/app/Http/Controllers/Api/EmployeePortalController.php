@@ -21,6 +21,7 @@ use App\Models\PerformanceReview;
 use App\Models\Project;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\ProjectDocumentFileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -30,7 +31,9 @@ use Illuminate\Validation\ValidationException;
 
 class EmployeePortalController extends Controller
 {
-    private const DATABASE_FILE_BACKUP_MAX_BYTES = 52428800;
+    public function __construct(private ProjectDocumentFileService $projectDocumentFiles)
+    {
+    }
 
     public function login(Request $request)
     {
@@ -237,7 +240,7 @@ class EmployeePortalController extends Controller
             'file' => 'required|file|max:204800',
         ]);
 
-        $filePayload = $this->storeProjectUploadedFile($request->file('file'));
+        $filePayload = $this->projectDocumentFiles->storeUploadedFile($request->file('file'));
 
         $document = Document::create([
             'project_id' => $data['project_id'],
@@ -272,11 +275,8 @@ class EmployeePortalController extends Controller
         ]);
 
         if ($request->hasFile('file')) {
-            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-                Storage::disk('public')->delete($document->file_path);
-            }
-
-            $data = [...$data, ...$this->storeProjectUploadedFile($request->file('file'))];
+            $this->projectDocumentFiles->deleteFile($document);
+            $data = [...$data, ...$this->projectDocumentFiles->storeUploadedFile($request->file('file'))];
         }
 
         $data['visibility'] = 'internal';
@@ -301,72 +301,10 @@ class EmployeePortalController extends Controller
     {
         $this->employee($request);
 
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
-        }
-
+        $this->projectDocumentFiles->deleteFile($document);
         $document->delete();
 
         return response()->json(['message' => 'Document deleted successfully']);
-    }
-
-    public function downloadProjectDocument(Request $request, Document $document)
-    {
-        $this->employee($request);
-        return $this->projectDocumentFileResponse($document, true);
-    }
-
-    public function previewProjectDocument(Request $request, Document $document)
-    {
-        $this->employee($request);
-        return $this->projectDocumentFileResponse($document, false);
-    }
-
-    private function storeProjectUploadedFile($file): array
-    {
-        $filePath = $file->store('documents', 'public');
-        abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
-
-        $payload = [
-            'file_path' => $filePath,
-            'file_type' => $file->getClientMimeType(),
-            'file_size' => $file->getSize(),
-            'file_content' => null,
-        ];
-
-        if ($file->getSize() <= self::DATABASE_FILE_BACKUP_MAX_BYTES) {
-            $payload['file_content'] = base64_encode(file_get_contents($file->getRealPath()));
-        }
-
-        return $payload;
-    }
-
-    private function projectDocumentFileResponse(Document $document, bool $download)
-    {
-        abort_unless($document->file_path || $document->file_content, 404);
-
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            return $download
-                ? Storage::disk('public')->download($document->file_path, $this->projectDocumentDownloadName($document), [
-                    'Content-Type' => $document->file_type ?: 'application/octet-stream',
-                ])
-                : Storage::disk('public')->response($document->file_path, $this->projectDocumentDownloadName($document), [
-                    'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
-                    'Cache-Control' => 'private, max-age=300',
-                ], 'inline');
-        }
-
-        abort_unless($document->file_content, 404);
-
-        $content = base64_decode($document->file_content, true);
-        abort_unless($content !== false, 404);
-
-        return response($content, 200, [
-            'Content-Type' => $document->file_type ?: 'application/octet-stream',
-            'Content-Length' => (string) strlen($content),
-            'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . addslashes($this->projectDocumentDownloadName($document)) . '"',
-            'Cache-Control' => 'private, max-age=300',
-        ]);
     }
 
     public function storeDocument(Request $request)
@@ -396,16 +334,6 @@ class EmployeePortalController extends Controller
         ]);
 
         return $document->load('uploader');
-    }
-
-    private function projectDocumentDownloadName(Document $document): string
-    {
-        $extension = pathinfo($document->file_path, PATHINFO_EXTENSION);
-        $title = preg_replace('/[^A-Za-z0-9 _.-]/', '', $document->title ?: 'project-document-' . $document->id);
-
-        return $extension && ! str_ends_with(strtolower($title), '.' . strtolower($extension))
-            ? $title . '.' . $extension
-            : $title;
     }
 
     public function downloadDocument(Request $request, EmployeeDocument $employeeDocument)
