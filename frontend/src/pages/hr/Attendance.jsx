@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Edit3, Plus, Save, Trash2, X } from "lucide-react";
+import ActionButton from "../../components/ui/ActionButton";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Table from "../../components/ui/Table";
@@ -119,8 +120,8 @@ export default function Attendance() {
         { key: "method", label: "Method" },
         { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
         { key: "actions", label: "Actions", render: (row) => <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" className="h-10 w-10 px-0 py-0" title="Edit attendance" aria-label="Edit attendance" onClick={() => editAttendance(row)}><Edit3 size={16} /></Button>
-          <Button type="button" variant="danger" className="h-10 w-10 px-0 py-0" title="Delete attendance" aria-label="Delete attendance" onClick={() => removeAttendance(row)}><Trash2 size={16} /></Button>
+          <ActionButton title="Edit attendance" aria-label="Edit attendance" tone="edit" onClick={() => editAttendance(row)}><Edit3 /></ActionButton>
+          <ActionButton title="Delete attendance" aria-label="Delete attendance" tone="delete" onClick={() => removeAttendance(row)}><Trash2 /></ActionButton>
         </div> },
       ]} rows={attendances} empty="No attendance records yet." />
     </SectionCard>
