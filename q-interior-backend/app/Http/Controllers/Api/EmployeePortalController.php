@@ -232,7 +232,7 @@ class EmployeePortalController extends Controller
             'title' => 'required|string|max:255',
             'document_category' => 'nullable|string|max:255',
             'visibility' => 'nullable|in:internal,client',
-            'file' => 'required|file|max:102400',
+            'file' => 'required|file|max:204800',
         ]);
 
         $filePath = $request->file('file')->store('documents', 'public');
@@ -268,7 +268,7 @@ class EmployeePortalController extends Controller
             'project_id' => 'required|exists:projects,id',
             'title' => 'required|string|max:255',
             'document_category' => 'nullable|string|max:255',
-            'file' => 'nullable|file|max:102400',
+            'file' => 'nullable|file|max:204800',
         ]);
 
         if ($request->hasFile('file')) {

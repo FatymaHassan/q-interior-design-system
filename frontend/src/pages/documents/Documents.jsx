@@ -29,8 +29,8 @@ export default function Documents({ mode = "documents" }) {
 
   const selectedProject = projects.find((project) => String(project.id) === String(selectedProjectId));
 
-  const loadDocuments = async (projectId = selectedProjectId) => {
-    setStatus("loading");
+  const loadDocuments = async (projectId = selectedProjectId, options = {}) => {
+    if (!options.silent) setStatus("loading");
     try {
       const data = await getDocuments({
         kind: isPhotos ? "photo" : "document",
@@ -39,7 +39,7 @@ export default function Documents({ mode = "documents" }) {
       setDocuments(data);
       setStatus("connected");
     } catch {
-      setStatus("error");
+      if (!options.silent) setStatus("error");
     }
   };
 
@@ -64,6 +64,14 @@ export default function Documents({ mode = "documents" }) {
     setEditingDocument(null);
     setForm((current) => ({ ...current, project_id: selectedProjectId, document_category: isPhotos ? "Photo" : "Design File", file: null }));
     loadDocuments(selectedProjectId);
+  }, [isPhotos, selectedProjectId]);
+
+  useEffect(() => {
+    const refreshId = setInterval(() => {
+      loadDocuments(selectedProjectId, { silent: true });
+    }, 15000);
+
+    return () => clearInterval(refreshId);
   }, [isPhotos, selectedProjectId]);
 
   const filteredDocuments = useMemo(() => {
@@ -197,6 +205,7 @@ export default function Documents({ mode = "documents" }) {
           className={fieldInputClass}
         >
           <option>Design File</option>
+          <option>Drawing</option>
           <option>Contract</option>
           <option>Receipt</option>
           <option>Invoice</option>

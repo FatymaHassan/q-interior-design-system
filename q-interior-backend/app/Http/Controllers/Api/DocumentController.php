@@ -51,7 +51,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'title' => 'required|string|max:255',
-            'file' => 'nullable|file|max:25600',
+            'file' => 'nullable|file|max:204800',
             'file_path' => 'nullable|string|max:255',
             'file_type' => 'nullable|string|max:255',
             'document_category' => 'nullable|string|max:255',
@@ -91,7 +91,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'project_id' => 'nullable|exists:projects,id',
             'title' => 'sometimes|required|string|max:255',
-            'file' => 'nullable|file|max:25600',
+            'file' => 'nullable|file|max:204800',
             'file_path' => 'nullable|string|max:255',
             'file_type' => 'nullable|string|max:255',
             'document_category' => 'nullable|string|max:255',

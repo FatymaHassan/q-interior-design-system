@@ -29,8 +29,8 @@ export default function EmployeePortal() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
-    setLoading(true);
+  const load = (options = {}) => {
+    if (!options.silent) setLoading(true);
     return Promise.all([
       getEmployeePortalDashboard(),
       getEmployeePortalAttendance(),
@@ -45,10 +45,19 @@ export default function EmployeePortal() {
       setReviews(reviewData);
       setNotice("");
     }).catch((error) => setNotice(error.response?.data?.message || "Employee portal data could not be loaded."))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!options.silent) setLoading(false);
+      });
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const refreshId = setInterval(() => {
+      load({ silent: true });
+    }, 15000);
+
+    return () => clearInterval(refreshId);
+  }, []);
 
   const signOut = async () => {
     await employeePortalLogout();
