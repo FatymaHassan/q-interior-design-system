@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
 import {
@@ -34,6 +35,7 @@ const emptyMaterial = { code: "", name: "", material_category_id: "", supplier_i
 const emptySupplier = { name: "", category: "General", contact_person: "", email: "", phone: "", address: "", city: "", payment_terms: "", opening_balance: 0, status: "Active", notes: "" };
 
 export default function InventoryModule() {
+  const confirm = useConfirmDialog();
   const [active, setActive] = useState("Dashboard");
   const [overview, setOverview] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -137,6 +139,39 @@ export default function InventoryModule() {
     load();
   };
 
+  const removeMaterialCategory = async (category) => {
+    const ok = await confirm({
+      title: "Delete material category?",
+      message: `Delete ${category.name}? This cannot be undone.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    await deleteMaterialCategory(category.id);
+    load();
+  };
+
+  const removeMaterial = async (material) => {
+    const ok = await confirm({
+      title: "Delete material?",
+      message: `Delete ${material.name}? This cannot be undone.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    await deleteMaterial(material.id);
+    load();
+  };
+
+  const removeInventorySupplier = async (supplier) => {
+    const ok = await confirm({
+      title: "Delete supplier?",
+      message: `Delete supplier ${supplier.name}? This cannot be undone.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    await deleteSupplier(supplier.id);
+    load();
+  };
+
   return <div className="space-y-6">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
@@ -163,7 +198,7 @@ export default function InventoryModule() {
           { key: "name", label: "Category" },
           { key: "description", label: "Description" },
           { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
-          { key: "actions", label: "Actions", render: (row) => <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => window.confirm(`Delete ${row.name}?`) && deleteMaterialCategory(row.id).then(load)}>Delete</Button> },
+          { key: "actions", label: "Actions", render: (row) => <Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeMaterialCategory(row)}>Delete</Button> },
         ]} rows={categories} />
       </div>
     </Card>}
@@ -194,7 +229,7 @@ export default function InventoryModule() {
           { key: "minimumStock", label: "Minimum" },
           { key: "purchasePrice", label: "Cost", render: (row) => currency(row.purchasePrice) },
           { key: "stockStatus", label: "Status", render: (row) => <Badge>{row.stockStatus}</Badge> },
-          { key: "actions", label: "Actions", render: (row) => <div className="flex gap-2"><Button variant="outline" className="px-3 py-2" onClick={() => { setEditingMaterial(row); setMaterialForm({ ...emptyMaterial, ...row.raw }); }}>Edit</Button><Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => window.confirm(`Delete ${row.name}?`) && deleteMaterial(row.id).then(load)}>Delete</Button></div> },
+          { key: "actions", label: "Actions", render: (row) => <div className="flex gap-2"><Button variant="outline" className="px-3 py-2" onClick={() => { setEditingMaterial(row); setMaterialForm({ ...emptyMaterial, ...row.raw }); }}>Edit</Button><Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeMaterial(row)}>Delete</Button></div> },
         ]} rows={materials} />
       </Card>
     </div>}
@@ -276,7 +311,7 @@ export default function InventoryModule() {
           { key: "phone", label: "Phone" },
           { key: "balance", label: "Balance", render: (row) => currency(row.balance) },
           { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
-          { key: "actions", label: "Actions", render: (row) => <div className="flex gap-2"><Button variant="outline" className="px-3 py-2" onClick={() => { setEditingSupplier(row); setSupplierForm({ ...emptySupplier, ...row.raw }); }}>Edit</Button><Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => window.confirm(`Delete ${row.name}?`) && deleteSupplier(row.id).then(load)}>Delete</Button></div> },
+          { key: "actions", label: "Actions", render: (row) => <div className="flex gap-2"><Button variant="outline" className="px-3 py-2" onClick={() => { setEditingSupplier(row); setSupplierForm({ ...emptySupplier, ...row.raw }); }}>Edit</Button><Button variant="outline" className="px-3 py-2 text-brand-danger" onClick={() => removeInventorySupplier(row)}>Delete</Button></div> },
         ]} rows={suppliers} />
       </Card>
     </div>}

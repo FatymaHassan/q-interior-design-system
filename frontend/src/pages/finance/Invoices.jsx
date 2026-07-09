@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { createInvoice, deleteInvoice, downloadInvoicePdf, getClients, getInvoices, getProjects, getSuppliers, sendInvoiceReminder, updateInvoice } from "../../services/api";
 import { formatCurrency, toNumber } from "../../utils/numberFormat";
@@ -35,6 +36,7 @@ export default function Invoices({ mode = "list" }) {
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [status, setStatus] = useState("loading");
   const [filterStatus, setFilterStatus] = useState("");
+  const confirm = useConfirmDialog();
 
   const loadData = () => Promise.all([getInvoices(filterStatus ? { status: filterStatus } : {}), getClients(), getProjects(), getSuppliers()])
     .then(([invoiceData, clientData, projectData, supplierData]) => {
@@ -107,7 +109,11 @@ export default function Invoices({ mode = "list" }) {
   };
 
   const removeInvoice = async (invoice) => {
-    if (!window.confirm(`Delete invoice ${invoice.number}?`)) return;
+    const ok = await confirm({
+      title: "Delete invoice?",
+      message: `Delete invoice ${invoice.number}? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deleteInvoice(invoice.id);
     if (editingInvoice?.id === invoice.id) resetForm();
     loadData();

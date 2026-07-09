@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
 import { approveTask, createTask, deleteTask, getEmployees, getProjects, getTaskDailySummary, getTasks, rejectTask, updateTaskStatus, uploadTaskAttachment } from "../../services/api";
@@ -16,6 +17,7 @@ export default function DailyTasks() {
   const [projects, setProjects] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(emptyTask);
+  const confirm = useConfirmDialog();
 
   const load = () => Promise.all([getTasks(), getTaskDailySummary(), getProjects(), getEmployees({ status: "Active" })])
     .then(([taskData, summaryData, projectData, employeeData]) => {
@@ -77,7 +79,11 @@ export default function DailyTasks() {
   };
 
   const removeTask = async (task) => {
-    if (!window.confirm(`Delete task "${task.title}"?`)) return;
+    const ok = await confirm({
+      title: "Delete task?",
+      message: `Delete task "${task.title}"? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deleteTask(task.id);
     load();
   };

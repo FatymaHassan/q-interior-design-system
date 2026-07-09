@@ -2,17 +2,23 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import PaymentList from "./PaymentList";
 import { deletePayment, getPayments } from "./paymentApi";
 
 export default function Payments() {
   const [payments, setPayments] = useState([]);
+  const confirm = useConfirmDialog();
   useEffect(() => {
     loadPayments();
   }, []);
   const loadPayments = () => getPayments().then(setPayments).catch(() => setPayments([]));
   const removePayment = async (payment) => {
-    if (!window.confirm(`Delete payment ${payment.amount.toLocaleString()}?`)) return;
+    const ok = await confirm({
+      title: "Delete payment?",
+      message: `Delete payment ${payment.amount.toLocaleString()}? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deletePayment(payment.id);
     loadPayments();
   };

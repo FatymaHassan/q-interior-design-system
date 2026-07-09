@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { addProjectMember, getClients, getEmployees, getProjectMembers, getProjectStages, removeProjectMember } from "../../services/api";
 import { toNumber } from "../../utils/numberFormat";
@@ -40,6 +41,7 @@ export default function ProjectEdit() {
   const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const confirm = useConfirmDialog();
 
   useEffect(() => {
     Promise.all([getProject(id), getClients(), getProjectStages(), getEmployees({ status: "Active" }), getProjectMembers(id)]).then(([project, clientData, stageData, employeeData, projectMemberData]) => {
@@ -135,7 +137,11 @@ export default function ProjectEdit() {
   };
 
   const removeMember = async (member) => {
-    if (!window.confirm(`Remove ${member.employee?.name || member.user?.name || "this member"} from this project?`)) return;
+    const ok = await confirm({
+      title: "Remove project member?",
+      message: `Remove ${member.employee?.name || member.user?.name || "this member"} from this project?`,
+    });
+    if (!ok) return;
     await removeProjectMember(id, member.id);
     setProjectMembers(await getProjectMembers(id));
   };

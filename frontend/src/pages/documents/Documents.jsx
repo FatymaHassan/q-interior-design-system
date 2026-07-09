@@ -3,6 +3,7 @@ import { Download, Edit3, FileText, Image, Search, Trash2, Upload, X } from "luc
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { createDocument, deleteDocument, downloadDocumentFile, getDocumentPreviewBlobUrl, getDocuments, getProjects, updateDocument } from "../../services/api";
 
@@ -17,6 +18,7 @@ export default function Documents({ mode = "documents" }) {
   const [status, setStatus] = useState("loading");
   const [saving, setSaving] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
+  const confirm = useConfirmDialog();
   const [form, setForm] = useState({
     project_id: "",
     title: "",
@@ -118,7 +120,11 @@ export default function Documents({ mode = "documents" }) {
   };
 
   const removeDocument = async (document) => {
-    if (!window.confirm(`Delete "${document.title}"?`)) return;
+    const ok = await confirm({
+      title: `Delete ${isPhotos ? "photo" : "document"}?`,
+      message: `Delete "${document.title}"? This file will be removed from the system.`,
+    });
+    if (!ok) return;
     await deleteDocument(document.id);
     if (editingDocument?.id === document.id) resetForm();
     await loadDocuments(selectedProjectId);

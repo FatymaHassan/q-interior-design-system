@@ -4,11 +4,13 @@ import { Link } from "react-router-dom";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import { fieldInputClass } from "../../components/ui/FormField";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { deleteSupplier, getSuppliers } from "../../services/api";
 import { FinanceActionButton, FinanceMetric, FinanceNotice, FinanceSection, money } from "./financeUi";
 
 export default function Suppliers() {
+  const confirm = useConfirmDialog();
   const [suppliers, setSuppliers] = useState([]);
   const [status, setStatus] = useState("loading");
   const [notice, setNotice] = useState("");
@@ -43,7 +45,12 @@ export default function Suppliers() {
   }), [suppliers]);
 
   const removeSupplier = async (supplier) => {
-    if (!window.confirm(`Delete supplier ${supplier.name}?`)) return;
+    const ok = await confirm({
+      title: "Delete supplier?",
+      message: `Delete supplier ${supplier.name}? This cannot be undone.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
     await deleteSupplier(supplier.id);
     setNotice("Supplier deleted successfully.");
     load();

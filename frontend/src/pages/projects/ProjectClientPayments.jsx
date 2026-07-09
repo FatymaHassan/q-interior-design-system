@@ -4,6 +4,7 @@ import { Edit3, Trash2 } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
 import { createPayment, deletePayment, getClients, getPayments, getProjects } from "../../services/api";
@@ -19,6 +20,7 @@ export default function ProjectClientPayments() {
   const [payments, setPayments] = useState([]);
   const [form, setForm] = useState({ project_id: "", client_id: "", payment_date: new Date().toISOString().slice(0, 10), amount: "", payment_method: "cash", payment_type: "Custom Payment", related_stage: "", reference_number: "", notes: "", receipt: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const confirm = useConfirmDialog();
   const selectedProject = useMemo(() => projects.find((project) => String(project.id) === String(form.project_id)), [projects, form.project_id]);
 
   const load = () => Promise.all([getProjects(), getClients(), getPayments()]).then(([projectRows, clientRows, paymentRows]) => {
@@ -64,7 +66,11 @@ export default function ProjectClientPayments() {
   };
 
   const removePayment = async (payment) => {
-    if (!window.confirm("Delete this client payment?")) return;
+    const ok = await confirm({
+      title: "Delete client payment?",
+      message: "Delete this client payment record? This will update the project payment totals.",
+    });
+    if (!ok) return;
     await deletePayment(payment.id);
     load();
   };

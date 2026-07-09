@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { approveQuotation, deleteQuotation, getQuotationPdfUrl, getQuotations, rejectQuotation, sendQuotation } from "./quotationApi";
 
@@ -12,6 +13,7 @@ export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [notice, setNotice] = useState("");
   const [status, setStatus] = useState("All");
+  const confirm = useConfirmDialog();
 
   const load = () => {
     getQuotations(status === "All" ? {} : { status })
@@ -24,7 +26,11 @@ export default function Quotations() {
   }, [status]);
 
   const remove = async (quotation) => {
-    if (!window.confirm(`Delete ${quotation.quotationNumber}?`)) return;
+    const ok = await confirm({
+      title: "Delete quotation?",
+      message: `Delete ${quotation.quotationNumber}? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deleteQuotation(quotation.id);
     load();
   };
@@ -36,7 +42,13 @@ export default function Quotations() {
 
   const decide = async (quotation, action) => {
     const label = action === "approve" ? "approved" : "rejected";
-    if (!window.confirm(`Mark ${quotation.quotationNumber} as ${label}?`)) return;
+    const ok = await confirm({
+      title: `${action === "approve" ? "Approve" : "Reject"} quotation?`,
+      message: `Mark ${quotation.quotationNumber} as ${label}?`,
+      confirmLabel: action === "approve" ? "Approve" : "Reject",
+      tone: "warning",
+    });
+    if (!ok) return;
     if (action === "approve") await approveQuotation(quotation.id, { client_comment: "Recorded by admin" });
     if (action === "reject") await rejectQuotation(quotation.id, { client_comment: "Recorded by admin" });
     load();

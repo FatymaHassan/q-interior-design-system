@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Pencil, Plus, Search, Trash2, XCircle } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Modal from "../../components/ui/Modal";
 import Table from "../../components/ui/Table";
@@ -19,6 +20,7 @@ export default function ExpenseCategories() {
   const [modalOpen, setModalOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirmDialog();
 
   const load = () => {
     setLoading(true);
@@ -61,7 +63,11 @@ export default function ExpenseCategories() {
   };
 
   const remove = async (category) => {
-    if (!window.confirm(`Delete or deactivate ${category.name}?`)) return;
+    const ok = await confirm({
+      title: "Delete category item?",
+      message: `Delete or deactivate ${category.name}? Existing related records may keep this item as history.`,
+    });
+    if (!ok) return;
     await deleteExpenseCategory(category.id);
     load();
   };

@@ -2,18 +2,24 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import ExpenseList from "./ExpenseList";
 import { approveExpense, deleteExpense, getExpenses, rejectExpense } from "./expenseApi";
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
+  const confirm = useConfirmDialog();
   useEffect(() => {
     loadExpenses();
   }, []);
 
   const loadExpenses = () => getExpenses({ expense_type: "project" }).then(setExpenses).catch(() => setExpenses([]));
   const removeExpense = async (expense) => {
-    if (!window.confirm(`Delete expense "${expense.title}"?`)) return;
+    const ok = await confirm({
+      title: "Delete expense?",
+      message: `Delete "${expense.title}" from project expenses? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deleteExpense(expense.id);
     loadExpenses();
   };

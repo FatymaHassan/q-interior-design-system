@@ -4,6 +4,7 @@ import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import ActionButton from "../../components/ui/ActionButton";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { createClient, createUser, deleteUser, getClients, getRoles, getUsers, updateClient, updateUser } from "../../services/api";
 
 const roleAccess = {
@@ -30,6 +31,7 @@ export default function UsersRoles() {
   const [activeMenu, setActiveMenu] = useState("Users List");
   const [status, setStatus] = useState("loading");
   const [notice, setNotice] = useState("");
+  const confirm = useConfirmDialog();
 
   const loadData = () => Promise.all([getUsers(), getRoles(), getClients()]).then(([userData, roleData, clientData]) => {
     setUsers(userData);
@@ -92,7 +94,11 @@ export default function UsersRoles() {
   };
 
   const removeUser = async (user) => {
-    if (!window.confirm(`Delete ${user.name}?`)) return;
+    const ok = await confirm({
+      title: "Delete user?",
+      message: `Delete ${user.name} and remove their system access?`,
+    });
+    if (!ok) return;
     await deleteUser(user.id);
     loadData();
   };

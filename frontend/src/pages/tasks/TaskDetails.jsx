@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
 import { addTaskComment, deleteTaskAttachment, getDocumentStorageUrl, getTask, updateTaskStatus, uploadTaskAttachment } from "../../services/api";
@@ -12,6 +13,7 @@ export default function TaskDetails() {
   const [task, setTask] = useState(null);
   const [comment, setComment] = useState("");
   const [statusNote, setStatusNote] = useState("");
+  const confirm = useConfirmDialog();
 
   const load = () => getTask(id).then(setTask).catch(() => setTask(null));
 
@@ -47,7 +49,11 @@ export default function TaskDetails() {
   };
 
   const removeAttachment = async (attachment) => {
-    if (!window.confirm("Delete this attachment?")) return;
+    const ok = await confirm({
+      title: "Delete attachment?",
+      message: "Delete this task attachment? This cannot be undone.",
+    });
+    if (!ok) return;
     await deleteTaskAttachment(attachment.id);
     load();
   };

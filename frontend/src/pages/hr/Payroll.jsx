@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Download, Edit3, FileSpreadsheet, FileText, Plus, Trash2, WalletCards } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Modal from "../../components/ui/Modal";
 import Table from "../../components/ui/Table";
 import { approvePayroll, deletePayroll, downloadPayrollExport, generatePayroll, getPayslipUrl, markPayrollPaid, updatePayroll } from "../../services/api";
@@ -30,6 +31,7 @@ export default function Payroll() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPayroll, setEditingPayroll] = useState(null);
   const [filters, setFilters] = useState({ employee_id: "", month: "", month_from: "", month_to: "", year: "", approval_status: "", payment_status: "" });
+  const confirm = useConfirmDialog();
 
   useEffect(() => {
     setPayrollForm((current) => ({ ...current, employee_id: current.employee_id || employees[0]?.id || "" }));
@@ -97,7 +99,11 @@ export default function Payroll() {
   };
 
   const removePayroll = async (row) => {
-    if (!window.confirm(`Delete payroll for ${row.employee?.name || "this employee"}?`)) return;
+    const ok = await confirm({
+      title: "Delete payroll?",
+      message: `Delete payroll for ${row.employee?.name || "this employee"}? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deletePayroll(row.id);
     reload();
   };

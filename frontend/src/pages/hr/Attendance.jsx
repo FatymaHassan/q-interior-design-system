@@ -3,6 +3,7 @@ import { Edit3, Plus, Save, Trash2, X } from "lucide-react";
 import ActionButton from "../../components/ui/ActionButton";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
 import { createManualAttendance, deleteAttendance, getAttendances, updateAttendance } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
@@ -16,6 +17,7 @@ export default function Attendance() {
   const [editingId, setEditingId] = useState(null);
   const [attendances, setAttendances] = useState([]);
   const [attendanceNotice, setAttendanceNotice] = useState("");
+  const confirm = useConfirmDialog();
 
   const loadAttendances = () => getAttendances(filters)
     .then((rows) => {
@@ -59,7 +61,11 @@ export default function Attendance() {
   };
 
   const removeAttendance = async (row) => {
-    if (!window.confirm(`Delete attendance for ${row.employee?.name || "employee"} on ${dateOnly(row.date)}?`)) return;
+    const ok = await confirm({
+      title: "Delete attendance?",
+      message: `Delete attendance for ${row.employee?.name || "employee"} on ${dateOnly(row.date)}? This removes it from admin and employee portal records.`,
+    });
+    if (!ok) return;
     await deleteAttendance(row.id);
     loadAttendances();
   };

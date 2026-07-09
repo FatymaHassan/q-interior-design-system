@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import ProjectList from "./ProjectList";
 import { deleteProject, getProjects } from "./projectApi";
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [status, setStatus] = useState("loading");
+  const confirm = useConfirmDialog();
 
   useEffect(() => {
     let active = true;
@@ -29,7 +31,11 @@ export default function Projects() {
   };
 
   const removeProject = async (project) => {
-    if (!window.confirm(`Delete project "${project.name}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: "Delete project?",
+      message: `Delete "${project.name}" and remove it from projects? This cannot be undone.`,
+    });
+    if (!ok) return;
     await deleteProject(project.id);
     loadProjects();
   };
