@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, CalendarDays, CheckCircle2, Clock, FileText, Home, MapPin, Plane, ReceiptText, ShieldCheck, Wallet } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, Clock, FileText, Home, MapPin } from "lucide-react";
 import Button from "../../components/ui/Button";
-import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import { PortalCard, PortalEmptyState, PortalSectionHeader, PortalShell, PortalSkeleton, PortalStatCard, PortalStatusBadge } from "../../components/portal/PortalShell";
-import { createEmployeePortalLeaveRequest, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalLeaveBalances, getEmployeePortalLeaveRequests, getEmployeePortalPayslips, getEmployeePortalReviews } from "../../services/api";
+import { employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalReviews } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
 
 const navItems = [
   { key: "Dashboard", label: "Home", icon: Home },
   { key: "Check In", label: "Check In", icon: MapPin },
   { key: "Attendance", label: "Attendance", icon: CalendarDays },
-  { key: "Leave", label: "Leave", icon: Plane },
-  { key: "Payslips", label: "Payslips", icon: Wallet },
   { key: "Reviews", label: "Reviews", icon: FileText },
 ];
 
@@ -21,9 +18,6 @@ export default function EmployeePortal() {
   const [active, setActive] = useState("Dashboard");
   const [data, setData] = useState(null);
   const [attendance, setAttendance] = useState(null);
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [leaveBalances, setLeaveBalances] = useState([]);
-  const [payslips, setPayslips] = useState([]);
   const [reviews, setReviews] = useState({ reviews: [], goals: [] });
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -33,16 +27,10 @@ export default function EmployeePortal() {
     return Promise.all([
       getEmployeePortalDashboard(),
       getEmployeePortalAttendance(),
-      getEmployeePortalLeaveRequests(),
-      getEmployeePortalLeaveBalances(),
-      getEmployeePortalPayslips(),
       getEmployeePortalReviews(),
-    ]).then(([dashboard, attendanceData, requestData, balanceData, payslipData, reviewData]) => {
+    ]).then(([dashboard, attendanceData, reviewData]) => {
       setData(dashboard);
       setAttendance(attendanceData);
-      setLeaveRequests(requestData);
-      setLeaveBalances(balanceData);
-      setPayslips(payslipData);
       setReviews(reviewData);
       setNotice("");
     }).catch((error) => setNotice(error.response?.data?.message || "Employee portal data could not be loaded."))
@@ -56,8 +44,6 @@ export default function EmployeePortal() {
     navigate("/login", { replace: true });
   };
 
-  const pendingLeaves = leaveRequests.filter((item) => item.status === "Pending").length;
-
   return <PortalShell
     title="Employee Portal"
     subtitle="Self-service HR"
@@ -66,26 +52,21 @@ export default function EmployeePortal() {
     active={active}
     onNavigate={setActive}
     onLogout={signOut}
-    notificationCount={pendingLeaves}
+    notificationCount={0}
   >
     {notice && <p className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{notice}</p>}
     {loading && !data ? <PortalSkeleton /> : <>
-      {active === "Dashboard" && <Dashboard dashboard={data} leaveBalances={leaveBalances} payslips={payslips} requests={leaveRequests} />}
+      {active === "Dashboard" && <Dashboard dashboard={data} />}
       {active === "Check In" && <CheckInPanel today={data?.today_attendance} employee={data?.employee} onDone={load} />}
       {active === "Attendance" && <AttendancePanel attendance={attendance} />}
-      {active === "Leave" && <LeavePanel requests={leaveRequests} balances={leaveBalances} onDone={load} />}
-      {active === "Payslips" && <PayslipPanel rows={payslips} />}
       {active === "Reviews" && <ReviewPanel data={reviews} />}
     </>}
   </PortalShell>;
 }
 
-function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
+function Dashboard({ dashboard }) {
   const summary = dashboard?.attendance_summary || {};
   const today = dashboard?.today_attendance;
-  const latestPayslip = payslips?.[0];
-  const balance = leaveBalances?.[0];
-  const pending = requests.filter((item) => item.status === "Pending").length;
 
   return <div className="space-y-5">
     <PortalCard className="p-5">
@@ -106,10 +87,10 @@ function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
       <PortalStatCard icon={CheckCircle2} label="Today" value={today?.status || "No entry"} helper={`${today?.check_in || "-"} to ${today?.check_out || "-"}`} tone="green" />
       <PortalStatCard icon={BarChart3} label="Attendance" value={`${summary.attendance_percentage || 0}%`} helper="This month" tone="blue" />
       <PortalStatCard icon={Clock} label="Late" value={`${summary.late_percentage || 0}%`} helper={`${summary.late_days || 0} late days`} tone="amber" />
-      <PortalStatCard icon={Plane} label="Leave" value={balance?.remaining_days ?? "-"} helper={`${pending} pending request`} tone="slate" />
+      <PortalStatCard icon={Clock} label="Early Out" value={summary.early_out_days || 0} helper="This month" tone="slate" />
     </section>
 
-    <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+    <section className="grid grid-cols-1 gap-4">
       <PortalCard className="p-5">
         <PortalSectionHeader title="Today Attendance" subtitle="GPS attendance status and working hours" />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -118,16 +99,6 @@ function Dashboard({ dashboard, leaveBalances, payslips, requests }) {
           <InfoTile label="Check Out" value={today?.check_out || "-"} />
           <InfoTile label="Hours" value={today?.total_hours || "0.00"} />
         </div>
-      </PortalCard>
-      <PortalCard className="p-5">
-        <PortalSectionHeader title="Latest Payslip" subtitle="Payment summary" />
-        {latestPayslip ? <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 p-4">
-          <div>
-            <p className="font-black text-slate-950">{latestPayslip.month}/{latestPayslip.year}</p>
-            <p className="mt-1 text-sm text-slate-500">Net salary: ${Number(latestPayslip.net_salary || 0).toLocaleString()}</p>
-          </div>
-          <PortalStatusBadge>{latestPayslip.payment_status}</PortalStatusBadge>
-        </div> : <PortalEmptyState title="No payslips yet" description="Payslips will appear here when payroll is published." />}
       </PortalCard>
     </section>
   </div>;
@@ -228,7 +199,6 @@ function AttendancePanel({ attendance }) {
       <PortalStatCard icon={CheckCircle2} label="Present" value={summary.present_days || 0} tone="green" />
       <PortalStatCard icon={Clock} label="Late" value={summary.late_days || 0} tone="amber" />
       <PortalStatCard icon={Clock} label="Early Out" value={summary.early_out_days || 0} tone="amber" />
-      <PortalStatCard icon={Plane} label="Leave" value={summary.leave_days || 0} tone="blue" />
       <PortalStatCard icon={BarChart3} label="Attendance" value={`${summary.attendance_percentage || 0}%`} tone="slate" />
     </section>
     <PortalCard className="p-5">
@@ -252,61 +222,6 @@ function AttendanceCard({ row }) {
     <div className="flex items-center justify-between gap-2"><p className="font-black text-slate-950">{row.date}</p><PortalStatusBadge>{row.status}</PortalStatusBadge></div>
     <div className="mt-3 grid grid-cols-3 gap-2 text-sm"><InfoTile label="In" value={row.check_in || "-"} /><InfoTile label="Out" value={row.check_out || "-"} /><InfoTile label="Hours" value={row.total_hours || "0.00"} /></div>
   </div>;
-}
-
-function LeavePanel({ requests, balances, onDone }) {
-  const [form, setForm] = useState({ leave_type: "Annual Leave", start_date: "", end_date: "", reason: "" });
-  const [saving, setSaving] = useState(false);
-  const submit = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    await createEmployeePortalLeaveRequest(form);
-    setForm({ leave_type: "Annual Leave", start_date: "", end_date: "", reason: "" });
-    setSaving(false);
-    onDone();
-  };
-  return <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-    <PortalCard className="p-5">
-      <PortalSectionHeader title="Request Leave" subtitle="Submit a leave request for HR approval" />
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {balances.map((item) => <InfoTile key={item.id} label={item.leave_type} value={`${item.remaining_days} days`} />)}
-      </div>
-      <form onSubmit={submit} className="space-y-3">
-        <FormField label="Leave type"><select value={form.leave_type} onChange={(event) => setForm({ ...form, leave_type: event.target.value })} className={fieldInputClass}><option>Annual Leave</option><option>Sick Leave</option><option>Unpaid Leave</option><option>Emergency Leave</option><option>Other</option></select></FormField>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <FormField label="Start date"><input type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} className={fieldInputClass} required /></FormField>
-          <FormField label="End date"><input type="date" value={form.end_date} onChange={(event) => setForm({ ...form, end_date: event.target.value })} className={fieldInputClass} required /></FormField>
-        </div>
-        <FormField label="Reason"><textarea value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} placeholder="Reason" className={fieldInputClass} rows="4" /></FormField>
-        <Button className="w-full" disabled={saving}>{saving ? "Submitting..." : "Submit Request"}</Button>
-      </form>
-    </PortalCard>
-    <PortalCard className="p-5">
-      <PortalSectionHeader title="Leave Requests" subtitle="Your request history" />
-      <div className="space-y-3">
-        {requests.map((request) => <div key={request.id} className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-950">{request.leave_type}</p><p className="mt-1 text-sm text-slate-500">{request.start_date} to {request.end_date} - {request.total_days} days</p></div><PortalStatusBadge>{request.status}</PortalStatusBadge></div>
-          {request.reason && <p className="mt-3 text-sm text-slate-600">{request.reason}</p>}
-          {request.rejection_reason && <p className="mt-2 text-sm font-bold text-red-600">{request.rejection_reason}</p>}
-        </div>)}
-        {requests.length === 0 && <PortalEmptyState title="No leave requests yet" description="Submitted leave requests will appear here." />}
-      </div>
-    </PortalCard>
-  </div>;
-}
-
-function PayslipPanel({ rows }) {
-  return <PortalCard className="p-5">
-    <PortalSectionHeader title="Payslips" subtitle="Payroll documents and payment status" />
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {rows.map((row) => <div key={row.id} className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-2"><p className="font-black text-slate-950">{row.month}/{row.year}</p><PortalStatusBadge>{row.payment_status}</PortalStatusBadge></div>
-        <p className="mt-3 text-2xl font-black text-slate-950">${Number(row.net_salary || 0).toLocaleString()}</p>
-        <p className="mt-1 text-sm text-slate-500">Approval: {row.approval_status}</p>
-      </div>)}
-      {rows.length === 0 && <PortalEmptyState title="No payslips yet" description="Payslips will appear after payroll is processed." />}
-    </div>
-  </PortalCard>;
 }
 
 function ReviewPanel({ data }) {

@@ -31,7 +31,7 @@ export default function EmployeeLogin() {
         <div>
           <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/12 bg-white/10 text-brand-gold"><BriefcaseBusiness size={22} /></div>
           <p className="mt-8 text-xs font-black uppercase tracking-[0.18em] text-brand-gold">Employee Portal</p>
-          <h1 className="mt-3 max-w-md text-4xl font-black leading-tight">Fast HR self-service for attendance, leave, payslips, and reviews.</h1>
+          <h1 className="mt-3 max-w-md text-4xl font-black leading-tight">Fast HR self-service for attendance, working hours, and reviews.</h1>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {[["GPS attendance", MapPin], ["Working hours", Clock]].map(([label, Icon]) => <div key={label} className="rounded-lg border border-white/10 bg-white/10 p-4">
