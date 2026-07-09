@@ -261,6 +261,59 @@ class EmployeePortalController extends Controller
         return $document->load(['project', 'uploader']);
     }
 
+    public function updateProjectDocument(Request $request, Document $document)
+    {
+        $employee = $this->employee($request);
+        $data = $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'title' => 'required|string|max:255',
+            'document_category' => 'nullable|string|max:255',
+            'file' => 'nullable|file|max:102400',
+        ]);
+
+        if ($request->hasFile('file')) {
+            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
+            }
+
+            $filePath = $request->file('file')->store('documents', 'public');
+            abort_unless($filePath, 500, 'The file could not be saved. Please check storage permissions.');
+
+            $data['file_path'] = $filePath;
+            $data['file_type'] = $request->file('file')->getClientMimeType();
+        }
+
+        $data['visibility'] = 'internal';
+        $data['uploaded_by'] = $request->user()?->id;
+        unset($data['file']);
+        $document->update($data);
+
+        Notification::create([
+            'project_id' => $document->project_id,
+            'title' => 'Project document updated',
+            'message' => $employee->name . ': ' . $document->title,
+            'type' => 'project_document_updated',
+            'module' => 'projects',
+            'link' => '/projects/' . $document->project_id,
+            'is_read' => false,
+        ]);
+
+        return $document->load(['project', 'uploader']);
+    }
+
+    public function destroyProjectDocument(Request $request, Document $document)
+    {
+        $this->employee($request);
+
+        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+            Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return response()->json(['message' => 'Document deleted successfully']);
+    }
+
     public function downloadProjectDocument(Request $request, Document $document)
     {
         $this->employee($request);

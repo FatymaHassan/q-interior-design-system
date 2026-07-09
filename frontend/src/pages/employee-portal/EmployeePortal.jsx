@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, FileText, Home, Image, MapPin, Search, Upload } from "lucide-react";
+import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, Edit3, FileText, Home, Image, MapPin, Search, Trash2, Upload, X } from "lucide-react";
 import Button from "../../components/ui/Button";
+import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { PortalCard, PortalEmptyState, PortalSectionHeader, PortalShell, PortalSkeleton, PortalStatCard, PortalStatusBadge } from "../../components/portal/PortalShell";
-import { createEmployeePortalProjectDocument, downloadEmployeePortalProjectDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalProjectDocumentPreviewBlobUrl, getEmployeePortalProjectDocuments, getEmployeePortalProjects, getEmployeePortalReviews } from "../../services/api";
+import { createEmployeePortalProjectDocument, deleteEmployeePortalProjectDocument, downloadEmployeePortalProjectDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalProjectDocumentPreviewBlobUrl, getEmployeePortalProjectDocuments, getEmployeePortalProjects, getEmployeePortalReviews, updateEmployeePortalProjectDocument } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
 
 const navItems = [
@@ -238,11 +239,13 @@ function AttendanceCard({ row }) {
 
 function DocumentsPanel({ mode, documents, projects, onDone }) {
   const isPhotos = mode === "photos";
+  const confirm = useConfirmDialog();
   const [form, setForm] = useState({ title: "", project_id: "", document_category: isPhotos ? "Photo" : "Design File", file: null });
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [editingDocument, setEditingDocument] = useState(null);
   const selectedProject = projects.find((project) => String(project.id) === String(selectedProjectId));
   const visibleDocuments = documents.filter((document) => {
     const matchesProject = selectedProjectId ? String(document.projectId) === String(selectedProjectId) : true;
@@ -264,7 +267,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
       setUploadError("Please choose a project before uploading.");
       return;
     }
-    if (!form.file) {
+    if (!editingDocument && !form.file) {
       setUploadError("Please choose a file before uploading.");
       return;
     }
@@ -274,10 +277,14 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     payload.append("title", form.title || form.file.name);
     payload.append("project_id", form.project_id);
     payload.append("document_category", isPhotos ? "Photo" : form.document_category);
-    payload.append("file", form.file);
+    if (form.file) payload.append("file", form.file);
     try {
-      await createEmployeePortalProjectDocument(payload);
-      setForm({ title: "", project_id: selectedProjectId || "", document_category: isPhotos ? "Photo" : "Design File", file: null });
+      if (editingDocument) {
+        await updateEmployeePortalProjectDocument(editingDocument.id, payload);
+      } else {
+        await createEmployeePortalProjectDocument(payload);
+      }
+      resetForm();
       event.target.reset();
       onDone();
     } catch (error) {
@@ -285,6 +292,35 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setEditingDocument(null);
+    setUploadError("");
+    setForm({ title: "", project_id: selectedProjectId || projects[0]?.id || "", document_category: isPhotos ? "Photo" : "Design File", file: null });
+  };
+
+  const startEdit = (document) => {
+    setEditingDocument(document);
+    setUploadError("");
+    setForm({
+      title: document.title,
+      project_id: document.projectId ? String(document.projectId) : "",
+      document_category: isPhotos ? "Photo" : document.category || "Design File",
+      file: null,
+    });
+  };
+
+  const removeDocument = async (document) => {
+    const ok = await confirm({
+      title: `Delete ${isPhotos ? "photo" : "document"}?`,
+      message: `Delete "${document.title}"? This file will be removed from the project.`,
+      confirmLabel: "Delete",
+    });
+    if (!ok) return;
+    await deleteEmployeePortalProjectDocument(document.id);
+    if (editingDocument?.id === document.id) resetForm();
+    onDone();
   };
 
   return <div className="space-y-5">
@@ -309,7 +345,11 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
     </section>
 
     <PortalCard className="p-5">
-      <PortalSectionHeader title={`Upload ${isPhotos ? "Photo" : "Document"}`} subtitle="Choose the project this file belongs to before uploading." />
+      <PortalSectionHeader
+        title={`${editingDocument ? "Edit" : "Upload"} ${isPhotos ? "Photo" : "Document"}`}
+        subtitle={editingDocument ? "Change the title, project, category, or replace the file." : "Choose the project this file belongs to before uploading."}
+        action={editingDocument ? <Button type="button" variant="outline" onClick={resetForm} className="gap-2"><X size={16} />Cancel</Button> : null}
+      />
       {uploadError && <p className="mb-3 rounded-lg border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{uploadError}</p>}
       <form onSubmit={submit} className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_170px_1fr_auto]">
         <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={isPhotos ? "Photo title" : "Document title"} className={inputClass} />
@@ -326,7 +366,7 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
           <option>Other</option>
         </select> : <div className="flex items-center rounded-lg border border-slate-200 bg-blue-50 px-3 py-2.5 text-sm font-black text-blue-700">Photo</div>}
         <input type="file" accept={isPhotos ? "image/*" : undefined} onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} className={inputClass} />
-        <Button disabled={saving || !form.file || !form.project_id} className="gap-2"><Upload size={16} />{saving ? "Uploading..." : "Upload"}</Button>
+        <Button disabled={saving || !form.project_id || (!editingDocument && !form.file)} className="gap-2"><Upload size={16} />{saving ? "Saving..." : editingDocument ? "Save" : "Upload"}</Button>
       </form>
     </PortalCard>
 
@@ -354,13 +394,21 @@ function DocumentsPanel({ mode, documents, projects, onDone }) {
           <div className="p-3">
             <p className="truncate font-black text-slate-950">{photo.title}</p>
             <p className="mt-1 truncate text-sm text-slate-500">{photo.project}</p>
-            <button type="button" onClick={() => downloadEmployeePortalProjectDocument(photo)} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-blue-700"><Download size={15} />Download</button>
+            <div className="mt-3 flex items-center gap-2">
+              <IconButton label="Edit photo" onClick={() => startEdit(photo)}><Edit3 size={15} /></IconButton>
+              <IconButton label="Download photo" onClick={() => downloadEmployeePortalProjectDocument(photo)}><Download size={15} /></IconButton>
+              <IconButton label="Delete photo" tone="danger" onClick={() => removeDocument(photo)}><Trash2 size={15} /></IconButton>
+            </div>
           </div>
         </div>)}
       </div> : <div className="space-y-2">
         {visibleDocuments.map((file) => <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
           <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><FileText size={18} /></span><span className="min-w-0"><span className="block truncate font-black text-slate-950">{file.title}</span><span className="text-sm text-slate-500">{file.project} - {file.category}</span></span></span>
-          <Button type="button" variant="outline" className="gap-2 px-3 py-2" onClick={() => downloadEmployeePortalProjectDocument(file)}><Download size={15} />Download</Button>
+          <span className="flex shrink-0 items-center gap-2">
+            <IconButton label="Edit document" onClick={() => startEdit(file)}><Edit3 size={15} /></IconButton>
+            <IconButton label="Download document" onClick={() => downloadEmployeePortalProjectDocument(file)}><Download size={15} /></IconButton>
+            <IconButton label="Delete document" tone="danger" onClick={() => removeDocument(file)}><Trash2 size={15} /></IconButton>
+          </span>
         </div>)}
       </div>}
       {visibleDocuments.length === 0 && <PortalEmptyState title={isPhotos ? "No photos yet" : "No documents yet"} description={isPhotos ? "Project photos will appear here." : "Project documents will appear here."} />}
@@ -390,6 +438,22 @@ function EmployeeProjectDocumentImage({ document }) {
   }, [document.id]);
 
   return src ? <img src={src} alt={document.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
+}
+
+function IconButton({ label, tone = "default", onClick, children }) {
+  const toneClass = tone === "danger"
+    ? "border-red-100 bg-red-50 text-red-700 hover:bg-red-100"
+    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+
+  return <button
+    type="button"
+    aria-label={label}
+    title={label}
+    onClick={onClick}
+    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${toneClass}`}
+  >
+    {children}
+  </button>;
 }
 
 function ReviewPanel({ data }) {

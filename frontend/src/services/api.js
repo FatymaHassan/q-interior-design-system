@@ -1690,6 +1690,18 @@ export async function createEmployeePortalProjectDocument(payload) {
   return mapDocument(response.data);
 }
 
+export async function updateEmployeePortalProjectDocument(id, payload) {
+  if (payload instanceof FormData && !payload.has("_method")) {
+    payload.append("_method", "PUT");
+  }
+  const response = await employeeApi.post(`/employee/project-documents/${id}`, payload);
+  return mapDocument(response.data);
+}
+
+export async function deleteEmployeePortalProjectDocument(id) {
+  await employeeApi.delete(`/employee/project-documents/${id}`);
+}
+
 export async function downloadEmployeePortalProjectDocument(documentRecord) {
   const id = typeof documentRecord === "object" ? documentRecord.id : documentRecord;
   const title = typeof documentRecord === "object" ? documentRecord.title || `project-document-${id}` : `project-document-${id}`;
