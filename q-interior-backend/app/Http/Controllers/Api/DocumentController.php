@@ -129,6 +129,28 @@ class DocumentController extends Controller
     {
         abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
 
-        return Storage::disk('public')->download($document->file_path);
+        return Storage::disk('public')->download($document->file_path, $this->downloadName($document), [
+            'Content-Type' => $document->file_type ?: 'application/octet-stream',
+        ]);
+    }
+
+    public function preview(Request $request, Document $document)
+    {
+        abort_unless($document->file_path && Storage::disk('public')->exists($document->file_path), 404);
+
+        return Storage::disk('public')->response($document->file_path, $this->downloadName($document), [
+            'Content-Type' => $document->file_type ?: Storage::disk('public')->mimeType($document->file_path) ?: 'application/octet-stream',
+            'Cache-Control' => 'private, max-age=300',
+        ], 'inline');
+    }
+
+    private function downloadName(Document $document): string
+    {
+        $extension = pathinfo($document->file_path, PATHINFO_EXTENSION);
+        $title = preg_replace('/[^A-Za-z0-9 _.-]/', '', $document->title ?: 'document-' . $document->id);
+
+        return $extension && ! str_ends_with(strtolower($title), '.' . strtolower($extension))
+            ? $title . '.' . $extension
+            : $title;
     }
 }

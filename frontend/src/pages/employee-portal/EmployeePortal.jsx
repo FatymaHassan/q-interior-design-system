@@ -4,7 +4,7 @@ import { BarChart3, CalendarDays, CheckCircle2, Clock, Download, Edit3, FileText
 import Button from "../../components/ui/Button";
 import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { PortalCard, PortalEmptyState, PortalSectionHeader, PortalShell, PortalSkeleton, PortalStatCard, PortalStatusBadge } from "../../components/portal/PortalShell";
-import { createEmployeePortalProjectDocument, deleteEmployeePortalProjectDocument, downloadEmployeePortalProjectDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalProjectDocumentPreviewBlobUrl, getEmployeePortalProjectDocuments, getEmployeePortalProjects, getEmployeePortalReviews, updateEmployeePortalProjectDocument } from "../../services/api";
+import { createEmployeePortalProjectDocument, deleteEmployeePortalProjectDocument, downloadEmployeePortalProjectDocument, employeeCheckIn, employeeCheckOut, employeePortalLogout, getDocumentStorageUrl, getEmployeePortalAttendance, getEmployeePortalDashboard, getEmployeePortalProjectDocumentPreviewBlobUrl, getEmployeePortalProjectDocuments, getEmployeePortalProjects, getEmployeePortalReviews, updateEmployeePortalProjectDocument } from "../../services/api";
 import { todayInSomalia } from "../../utils/dateTime";
 
 const navItems = [
@@ -437,7 +437,7 @@ function EmployeeProjectDocumentImage({ document }) {
         if (active) setSrc(url);
       })
       .catch(() => {
-        if (active) setSrc("");
+        if (active) setSrc(getDocumentStorageUrl(document.filePath));
       });
 
     return () => {
@@ -446,7 +446,7 @@ function EmployeeProjectDocumentImage({ document }) {
     };
   }, [document.id]);
 
-  return src ? <img src={src} alt={document.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
+  return src ? <img src={src} alt={document.title} onError={() => setSrc("")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Image size={30} /></div>;
 }
 
 function IconButton({ label, tone = "default", onClick, children }) {

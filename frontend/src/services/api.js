@@ -1408,7 +1408,7 @@ export async function downloadDocumentFile(fileRecord) {
 }
 
 export async function getDocumentPreviewBlobUrl(id) {
-  const response = await api.get(`/documents/${id}/download`, { responseType: "blob" });
+  const response = await api.get(`/documents/${id}/preview`, { responseType: "blob" });
   return URL.createObjectURL(response.data);
 }
 
@@ -1712,7 +1712,7 @@ export async function downloadEmployeePortalProjectDocument(documentRecord) {
 }
 
 export async function getEmployeePortalProjectDocumentPreviewBlobUrl(id) {
-  const response = await employeeApi.get(`/employee/project-documents/${id}/download`, { responseType: "blob" });
+  const response = await employeeApi.get(`/employee/project-documents/${id}/preview`, { responseType: "blob" });
   return URL.createObjectURL(response.data);
 }
 
@@ -1770,8 +1770,10 @@ function saveBlob(blob, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default api;

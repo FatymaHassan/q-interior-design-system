@@ -156,6 +156,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/employee/project-documents/{document}', [EmployeePortalController::class, 'updateProjectDocument']);
     Route::put('/employee/project-documents/{document}', [EmployeePortalController::class, 'updateProjectDocument']);
     Route::delete('/employee/project-documents/{document}', [EmployeePortalController::class, 'destroyProjectDocument']);
+    Route::get('/employee/project-documents/{document}/preview', [EmployeePortalController::class, 'previewProjectDocument']);
     Route::get('/employee/project-documents/{document}/download', [EmployeePortalController::class, 'downloadProjectDocument']);
     Route::get('/employee/documents', [EmployeePortalController::class, 'documents']);
     Route::post('/employee/documents', [EmployeePortalController::class, 'storeDocument']);
@@ -240,6 +241,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/client-messages', [ClientMessageController::class, 'index']);
     Route::post('/projects/{project}/client-messages/reply', [ClientMessageController::class, 'reply']);
     Route::patch('/client-messages/{message}/read', [ClientMessageController::class, 'markRead']);
+    Route::get('/documents/{document}/preview', [DocumentController::class, 'preview']);
     Route::get('/documents/{document}/download', [DocumentController::class, 'download']);
     Route::get('/expense-categories', [ExpenseCategoryController::class, 'index'])->middleware('role:admin,manager,finance,staff');
     Route::post('/expense-categories', [ExpenseCategoryController::class, 'store'])->middleware('role:admin,manager,finance');

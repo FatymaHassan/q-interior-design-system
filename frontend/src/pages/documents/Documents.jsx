@@ -5,7 +5,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import { useConfirmDialog } from "../../components/ui/ConfirmDialog";
 import Table from "../../components/ui/Table";
-import { createDocument, deleteDocument, downloadDocumentFile, getDocumentPreviewBlobUrl, getDocuments, getProjects, updateDocument } from "../../services/api";
+import { createDocument, deleteDocument, downloadDocumentFile, getDocumentPreviewBlobUrl, getDocumentStorageUrl, getDocuments, getProjects, updateDocument } from "../../services/api";
 
 const fieldInputClass = "w-full rounded-xl border border-brand-border bg-white px-4 py-3 text-sm outline-none focus:border-brand-gold";
 
@@ -285,7 +285,7 @@ function DocumentImage({ document }) {
         if (active) setSrc(url);
       })
       .catch(() => {
-        if (active) setSrc("");
+        if (active) setSrc(getDocumentStorageUrl(document.filePath));
       });
 
     return () => {
@@ -294,7 +294,7 @@ function DocumentImage({ document }) {
     };
   }, [document.id]);
 
-  return src ? <img src={src} alt={document.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
+  return src ? <img src={src} alt={document.title} onError={() => setSrc("")} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-brand-muted"><Image size={32} /></div>;
 }
 
 function DocumentTable({ documents, onEdit, onDelete }) {
