@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Edit3, Plus, Save, Trash2, X } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Table from "../../components/ui/Table";
@@ -83,8 +84,8 @@ export default function Attendance() {
         </select>
         <input name="notes" value={form.notes} onChange={updateForm} placeholder="Notes" className={fieldInputClass} />
         <div className="flex gap-2">
-          <Button>{editingId ? "Update" : "Add"}</Button>
-          {editingId && <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(emptyAttendanceForm()); }}>Cancel</Button>}
+          <Button className="gap-2">{editingId ? <Save size={16} /> : <Plus size={16} />}{editingId ? "Update" : "Add"}</Button>
+          {editingId && <Button type="button" variant="outline" className="gap-2" onClick={() => { setEditingId(null); setForm(emptyAttendanceForm()); }}><X size={16} />Cancel</Button>}
         </div>
       </form>
     </SectionCard>
@@ -118,8 +119,8 @@ export default function Attendance() {
         { key: "method", label: "Method" },
         { key: "status", label: "Status", render: (row) => <Badge>{row.status}</Badge> },
         { key: "actions", label: "Actions", render: (row) => <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" className="px-3 py-2 text-xs" onClick={() => editAttendance(row)}>Edit</Button>
-          <Button type="button" variant="danger" className="px-3 py-2 text-xs" onClick={() => removeAttendance(row)}>Delete</Button>
+          <Button type="button" variant="outline" className="h-10 w-10 px-0 py-0" title="Edit attendance" aria-label="Edit attendance" onClick={() => editAttendance(row)}><Edit3 size={16} /></Button>
+          <Button type="button" variant="danger" className="h-10 w-10 px-0 py-0" title="Delete attendance" aria-label="Delete attendance" onClick={() => removeAttendance(row)}><Trash2 size={16} /></Button>
         </div> },
       ]} rows={attendances} empty="No attendance records yet." />
     </SectionCard>
