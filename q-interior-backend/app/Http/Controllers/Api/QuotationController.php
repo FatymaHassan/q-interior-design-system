@@ -351,7 +351,10 @@ class QuotationController extends Controller
             abort_unless($token && PersonalAccessToken::findToken($token), 401);
         }
 
-        $quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'attachments', 'approvals']);
+        // Reconcile legacy/stale line totals before exporting so the PDF always
+        // reflects the current quantity, rate, discount, tax and profit values.
+        $this->recalculateTotals($quotation);
+        $quotation->refresh()->load(['client', 'project', 'sections.rooms.items', 'items', 'attachments', 'approvals']);
 
         return response($this->pdfDocument($quotation))
             ->header('Content-Type', 'application/pdf')
@@ -536,6 +539,25 @@ class QuotationController extends Controller
 
     protected function recalculateTotals(Quotation $quotation): void
     {
+        foreach ($quotation->items()->get() as $item) {
+            $unitType = $item->unit_type ?: ($item->area_m2 ? 'M²' : 'Unit');
+            $quantity = (float) ($item->quantity ?: $item->area_m2 ?: ($unitType === 'Lump Sum' ? 1 : 0));
+            $rate = (float) ($item->rate ?: $item->unit_price ?: 0);
+            $calculated = $this->calculateItemTotal(
+                $unitType,
+                $quantity,
+                $rate,
+                (float) $item->total,
+                (bool) $item->is_manual_total,
+                (float) $item->discount,
+                (float) $item->tax,
+            );
+
+            if (round((float) $item->total, 2) !== round($calculated, 2)) {
+                $item->update(['total' => round($calculated, 2)]);
+            }
+        }
+
         $subtotal = (float) $quotation->items()->sum('total');
         $discount = (float) $quotation->items()->sum('discount');
         $tax = (float) $quotation->items()->sum('tax');
@@ -650,22 +672,25 @@ class QuotationController extends Controller
 
     protected function pdfDocument(Quotation $quotation): string
     {
-        $content = [];
         $logo = $this->pdfImageFromPath(public_path('images/q-interior-logo.jpeg'), 'Logo');
         $images = $this->pdfAttachmentImages($quotation);
-        $this->drawQuotationPage($content, $quotation, (bool) $logo, $images);
+        $pages = $this->drawQuotationPages($quotation, $logo, $images);
 
-        return $this->buildPdf(implode("\n", $content), $logo, $this->flattenPdfImages($images));
+        return $this->buildPdf($pages, $logo, $this->flattenPdfImages($images));
     }
 
-    protected function drawQuotationPage(array &$content, Quotation $quotation, bool $hasLogo = false, array $images = []): void
+    protected function drawQuotationPages(Quotation $quotation, ?array $logo = null, array $images = []): array
     {
-        if ($hasLogo) {
-            $this->pdfImage($content, 'Logo', 42, 748, 82, 82);
+        $pages = [[]];
+        $pageIndex = 0;
+        $content =& $pages[$pageIndex];
+
+        if ($logo) {
+            $this->pdfImageContain($content, $logo, 42, 748, 82, 82);
         }
 
-        $this->pdfText($content, 'Q INTERIOR DESIGN STUDIO', $hasLogo ? 140 : 174, 790, 16, true);
-        $this->pdfText($content, 'Mogadishu, Somalia  |  +252 61 0000000', $hasLogo ? 140 : 190, 772, 9);
+        $this->pdfText($content, 'Q INTERIOR DESIGN STUDIO', $logo ? 140 : 174, 790, 16, true);
+        $this->pdfText($content, 'Mogadishu, Somalia  |  +252 61 0000000', $logo ? 140 : 190, 772, 9);
         $this->line($content, 42, 758, 553, 758);
         $this->pdfText($content, 'QUOTATION', 244, 730, 22, true);
         $this->line($content, 42, 712, 553, 712);
@@ -678,14 +703,98 @@ class QuotationController extends Controller
         $y = 610;
         if (($images['quotation'] ?? []) !== []) {
             $this->pdfText($content, 'PROJECT IMAGES', 42, 616, 10, true);
-            foreach (array_slice($images['quotation'], 0, 3) as $index => $image) {
-                $x = 42 + ($index * 170);
-                $this->rectStroke($content, $x, 514, 154, 82);
-                $this->pdfImage($content, $image['name'], $x + 2, 516, 150, 78);
+            foreach (array_chunk($images['quotation'], 3) as $imageRow) {
+                if ($y < 250) {
+                    $this->startQuotationContinuationPage($pages, $pageIndex, $content, $quotation);
+                    $y = 750;
+                }
+                $imageY = $y - 96;
+                foreach ($imageRow as $index => $image) {
+                    $x = 42 + ($index * 170);
+                    $this->rectStroke($content, $x, $imageY, 154, 82);
+                    $this->pdfImageContain($content, $image, $x + 2, $imageY + 2, 150, 78);
+                }
+                $y -= 104;
             }
-            $y = 480;
         }
 
+        $this->quotationTableHeader($content, $y);
+        $y -= 20;
+
+        $ensureSpace = function (int $height) use (&$pages, &$pageIndex, &$content, &$y, $quotation): void {
+            if ($y - $height >= 72) {
+                return;
+            }
+            $this->startQuotationContinuationPage($pages, $pageIndex, $content, $quotation);
+            $y = 750;
+            $this->quotationTableHeader($content, $y);
+            $y -= 20;
+        };
+
+        $hasSections = $quotation->sections->isNotEmpty();
+        if ($hasSections) {
+            foreach ($quotation->sections as $sectionIndex => $section) {
+                $ensureSpace(18);
+                $this->rect($content, 42, $y, 511, 18, '0.86 0.86 0.86 rg');
+                $this->pdfText($content, strtoupper($section->title), 48, $y + 5, 9, true);
+                $y -= 18;
+                $y = $this->pdfImageStrip($content, $images['sections'][(string) $sectionIndex] ?? [], $y, $ensureSpace);
+                foreach ($section->rooms as $roomIndex => $room) {
+                    $ensureSpace(18);
+                    $this->rect($content, 42, $y, 511, 18, '0.94 0.94 0.94 rg');
+                    $this->pdfText($content, ($roomIndex + 1) . '. ' . $room->title, 56, $y + 5, 9, true);
+                    $y -= 18;
+                    foreach ($room->items as $itemIndex => $item) {
+                        $ensureSpace(18);
+                        $this->scopeRow($content, $item, $y);
+                        $y -= 18;
+                        $y = $this->pdfImageStrip($content, $images['items'][$sectionIndex . '-' . $roomIndex . '-' . $itemIndex] ?? [], $y, $ensureSpace);
+                    }
+                }
+            }
+        } else {
+            foreach ($quotation->items as $item) {
+                $ensureSpace(18);
+                $this->scopeRow($content, $item, $y);
+                $y -= 18;
+            }
+        }
+
+        $ensureSpace(146);
+        $profitLabel = 'Profit ' . number_format((float) $quotation->profit_percentage, 2) . '%';
+        $this->pdfText($content, 'Subtotal', 342, $y - 8, 10, true);
+        $this->pdfText($content, '$' . number_format((float) $quotation->subtotal, 2), 455, $y - 8, 10, true);
+        $this->pdfText($content, $profitLabel, 342, $y - 28, 10, true);
+        $this->pdfText($content, '$' . number_format((float) $quotation->profit_amount, 2), 455, $y - 28, 10, true);
+        $this->rect($content, 326, $y - 58, 227, 24, '0.10 0.12 0.16 rg');
+        $this->pdfText($content, 'GRAND TOTAL', 342, $y - 50, 11, true, '1 1 1 rg');
+        $this->pdfText($content, '$' . number_format((float) ($quotation->grand_total ?: $quotation->total_amount), 2), 455, $y - 50, 11, true, '1 1 1 rg');
+
+        $detailsY = $y - 82;
+        $this->pdfText($content, 'PAYMENT TERMS', 42, $detailsY, 9, true);
+        $this->multiline($content, $quotation->payment_terms ?: "60% advance upon agreement\n30% upon progress payment\n10% final payment", 42, $detailsY - 14, 8, 3);
+        $this->pdfText($content, 'PAYMENT DETAILS', 250, $detailsY, 9, true);
+        $this->pdfText($content, 'Account: ' . ($quotation->payment_account_name ?: '-') . ' | Bank: ' . ($quotation->payment_bank ?: '-'), 250, $detailsY - 14, 8);
+        $this->pdfText($content, 'Account No: ' . ($quotation->payment_account_no ?: '-') . ' | Phone: ' . ($quotation->payment_phone ?: '-'), 250, $detailsY - 28, 8);
+        $this->pdfText($content, 'APPROVAL  Client Signature: ____________________  Date: ____________________', 250, $detailsY - 44, 8, true);
+        $this->pdfText($content, mb_strimwidth('Terms: ' . ($quotation->terms_conditions ?: '-'), 0, 90, '...'), 42, $detailsY - 58, 7);
+        $this->pdfText($content, mb_strimwidth($quotation->footer_note ?: 'Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!', 0, 100, '...'), 90, 18, 8);
+
+        return array_map(fn (array $page) => implode("\n", $page), $pages);
+    }
+
+    protected function startQuotationContinuationPage(array &$pages, int &$pageIndex, array &$content, Quotation $quotation): void
+    {
+        $pageIndex++;
+        $pages[$pageIndex] = [];
+        $content =& $pages[$pageIndex];
+        $this->pdfText($content, 'Q INTERIOR DESIGN STUDIO', 42, 805, 13, true);
+        $this->pdfText($content, 'QUOTATION ' . $quotation->quotation_number . ' - CONTINUED', 285, 805, 10, true);
+        $this->line($content, 42, 790, 553, 790);
+    }
+
+    protected function quotationTableHeader(array &$content, int $y): void
+    {
         $this->rect($content, 42, $y, 511, 22, '0.10 0.12 0.16 rg');
         $this->pdfText($content, 'Description / Scope of Work', 48, $y + 7, 9, true, '1 1 1 rg');
         $this->pdfText($content, 'Qty / Unit', 306, $y + 7, 9, true, '1 1 1 rg');
@@ -694,56 +803,6 @@ class QuotationController extends Controller
         $this->pdfText($content, 'Tax', 450, $y + 7, 9, true, '1 1 1 rg');
         $this->pdfText($content, 'Total', 488, $y + 7, 9, true, '1 1 1 rg');
         $this->pdfText($content, 'Notes', 535, $y + 7, 8, true, '1 1 1 rg');
-        $y -= 20;
-
-        $hasSections = $quotation->sections->isNotEmpty();
-        if ($hasSections) {
-            foreach ($quotation->sections as $sectionIndex => $section) {
-                $this->rect($content, 42, $y, 511, 18, '0.86 0.86 0.86 rg');
-                $this->pdfText($content, strtoupper($section->title), 48, $y + 5, 9, true);
-                $y -= 18;
-                $y = $this->pdfImageStrip($content, $images['sections'][(string) $sectionIndex] ?? [], $y);
-                foreach ($section->rooms as $roomIndex => $room) {
-                    $this->rect($content, 42, $y, 511, 18, '0.94 0.94 0.94 rg');
-                    $this->pdfText($content, ($roomIndex + 1) . '. ' . $room->title, 56, $y + 5, 9, true);
-                    $y -= 18;
-                    foreach ($room->items as $itemIndex => $item) {
-                        $this->scopeRow($content, $item, $y);
-                        $y -= 18;
-                        $y = $this->pdfImageStrip($content, $images['items'][$sectionIndex . '-' . $roomIndex . '-' . $itemIndex] ?? [], $y);
-                        if ($y < 145) {
-                            break 3;
-                        }
-                    }
-                }
-            }
-        } else {
-            foreach ($quotation->items as $item) {
-                $this->scopeRow($content, $item, $y);
-                $y -= 18;
-                if ($y < 145) {
-                    break;
-                }
-            }
-        }
-
-        $profitLabel = 'Profit ' . number_format((float) $quotation->profit_percentage, 2) . '%';
-        $this->pdfText($content, 'Subtotal', 342, 132, 10, true);
-        $this->pdfText($content, '$' . number_format((float) $quotation->subtotal, 2), 430, 132, 10, true);
-        $this->pdfText($content, $profitLabel, 342, 112, 10, true);
-        $this->pdfText($content, '$' . number_format((float) $quotation->profit_amount, 2), 430, 112, 10, true);
-        $this->rect($content, 326, 82, 227, 24, '0.10 0.12 0.16 rg');
-        $this->pdfText($content, 'GRAND TOTAL', 342, 90, 11, true, '1 1 1 rg');
-        $this->pdfText($content, '$' . number_format((float) ($quotation->grand_total ?: $quotation->total_amount), 2), 430, 90, 11, true, '1 1 1 rg');
-
-        $this->pdfText($content, 'PAYMENT TERMS', 42, 112, 9, true);
-        $this->multiline($content, $quotation->payment_terms ?: "60% advance upon agreement\n30% upon progress payment\n10% final payment", 42, 96, 8, 3);
-        $this->pdfText($content, 'PAYMENT DETAILS', 42, 55, 9, true);
-        $this->pdfText($content, 'Account Name: ' . ($quotation->payment_account_name ?: '________________________'), 42, 40, 8);
-        $this->pdfText($content, 'Bank: ' . ($quotation->payment_bank ?: '____________________________'), 42, 28, 8);
-        $this->pdfText($content, 'Account No: ' . ($quotation->payment_account_no ?: '________________________'), 250, 28, 8);
-        $this->pdfText($content, 'APPROVAL  Client Signature: ____________________  Date: ____________________', 250, 55, 8, true);
-        $this->pdfText($content, $quotation->footer_note ?: 'Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!', 122, 12, 8);
     }
 
     protected function scopeRow(array &$content, QuotationItem $item, int $y): void
@@ -758,20 +817,24 @@ class QuotationController extends Controller
         $this->pdfText($content, mb_strimwidth($item->notes ?: '', 0, 10, '...'), 535, $y + 5, 7);
     }
 
-    protected function pdfImageStrip(array &$content, array $images, int $y): int
+    protected function pdfImageStrip(array &$content, array $images, int $y, callable $ensureSpace): int
     {
-        if ($images === [] || $y < 230) {
+        if ($images === []) {
             return $y;
         }
 
-        $imageY = $y - 62;
-        foreach (array_slice($images, 0, 3) as $index => $image) {
-            $x = 48 + ($index * 128);
-            $this->rectStroke($content, $x, $imageY, 116, 54);
-            $this->pdfImage($content, $image['name'], $x + 2, $imageY + 2, 112, 50);
+        foreach (array_chunk($images, 3) as $imageRow) {
+            $ensureSpace(70);
+            $imageY = $y - 62;
+            foreach ($imageRow as $index => $image) {
+                $x = 48 + ($index * 128);
+                $this->rectStroke($content, $x, $imageY, 116, 54);
+                $this->pdfImageContain($content, $image, $x + 2, $imageY + 2, 112, 50);
+            }
+            $y -= 70;
         }
 
-        return $y - 70;
+        return $y;
     }
 
     protected function htmlPreview(Quotation $quotation): string
@@ -912,6 +975,16 @@ class QuotationController extends Controller
         $content[] = 'q ' . $w . ' 0 0 ' . $h . ' ' . $x . ' ' . $y . ' cm /' . $name . ' Do Q';
     }
 
+    protected function pdfImageContain(array &$content, array $image, int $x, int $y, int $boxW, int $boxH): void
+    {
+        $scale = min($boxW / max(1, $image['width']), $boxH / max(1, $image['height']));
+        $width = max(1, (int) round($image['width'] * $scale));
+        $height = max(1, (int) round($image['height'] * $scale));
+        $imageX = $x + (int) floor(($boxW - $width) / 2);
+        $imageY = $y + (int) floor(($boxH - $height) / 2);
+        $this->pdfImage($content, $image['name'], $imageX, $imageY, $width, $height);
+    }
+
     protected function multiline(array &$content, string $text, int $x, int $y, int $size, int $lines): void
     {
         foreach (array_slice(preg_split('/\r\n|\r|\n/', $text), 0, $lines) as $index => $line) {
@@ -1009,10 +1082,14 @@ class QuotationController extends Controller
         ];
     }
 
-    protected function buildPdf(string $pageContent, ?array $logo, array $images = []): string
+    protected function buildPdf(array $pageContents, ?array $logo, array $images = []): string
     {
         $xObjects = [];
-        $nextObjectId = 7;
+        $pageCount = count($pageContents);
+        $firstPageObjectId = 3;
+        $fontRegularObjectId = $firstPageObjectId + ($pageCount * 2);
+        $fontBoldObjectId = $fontRegularObjectId + 1;
+        $nextObjectId = $fontBoldObjectId + 1;
         foreach (array_filter(array_merge($logo ? [$logo] : [], $images)) as $image) {
             $xObjects[] = ['object_id' => $nextObjectId++, 'image' => $image];
         }
@@ -1023,23 +1100,33 @@ class QuotationController extends Controller
             $xObjectResource = '/XObject << ' . implode(' ', $entries) . ' >>';
         }
 
+        $kids = [];
+        for ($index = 0; $index < $pageCount; $index++) {
+            $kids[] = ($firstPageObjectId + ($index * 2)) . ' 0 R';
+        }
         $objects = [
-            '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-            '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-            '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> ' . $xObjectResource . ' >> /Contents 6 0 R >> endobj',
-            '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
-            '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj',
-            '6 0 obj << /Length ' . strlen($pageContent) . " >> stream\n" . $pageContent . "\nendstream endobj",
+            1 => '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+            2 => '2 0 obj << /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . $pageCount . ' >> endobj',
         ];
+        foreach ($pageContents as $index => $pageContent) {
+            $pageObjectId = $firstPageObjectId + ($index * 2);
+            $contentObjectId = $pageObjectId + 1;
+            $objects[$pageObjectId] = $pageObjectId . ' 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ' . $fontRegularObjectId . ' 0 R /F2 ' . $fontBoldObjectId . ' 0 R >> ' . $xObjectResource . ' >> /Contents ' . $contentObjectId . ' 0 R >> endobj';
+            $objects[$contentObjectId] = $contentObjectId . ' 0 obj << /Length ' . strlen($pageContent) . " >> stream\n" . $pageContent . "\nendstream endobj";
+        }
+        $objects[$fontRegularObjectId] = $fontRegularObjectId . ' 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj';
+        $objects[$fontBoldObjectId] = $fontBoldObjectId . ' 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj';
 
         foreach ($xObjects as $entry) {
             $image = $entry['image'];
-            $objects[] = $entry['object_id'] . ' 0 obj << /Type /XObject /Subtype /Image /Width ' . $image['width'] . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($image['data']) . " >> stream\n" . $image['data'] . "\nendstream endobj";
+            $objects[$entry['object_id']] = $entry['object_id'] . ' 0 obj << /Type /XObject /Subtype /Image /Width ' . $image['width'] . ' /Height ' . $image['height'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($image['data']) . " >> stream\n" . $image['data'] . "\nendstream endobj";
         }
+
+        ksort($objects);
 
         $pdf = "%PDF-1.4\n";
         $offsets = [0];
-        foreach ($objects as $object) {
+        foreach ($objects as $objectId => $object) {
             $offsets[] = strlen($pdf);
             $pdf .= $object . "\n";
         }

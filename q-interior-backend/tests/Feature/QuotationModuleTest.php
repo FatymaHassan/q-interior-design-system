@@ -168,4 +168,51 @@ class QuotationModuleTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['status' => 'Approved']);
     }
+
+    public function test_downloaded_pdf_paginates_all_items_and_reconciles_totals(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $items = collect(range(1, 35))->map(fn (int $number) => [
+            'description' => 'Complete scope line ' . str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+            'quantity' => 2,
+            'unit_price' => 10,
+            'discount' => 0,
+            'tax' => 0,
+        ])->all();
+
+        $quotation = $this->postJson('/api/quotations', [
+            'title' => 'Long complete quotation',
+            'quotation_date' => now()->toDateString(),
+            'profit_percentage' => 10,
+            'items' => $items,
+        ])->assertCreated()->json();
+
+        // Simulate totals left stale by an older application version.
+        Quotation::findOrFail($quotation['id'])->update([
+            'subtotal' => 1,
+            'profit_amount' => 1,
+            'grand_total' => 2,
+            'total_amount' => 2,
+        ]);
+
+        $token = $user->createToken('long-pdf-test')->plainTextToken;
+        $response = $this->get('/api/quotations/' . $quotation['id'] . '/pdf?token=' . urlencode($token))
+            ->assertOk();
+        $pdf = $response->getContent();
+
+        $this->assertStringContainsString('/Count 2', $pdf);
+        $this->assertStringContainsString('Complete scope line 01', $pdf);
+        $this->assertStringContainsString('Complete scope line 35', $pdf);
+        $this->assertStringContainsString('Subtotal', $pdf);
+        $this->assertStringContainsString('$700.00', $pdf);
+        $this->assertStringContainsString('$770.00', $pdf);
+        $this->assertDatabaseHas('quotations', [
+            'id' => $quotation['id'],
+            'subtotal' => 700,
+            'profit_amount' => 70,
+            'grand_total' => 770,
+        ]);
+    }
 }
