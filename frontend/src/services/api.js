@@ -1332,6 +1332,12 @@ export function getQuotationPreviewUrl(id) {
   return `${api.defaults.baseURL}/quotations/${id}/preview${suffix}`;
 }
 
+export function getQuotationAttachmentUrl(quotationId, attachmentId) {
+  const token = localStorage.getItem("q_interior_token");
+  const suffix = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${api.defaults.baseURL}/quotations/${quotationId}/attachments/${attachmentId}/file${suffix}`;
+}
+
 export async function getExpenseCategories(params = {}) {
   const response = await api.get("/expense-categories", { params });
   return response.data.map(mapCategory);

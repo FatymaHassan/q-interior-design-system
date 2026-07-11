@@ -8,7 +8,9 @@ use App\Models\Project;
 use App\Models\Quotation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -225,5 +227,54 @@ class QuotationModuleTest extends TestCase
             'profit_amount' => 70,
             'grand_total' => 770,
         ]);
+    }
+
+    public function test_uploaded_quotation_image_appears_in_preview_pdf_and_file_endpoint(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $quotation = $this->postJson('/api/quotations', [
+            'title' => 'Quotation image visibility test',
+            'quotation_date' => now()->toDateString(),
+            'sections' => [[
+                'title' => 'FURNITURE',
+                'rooms' => [[
+                    'title' => 'Living Room',
+                    'items' => [[
+                        'description' => 'Dining chair',
+                        'unit_type' => 'Unit',
+                        'quantity' => 1,
+                        'rate' => 120,
+                    ]],
+                ]],
+            ]],
+        ])->assertCreated()->json();
+
+        $imageContent = file_get_contents(public_path('images/q-interior-logo.jpeg'));
+        $attachment = $this->post('/api/quotations/' . $quotation['id'] . '/attachments', [
+            'title' => 'QI_SCOPE|item|0|0|0|Dining chair|1',
+            'visibility' => 'client',
+            'file' => UploadedFile::fake()->createWithContent('chair.jpg', $imageContent),
+        ])->assertCreated()->json();
+
+        $this->assertDatabaseHas('quotation_attachments', ['id' => $attachment['id']]);
+        $this->assertNotEmpty(\App\Models\QuotationAttachment::findOrFail($attachment['id'])->file_content);
+
+        $this->get('/api/quotations/' . $quotation['id'] . '/attachments/' . $attachment['id'] . '/file')
+            ->assertOk()
+            ->assertHeader('content-disposition', 'inline; filename="' . basename($attachment['file_path']) . '"');
+
+        $this->get('/api/quotations/' . $quotation['id'] . '/preview')
+            ->assertOk()
+            ->assertSee('data:image/jpeg;base64,', false)
+            ->assertSee('Dining chair');
+
+        $pdfResponse = $this->get('/api/quotations/' . $quotation['id'] . '/pdf')
+            ->assertOk()
+            ->assertSee('/Subtype /Image', false)
+            ->assertSee('Dining chair');
+        $this->assertStringContainsString('/Count 1', $pdfResponse->getContent());
     }
 }

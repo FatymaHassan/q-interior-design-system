@@ -136,6 +136,7 @@ Route::post('/client-portal/quotations/{quotation}/revision', [ClientPortalQuota
 Route::post('/client-portal/quotations/{quotation}/request-revision', [ClientPortalQuotationController::class, 'revision']);
 Route::get('/quotations/{quotation}/pdf', [QuotationController::class, 'pdf']);
 Route::get('/quotations/{quotation}/preview', [QuotationController::class, 'preview']);
+Route::get('/quotations/{quotation}/attachments/{quotationAttachment}/file', [QuotationController::class, 'attachmentFile']);
 Route::get('/payrolls/{payroll}/payslip', [HrController::class, 'payslip']);
 
 Route::middleware('auth:sanctum')->group(function () {

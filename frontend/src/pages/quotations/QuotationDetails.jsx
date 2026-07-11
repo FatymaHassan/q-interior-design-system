@@ -5,7 +5,7 @@ import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import FormField, { fieldInputClass } from "../../components/ui/FormField";
 import Table from "../../components/ui/Table";
-import { approveQuotation, convertQuotation, getQuotation, getQuotationPdfUrl, getQuotationPreviewUrl, rejectQuotation, reviseQuotation, sendQuotation, uploadQuotationAttachment } from "./quotationApi";
+import { approveQuotation, convertQuotation, getQuotation, getQuotationAttachmentUrl, getQuotationPdfUrl, getQuotationPreviewUrl, rejectQuotation, reviseQuotation, sendQuotation, uploadQuotationAttachment } from "./quotationApi";
 
 export default function QuotationDetails() {
   const { id } = useParams();
@@ -46,6 +46,8 @@ export default function QuotationDetails() {
   };
 
   if (!quotation) return <div className="rounded-2xl bg-white p-6 text-sm text-brand-muted">Loading quotation...</div>;
+
+  const imageAttachments = (quotation.attachments || []).filter(isImageAttachment);
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -113,6 +115,24 @@ export default function QuotationDetails() {
     </div>
 
     <Card className="p-5 md:p-6">
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Quotation Images</h2>
+          <p className="text-sm text-brand-muted">All project, section, room, and item images uploaded with this quotation.</p>
+        </div>
+        <span className="text-sm font-semibold text-brand-muted">{imageAttachments.length} image{imageAttachments.length === 1 ? "" : "s"}</span>
+      </div>
+      {imageAttachments.length ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {imageAttachments.map((image) => <figure key={image.id} className="overflow-hidden rounded-2xl border border-brand-border bg-brand-soft/40">
+          <a href={getQuotationAttachmentUrl(quotation.id, image.id)} target="_blank" rel="noreferrer" className="block bg-white">
+            <img src={getQuotationAttachmentUrl(quotation.id, image.id)} alt={attachmentCaption(image)} className="h-48 w-full object-contain" loading="lazy" />
+          </a>
+          <figcaption className="px-4 py-3 text-sm font-semibold text-brand-primary">{attachmentCaption(image)}</figcaption>
+        </figure>)}
+      </div> : <div className="rounded-2xl border border-dashed border-brand-border bg-brand-soft/40 p-8 text-center text-sm text-brand-muted">No quotation images are currently available. If these images were uploaded before storage was repaired, upload them once more.</div>}
+    </Card>
+
+    <Card className="p-5 md:p-6">
       <h2 className="mb-3 text-xl font-bold">Terms & Notes</h2>
       <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
         <div><b>Payment Terms</b><p className="mt-1 text-brand-muted">{quotation.paymentTerms || "-"}</p></div>
@@ -152,4 +172,18 @@ function formatQtyUnit(item) {
   const quantity = Number(item.quantity || item.area_m2 || 0);
   const label = unit === "Piece" && quantity !== 1 ? "Pieces" : unit;
   return `${quantity.toLocaleString()} ${label}`;
+}
+
+function isImageAttachment(attachment) {
+  const type = String(attachment.file_type || "").toLowerCase();
+  const path = String(attachment.file_path || "").toLowerCase();
+  return type.startsWith("image/") || /^(jpg|jpeg|jfif|png|webp)$/.test(type) || /\.(jpg|jpeg|jfif|png|webp)$/.test(path);
+}
+
+function attachmentCaption(attachment) {
+  const parts = String(attachment.title || "Quotation image").split("|");
+  if (parts[0] !== "QI_SCOPE") return attachment.title || "Quotation image";
+  if (parts[1] === "section") return parts[3] || "Section image";
+  if (parts[1] === "item") return parts[5] || "Item image";
+  return parts[2] || "Project image";
 }

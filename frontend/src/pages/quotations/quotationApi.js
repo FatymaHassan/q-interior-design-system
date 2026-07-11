@@ -5,6 +5,7 @@ export {
   approveQuotation,
   getQuotation,
   getQuotationPdfUrl,
+  getQuotationAttachmentUrl,
   getQuotationPreviewUrl,
   getQuotationReport,
   getQuotations,

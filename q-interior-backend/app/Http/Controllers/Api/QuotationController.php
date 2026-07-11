@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ProjectStage;
 use App\Models\Quotation;
 use App\Models\QuotationApproval;
+use App\Models\QuotationAttachment;
 use App\Models\QuotationItem;
 use App\Models\QuotationRoom;
 use App\Models\QuotationSection;
@@ -19,6 +20,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class QuotationController extends Controller
 {
+    private const QUOTATION_IMAGE_BACKUP_MAX_BYTES = 5242880;
     public function index(Request $request)
     {
         $this->expireOldQuotations();
@@ -189,10 +191,14 @@ class QuotationController extends Controller
             'visibility' => 'nullable|in:internal,client',
         ]);
 
+        $file = $request->file('file');
         $attachment = $quotation->attachments()->create([
             'title' => $data['title'],
-            'file_path' => $request->file('file')->store('quotation-attachments', 'public'),
-            'file_type' => $request->file('file')->getClientOriginalExtension(),
+            'file_path' => $file->store('quotation-attachments', 'public'),
+            'file_type' => $file->getClientMimeType() ?: $file->getClientOriginalExtension(),
+            'file_content' => $file->getSize() <= self::QUOTATION_IMAGE_BACKUP_MAX_BYTES
+                ? base64_encode(file_get_contents($file->getRealPath()))
+                : null,
             'visibility' => $data['visibility'] ?? 'internal',
             'uploaded_by' => $request->user()?->id,
         ]);
@@ -243,6 +249,31 @@ class QuotationController extends Controller
 
         return response($this->htmlPreview($quotation->load(['client', 'project', 'sections.rooms.items', 'items', 'attachments', 'approvals'])))
             ->header('Content-Type', 'text/html');
+    }
+
+    public function attachmentFile(Request $request, Quotation $quotation, QuotationAttachment $quotationAttachment)
+    {
+        $this->authenticateQuotationFileRequest($request);
+        abort_unless($quotationAttachment->quotation_id === $quotation->id, 404);
+
+        [$content, $mimeType] = $this->quotationAttachmentContent($quotationAttachment);
+
+        return response($content, 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => (string) strlen($content),
+            'Content-Disposition' => 'inline; filename="' . addslashes(basename($quotationAttachment->file_path)) . '"',
+            'Cache-Control' => 'private, max-age=300',
+        ]);
+    }
+
+    protected function authenticateQuotationFileRequest(Request $request): void
+    {
+        if ($request->user()) {
+            return;
+        }
+
+        $token = $request->query('token') ?: str_replace('Bearer ', '', $request->header('Authorization', ''));
+        abort_unless($token && PersonalAccessToken::findToken($token), 401);
     }
 
     public function storeSection(Request $request, Quotation $quotation)
@@ -346,10 +377,7 @@ class QuotationController extends Controller
 
     public function pdf(Request $request, Quotation $quotation)
     {
-        if (! $request->user()) {
-            $token = $request->query('token') ?: str_replace('Bearer ', '', $request->header('Authorization', ''));
-            abort_unless($token && PersonalAccessToken::findToken($token), 401);
-        }
+        $this->authenticateQuotationFileRequest($request);
 
         // Reconcile legacy/stale line totals before exporting so the PDF always
         // reflects the current quantity, rate, discount, tax and profit values.
@@ -772,7 +800,13 @@ class QuotationController extends Controller
             }
         }
 
-        $ensureSpace(146);
+        if ($y - 146 < 24) {
+            $this->startQuotationContinuationPage($pages, $pageIndex, $content, $quotation);
+            $content =& $pages[$pageIndex];
+            $y = 750;
+            $this->quotationTableHeader($content, $y);
+            $y -= 20;
+        }
         $content =& $pages[$pageIndex];
         $profitLabel = 'Profit ' . number_format((float) $quotation->profit_percentage, 2) . '%';
         $this->pdfText($content, 'Subtotal', 342, $y - 8, 10, true);
@@ -792,15 +826,14 @@ class QuotationController extends Controller
         $this->pdfText($content, 'APPROVAL  Client Signature: ____________________  Date: ____________________', 250, $detailsY - 44, 8, true);
         $this->pdfText($content, mb_strimwidth($quotation->footer_note ?: 'Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!', 0, 100, '...'), 90, 18, 8);
 
-        $this->appendQuotationInformationPages($pages, $pageIndex, $content, $quotation);
+        $this->appendQuotationInformationPages($pages, $pageIndex, $content, $quotation, $detailsY - 56);
 
         return array_map(fn (array $page) => implode("\n", $page), $pages);
     }
 
-    protected function appendQuotationInformationPages(array &$pages, int &$pageIndex, array &$content, Quotation $quotation): void
+    protected function appendQuotationInformationPages(array &$pages, int &$pageIndex, array &$content, Quotation $quotation, int $availableY): void
     {
         $sections = array_filter([
-            'PAYMENT TERMS' => $quotation->payment_terms,
             'PAYMENT NOTES' => $quotation->payment_notes,
             'TERMS & CONDITIONS' => $quotation->terms_conditions,
             'SPECIAL CONDITIONS' => $quotation->special_conditions,
@@ -809,6 +842,24 @@ class QuotationController extends Controller
         ], fn ($value) => trim((string) $value) !== '');
 
         if ($sections === []) {
+            return;
+        }
+
+        $lineCount = collect($sections)->sum(fn ($value) => count($this->wrappedPdfLines((string) $value, 86)) + 1);
+        $requiredHeight = 16 + ($lineCount * 10);
+        if ($lineCount <= 7 && $availableY - $requiredHeight >= 26) {
+            $y = $availableY;
+            $this->pdfText($content, 'ADDITIONAL INFORMATION', 42, $y, 9, true);
+            $y -= 15;
+            foreach ($sections as $title => $value) {
+                $sectionLines = $this->wrappedPdfLines((string) $value, 76);
+                $this->pdfText($content, $title, 42, $y, 8, true);
+                foreach ($sectionLines as $lineIndex => $line) {
+                    $this->pdfText($content, $line, 170, $y - ($lineIndex * 10), 7);
+                }
+                $y -= max(14, count($sectionLines) * 10);
+            }
+
             return;
         }
 
@@ -969,7 +1020,7 @@ class QuotationController extends Controller
 
         $imageGallery = '';
         foreach ($scopedImages['quotation'] as $attachment) {
-            $imageGallery .= '<figure><img src="' . e(Storage::disk('public')->url($attachment->file_path)) . '" alt="' . e($this->imageCaption($attachment)) . '"><figcaption>' . e($this->imageCaption($attachment)) . '</figcaption></figure>';
+            $imageGallery .= '<figure><img src="' . e($this->quotationAttachmentDataUri($attachment)) . '" alt="' . e($this->imageCaption($attachment)) . '"><figcaption>' . e($this->imageCaption($attachment)) . '</figcaption></figure>';
         }
         $imageSection = $imageGallery ? '<section class="images"><h2>Project Images</h2><div class="image-grid">' . $imageGallery . '</div></section>' : '';
         $logo = asset('images/q-interior-logo.jpeg');
@@ -982,9 +1033,13 @@ class QuotationController extends Controller
     {
         return $quotation->attachments
             ->filter(function ($attachment) {
-                $extension = strtolower((string) ($attachment->file_type ?: pathinfo($attachment->file_path, PATHINFO_EXTENSION)));
-                return in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
-                    && Storage::disk('public')->exists($attachment->file_path);
+                $type = strtolower((string) $attachment->file_type);
+                $extension = strtolower(pathinfo($attachment->file_path, PATHINFO_EXTENSION));
+                $isImage = str_starts_with($type, 'image/')
+                    || in_array($type, ['jpg', 'jpeg', 'jfif', 'png', 'webp'], true)
+                    || in_array($extension, ['jpg', 'jpeg', 'jfif', 'png', 'webp'], true);
+
+                return $isImage && (Storage::disk('public')->exists($attachment->file_path) || $attachment->file_content);
             })
             ->values();
     }
@@ -1022,7 +1077,7 @@ class QuotationController extends Controller
 
         $gallery = '';
         foreach ($attachments as $attachment) {
-            $gallery .= '<figure><img src="' . e(Storage::disk('public')->url($attachment->file_path)) . '" alt="' . e($attachment->title) . '"></figure>';
+            $gallery .= '<figure><img src="' . e($this->quotationAttachmentDataUri($attachment)) . '" alt="' . e($attachment->title) . '"></figure>';
         }
 
         return '<tr class="inline-images"><td colspan="7"><div>' . $gallery . '</div></td></tr>';
@@ -1040,6 +1095,30 @@ class QuotationController extends Controller
             'item' => $parts[5] ?? 'Item image',
             default => $parts[2] ?? 'Project image',
         };
+    }
+
+    protected function quotationAttachmentDataUri(QuotationAttachment $attachment): string
+    {
+        [$content, $mimeType] = $this->quotationAttachmentContent($attachment);
+
+        return 'data:' . $mimeType . ';base64,' . base64_encode($content);
+    }
+
+    protected function quotationAttachmentContent(QuotationAttachment $attachment): array
+    {
+        if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
+            $content = Storage::disk('public')->get($attachment->file_path);
+            $mimeType = Storage::disk('public')->mimeType($attachment->file_path)
+                ?: $attachment->file_type
+                ?: 'application/octet-stream';
+
+            return [$content, $mimeType];
+        }
+
+        $content = base64_decode((string) $attachment->file_content, true);
+        abort_unless($content !== false && $content !== '', 404, 'Quotation image is no longer available. Please upload it again.');
+
+        return [$content, $attachment->file_type ?: 'application/octet-stream'];
     }
 
     protected function formatQuantityUnit(QuotationItem $item): string
@@ -1112,8 +1191,7 @@ class QuotationController extends Controller
     {
         $images = ['quotation' => [], 'sections' => [], 'items' => []];
         foreach ($this->scopedImageAttachments($quotation)['quotation'] as $attachment) {
-            $path = storage_path('app/public/' . $attachment->file_path);
-            $image = $this->pdfImageFromPath($path, 'PhotoQ' . (count($images['quotation']) + 1));
+            $image = $this->pdfImageFromAttachment($attachment, 'PhotoQ' . (count($images['quotation']) + 1));
             if ($image) {
                 $images['quotation'][] = $image;
             }
@@ -1121,8 +1199,7 @@ class QuotationController extends Controller
 
         foreach ($this->scopedImageAttachments($quotation)['sections'] as $key => $attachments) {
             foreach ($attachments as $attachment) {
-                $path = storage_path('app/public/' . $attachment->file_path);
-                $image = $this->pdfImageFromPath($path, 'PhotoS' . preg_replace('/\D+/', '', $key) . '_' . (count($images['sections'][$key] ?? []) + 1));
+                $image = $this->pdfImageFromAttachment($attachment, 'PhotoS' . preg_replace('/\D+/', '', $key) . '_' . (count($images['sections'][$key] ?? []) + 1));
                 if ($image) {
                     $images['sections'][$key][] = $image;
                 }
@@ -1131,8 +1208,7 @@ class QuotationController extends Controller
 
         foreach ($this->scopedImageAttachments($quotation)['items'] as $key => $attachments) {
             foreach ($attachments as $attachment) {
-                $path = storage_path('app/public/' . $attachment->file_path);
-                $image = $this->pdfImageFromPath($path, 'PhotoI' . preg_replace('/\D+/', '', $key) . '_' . (count($images['items'][$key] ?? []) + 1));
+                $image = $this->pdfImageFromAttachment($attachment, 'PhotoI' . preg_replace('/\D+/', '', $key) . '_' . (count($images['items'][$key] ?? []) + 1));
                 if ($image) {
                     $images['items'][$key][] = $image;
                 }
@@ -1140,6 +1216,13 @@ class QuotationController extends Controller
         }
 
         return $images;
+    }
+
+    protected function pdfImageFromAttachment(QuotationAttachment $attachment, string $name): ?array
+    {
+        [$content] = $this->quotationAttachmentContent($attachment);
+
+        return $this->pdfImageFromData($content, $name);
     }
 
     protected function flattenPdfImages(array $groups): array
@@ -1161,16 +1244,21 @@ class QuotationController extends Controller
             return null;
         }
 
-        $size = @getimagesize($path);
+        return $this->pdfImageFromData(file_get_contents($path), $name);
+    }
+
+    protected function pdfImageFromData(string $sourceData, string $name): ?array
+    {
+        $size = @getimagesizefromstring($sourceData);
         if (! $size) {
             return null;
         }
 
         $data = null;
         if (($size['mime'] ?? '') === 'image/jpeg') {
-            $data = file_get_contents($path);
+            $data = $sourceData;
         } elseif (function_exists('imagecreatefromstring') && function_exists('imagejpeg')) {
-            $source = @imagecreatefromstring(file_get_contents($path));
+            $source = @imagecreatefromstring($sourceData);
             if ($source) {
                 ob_start();
                 imagejpeg($source, null, 90);
