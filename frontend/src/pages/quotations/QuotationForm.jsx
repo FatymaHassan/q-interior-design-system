@@ -9,6 +9,8 @@ import { createQuotation, getQuotation, updateQuotation, uploadQuotationAttachme
 
 const unitTypes = ["M²", "Meter", "Piece", "Unit", "Set", "Day", "Hour", "Lump Sum", "Custom"];
 const defaultItem = { description: "", unit_type: "M²", quantity: 0, rate: 0, discount: 0, tax: 0, total: 0, is_manual_total: false, notes: "" };
+const defaultRoom = { title: "Living Room", items: [{ ...defaultItem }] };
+const defaultSection = { title: "GROUND FLOOR", rooms: [{ ...defaultRoom }] };
 const emptyForm = {
   client_id: "",
   project_id: "",
@@ -29,7 +31,7 @@ const emptyForm = {
   terms_conditions: "Duration: Work completed within 4 weeks\nAll materials meet professional interior standards",
   footer_note: "Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!",
   notes: "",
-  sections: [],
+  sections: [{ ...defaultSection }],
 };
 
 export default function QuotationForm() {
@@ -42,7 +44,6 @@ export default function QuotationForm() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [imageFiles, setImageFiles] = useState({ quotation: [], sections: {}, items: {} });
-  const [sectionDraft, setSectionDraft] = useState("");
 
   useEffect(() => {
     Promise.all([getClients(), getProjects(), id ? getQuotation(id) : Promise.resolve(null)]).then(([clientData, projectData, quotation]) => {
@@ -70,13 +71,11 @@ export default function QuotationForm() {
           terms_conditions: quotation.termsConditions,
           footer_note: quotation.footerNote,
           notes: quotation.notes,
-          sections: quotation.sections?.length ? quotation.sections.flatMap((section) => (section.rooms || []).map((room) => {
-            const sectionTitle = sameHeading(section.title, room.title) ? section.title : room.title;
-            return {
-              title: sectionTitle,
-              rooms: [{
-                title: sectionTitle,
-                items: (room.items || []).map((item) => ({
+          sections: quotation.sections?.length ? quotation.sections.map((section) => ({
+            title: section.title,
+            rooms: (section.rooms || []).map((room) => ({
+              title: room.title,
+              items: (room.items || []).map((item) => ({
                 description: item.description,
                 unit_type: item.unit_type || (item.area_m2 ? "M²" : "Unit"),
                 quantity: item.quantity || item.area_m2 || 0,
@@ -86,10 +85,9 @@ export default function QuotationForm() {
                 total: item.total || 0,
                 is_manual_total: Boolean(item.is_manual_total),
                 notes: item.notes || "",
-                })),
-              }],
-            };
-          })) : [],
+              })),
+            })),
+          })) : [{ ...defaultSection }],
         });
       }
     }).catch(() => setNotice("Could not load quotation form data."));
@@ -122,16 +120,10 @@ export default function QuotationForm() {
       location: selected?.location || current.location,
     }));
   };
-  const addSection = () => {
-    const title = sectionDraft.trim();
-    if (!title) {
-      setNotice("Write the section name before clicking Add Section.");
-      return;
-    }
-    setForm((current) => ({ ...current, sections: [...current.sections, { title, rooms: [{ title, items: [{ ...defaultItem }] }] }] }));
-    setSectionDraft("");
-    setNotice("");
-  };
+  const updateSection = (sectionIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, title } : section) }));
+  const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "NEW FLOOR / AREA", rooms: [{ title: "New Room", items: [{ ...defaultItem }] }] }] }));
+  const addRoom = (sectionIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title: "New Room", items: [{ ...defaultItem }] }] } : section) }));
+  const updateRoom = (sectionIndex, roomIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, title } : room) } : section) }));
   const addItem = (sectionIndex, roomIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: [...room.items, { ...defaultItem }] } : room) } : section) }));
   const updateItem = (sectionIndex, roomIndex, itemIndex, field, value) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => iIndex === itemIndex ? { ...item, [field]: value } : item) } : room) } : section) }));
   const updateImages = (group, key, files) => setImageFiles((current) => {
@@ -148,10 +140,6 @@ export default function QuotationForm() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!form.sections.length) {
-      setNotice("Add at least one section and its items before saving the quotation.");
-      return;
-    }
     setSaving(true);
     setNotice("");
     const payload = {
@@ -160,17 +148,13 @@ export default function QuotationForm() {
       client_id: form.client_id ? Number(form.client_id) : null,
       project_id: form.project_id ? Number(form.project_id) : null,
       profit_percentage: toNumber(form.profit_percentage),
-      sections: form.sections.map((section, sectionIndex) => {
-        const sectionTitle = section.title.trim() || "General";
-        return {
-          ...section,
-          title: sectionTitle,
-          sort_order: sectionIndex,
-          rooms: section.rooms.map((room, roomIndex) => ({
-            ...room,
-            title: room.title.trim() || sectionTitle,
-            sort_order: roomIndex,
-            items: room.items.map((item, itemIndex) => ({
+      sections: form.sections.map((section, sectionIndex) => ({
+        ...section,
+        sort_order: sectionIndex,
+        rooms: section.rooms.map((room, roomIndex) => ({
+          ...room,
+          sort_order: roomIndex,
+          items: room.items.map((item, itemIndex) => ({
             description: item.description,
             unit_type: item.unit_type,
             quantity: item.unit_type === "Lump Sum" ? toNumber(item.quantity || 1) : toNumber(item.quantity),
@@ -181,10 +165,9 @@ export default function QuotationForm() {
             is_manual_total: Boolean(item.is_manual_total || item.unit_type === "Custom"),
             notes: item.notes,
             sort_order: itemIndex,
-            })),
           })),
-        };
-      }),
+        })),
+      })),
     };
     try {
       const quotation = id ? await updateQuotation(id, payload) : await createQuotation(payload);
@@ -242,28 +225,16 @@ export default function QuotationForm() {
           <FormField label="Date"><input name="quotation_date" type="date" value={form.quotation_date} onChange={updateField} className={fieldInputClass} /></FormField>
         </div>
         <div className="rounded-2xl border border-brand-border p-4">
-          <div className="mb-5">
+          <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold text-brand-primary">Scope of Work</h3>
-            <p className="mt-1 text-sm text-brand-muted">Create a section such as Living Room, Bedroom, Furniture, or Lighting, then add its items.</p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input
-                value={sectionDraft}
-                onChange={(event) => setSectionDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    addSection();
-                  }
-                }}
-                placeholder="Write section name, e.g. Living Room"
-                className={fieldInputClass}
-              />
-              <Button type="button" variant="outline" className="shrink-0 px-4 py-2" onClick={addSection}>Add Section</Button>
-            </div>
+            <Button type="button" variant="outline" className="px-3 py-2" onClick={addSection}>Add Floor / Section</Button>
           </div>
           <div className="space-y-5">
             {form.sections.map((section, sectionIndex) => <div key={sectionIndex} className="rounded-2xl bg-brand-soft p-4">
-              <div className="mb-3 rounded-xl bg-brand-primary px-4 py-3 font-bold uppercase text-white">{section.title}</div>
+              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} className={`${fieldInputClass} font-bold uppercase`} />
+                <Button type="button" variant="outline" className="px-3 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
+              </div>
               <ScopedImageInput
                 label="Floor / section images"
                 files={imageFiles.sections[sectionKey(sectionIndex)] || []}
@@ -271,6 +242,7 @@ export default function QuotationForm() {
               />
               <div className="space-y-4">
                 {section.rooms.map((room, roomIndex) => <div key={roomIndex} className="rounded-xl bg-white p-3">
+                  <input value={room.title} onChange={(event) => updateRoom(sectionIndex, roomIndex, event.target.value)} className={`${fieldInputClass} mb-3 font-semibold`} />
                   <div className="space-y-2">
                     {room.items.map((item, itemIndex) => {
                       const key = itemKey(sectionIndex, roomIndex, itemIndex);
@@ -392,8 +364,4 @@ function itemTotal(item) {
   if (item.unit_type === "Custom" || item.is_manual_total) return Math.max(toNumber(item.total) - toNumber(item.discount) + toNumber(item.tax), 0);
   const base = item.unit_type === "Lump Sum" ? toNumber(item.total || rate) : quantity * rate;
   return Math.max(base - toNumber(item.discount) + toNumber(item.tax), 0);
-}
-
-function sameHeading(first, second) {
-  return String(first || "").trim().toLocaleLowerCase() === String(second || "").trim().toLocaleLowerCase();
 }
