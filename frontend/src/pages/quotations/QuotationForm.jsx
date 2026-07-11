@@ -44,6 +44,7 @@ export default function QuotationForm() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [imageFiles, setImageFiles] = useState({ quotation: [], sections: {}, items: {} });
+  const [roomDrafts, setRoomDrafts] = useState({});
 
   useEffect(() => {
     Promise.all([getClients(), getProjects(), id ? getQuotation(id) : Promise.resolve(null)]).then(([clientData, projectData, quotation]) => {
@@ -122,8 +123,16 @@ export default function QuotationForm() {
   };
   const updateSection = (sectionIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, title } : section) }));
   const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "", rooms: [{ title: "", items: [{ ...defaultItem }] }] }] }));
-  const addRoom = (sectionIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title: "", items: [{ ...defaultItem }] }] } : section) }));
-  const updateRoom = (sectionIndex, roomIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, title } : room) } : section) }));
+  const addRoom = (sectionIndex) => {
+    const title = String(roomDrafts[sectionIndex] || "").trim();
+    if (!title) {
+      setNotice("Write the room name before clicking Add Room.");
+      return;
+    }
+    setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title, items: [{ ...defaultItem }] }] } : section) }));
+    setRoomDrafts((current) => ({ ...current, [sectionIndex]: "" }));
+    setNotice("");
+  };
   const addItem = (sectionIndex, roomIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: [...room.items, { ...defaultItem }] } : room) } : section) }));
   const updateItem = (sectionIndex, roomIndex, itemIndex, field, value) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => iIndex === itemIndex ? { ...item, [field]: value } : item) } : room) } : section) }));
   const updateImages = (group, key, files) => setImageFiles((current) => {
@@ -236,9 +245,23 @@ export default function QuotationForm() {
           </div>
           <div className="space-y-5">
             {form.sections.map((section, sectionIndex) => <div key={sectionIndex} className="rounded-2xl bg-brand-soft p-4">
-              <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="mb-3">
                 <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} placeholder="Write your section" className={`${fieldInputClass} font-bold uppercase`} />
-                <Button type="button" variant="outline" className="px-3 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={roomDrafts[sectionIndex] || ""}
+                    onChange={(event) => setRoomDrafts((current) => ({ ...current, [sectionIndex]: event.target.value }))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addRoom(sectionIndex);
+                      }
+                    }}
+                    placeholder="Write room name"
+                    className={fieldInputClass}
+                  />
+                  <Button type="button" variant="outline" className="shrink-0 px-4 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
+                </div>
               </div>
               <ScopedImageInput
                 label="Floor / section images"
@@ -247,7 +270,7 @@ export default function QuotationForm() {
               />
               <div className="space-y-4">
                 {section.rooms.map((room, roomIndex) => <div key={roomIndex} className="rounded-xl bg-white p-3">
-                  <input value={room.title} onChange={(event) => updateRoom(sectionIndex, roomIndex, event.target.value)} placeholder="Write your room (optional)" className={`${fieldInputClass} mb-3 font-semibold`} />
+                  {room.title && !sameHeading(room.title, section.title) && <div className="mb-3 rounded-xl bg-brand-soft px-4 py-3 font-bold text-brand-primary">{room.title}</div>}
                   <div className="space-y-2">
                     {room.items.map((item, itemIndex) => {
                       const key = itemKey(sectionIndex, roomIndex, itemIndex);
@@ -369,4 +392,8 @@ function itemTotal(item) {
   if (item.unit_type === "Custom" || item.is_manual_total) return Math.max(toNumber(item.total) - toNumber(item.discount) + toNumber(item.tax), 0);
   const base = item.unit_type === "Lump Sum" ? toNumber(item.total || rate) : quantity * rate;
   return Math.max(base - toNumber(item.discount) + toNumber(item.tax), 0);
+}
+
+function sameHeading(first, second) {
+  return String(first || "").trim().toLocaleLowerCase() === String(second || "").trim().toLocaleLowerCase();
 }
