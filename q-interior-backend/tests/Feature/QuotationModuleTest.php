@@ -277,4 +277,37 @@ class QuotationModuleTest extends TestCase
             ->assertSee('Dining chair');
         $this->assertStringContainsString('/Count 1', $pdfResponse->getContent());
     }
+
+    public function test_matching_section_and_room_names_are_not_repeated_in_preview_or_pdf(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $quotation = $this->postJson('/api/quotations', [
+            'title' => 'Furniture quotation',
+            'quotation_date' => now()->toDateString(),
+            'sections' => [[
+                'title' => 'Furniture',
+                'rooms' => [[
+                    'title' => 'Furniture',
+                    'items' => [[
+                        'description' => 'Dining table',
+                        'unit_type' => 'Unit',
+                        'quantity' => 1,
+                        'rate' => 500,
+                    ]],
+                ]],
+            ]],
+        ])->assertCreated()->json();
+
+        $this->get('/api/quotations/' . $quotation['id'] . '/preview')
+            ->assertOk()
+            ->assertSee('FURNITURE')
+            ->assertDontSee('1. Furniture');
+
+        $pdf = $this->get('/api/quotations/' . $quotation['id'] . '/pdf')
+            ->assertOk()
+            ->getContent();
+        $this->assertSame(1, substr_count($pdf, '(FURNITURE)'));
+        $this->assertStringNotContainsString('(1. Furniture)', $pdf);
+    }
 }

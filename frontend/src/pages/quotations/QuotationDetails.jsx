@@ -76,7 +76,7 @@ export default function QuotationDetails() {
           {quotation.sections?.length ? quotation.sections.map((section) => <div key={section.id || section.title} className="rounded-2xl border border-brand-border overflow-hidden">
             <div className="bg-brand-primary px-4 py-3 font-bold uppercase text-white">{section.title}</div>
             {(section.rooms || []).map((room) => <div key={room.id || room.title}>
-              <div className="bg-brand-soft px-4 py-2 font-semibold">{room.title}</div>
+              {!sameHeading(section.title, room.title) && <div className="bg-brand-soft px-4 py-2 font-semibold">{room.title}</div>}
               <Table columns={[
                 { key: "description", label: "Description" },
                 { key: "quantity", label: "Qty / Unit", render: (item) => formatQtyUnit(item) },
@@ -186,4 +186,8 @@ function attachmentCaption(attachment) {
   if (parts[1] === "section") return parts[3] || "Section image";
   if (parts[1] === "item") return parts[5] || "Item image";
   return parts[2] || "Project image";
+}
+
+function sameHeading(first, second) {
+  return String(first || "").trim().toLocaleLowerCase() === String(second || "").trim().toLocaleLowerCase();
 }

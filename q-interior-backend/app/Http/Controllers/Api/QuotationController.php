@@ -772,11 +772,13 @@ class QuotationController extends Controller
                 $y = $this->pdfImageStrip($pages, $pageIndex, $quotation, $images['sections'][(string) $sectionIndex] ?? [], $y);
                 $content =& $pages[$pageIndex];
                 foreach ($section->rooms as $roomIndex => $room) {
-                    $ensureSpace(18);
-                    $content =& $pages[$pageIndex];
-                    $this->rect($content, 42, $y, 511, 18, '0.94 0.94 0.94 rg');
-                    $this->pdfText($content, ($roomIndex + 1) . '. ' . $room->title, 56, $y + 5, 9, true);
-                    $y -= 18;
+                    if (! $this->sameQuotationHeading($section->title, $room->title)) {
+                        $ensureSpace(18);
+                        $content =& $pages[$pageIndex];
+                        $this->rect($content, 42, $y, 511, 18, '0.94 0.94 0.94 rg');
+                        $this->pdfText($content, ($roomIndex + 1) . '. ' . $room->title, 56, $y + 5, 9, true);
+                        $y -= 18;
+                    }
                     foreach ($room->items as $itemIndex => $item) {
                         $itemImages = $images['items'][$sectionIndex . '-' . $roomIndex . '-' . $itemIndex] ?? [];
                         $rowHeight = $this->quotationItemRowHeight($item, $itemImages !== []);
@@ -1005,7 +1007,9 @@ class QuotationController extends Controller
             $rows .= '<tr class="section"><td colspan="7">' . e(strtoupper($section->title)) . '</td></tr>';
             $rows .= $this->htmlImageRow($scopedImages['sections'][(string) $sectionIndex] ?? []);
             foreach ($section->rooms as $roomIndex => $room) {
-                $rows .= '<tr class="room"><td colspan="7">' . ($roomIndex + 1) . '. ' . e($room->title) . '</td></tr>';
+                if (! $this->sameQuotationHeading($section->title, $room->title)) {
+                    $rows .= '<tr class="room"><td colspan="7">' . ($roomIndex + 1) . '. ' . e($room->title) . '</td></tr>';
+                }
                 foreach ($room->items as $itemIndex => $item) {
                     $rows .= '<tr><td>' . e($item->description) . '</td><td>' . e($this->formatQuantityUnit($item)) . '</td><td>$' . number_format((float) ($item->rate ?: $item->unit_price), 2) . '</td><td>$' . number_format((float) $item->discount, 2) . '</td><td>$' . number_format((float) $item->tax, 2) . '</td><td>$' . number_format((float) $item->total, 2) . '</td><td>' . e($item->notes) . '</td></tr>';
                     $rows .= $this->htmlImageRow($scopedImages['items'][$sectionIndex . '-' . $roomIndex . '-' . $itemIndex] ?? []);
@@ -1095,6 +1099,11 @@ class QuotationController extends Controller
             'item' => $parts[5] ?? 'Item image',
             default => $parts[2] ?? 'Project image',
         };
+    }
+
+    protected function sameQuotationHeading(?string $sectionTitle, ?string $roomTitle): bool
+    {
+        return mb_strtolower(trim((string) $sectionTitle)) === mb_strtolower(trim((string) $roomTitle));
     }
 
     protected function quotationAttachmentDataUri(QuotationAttachment $attachment): string

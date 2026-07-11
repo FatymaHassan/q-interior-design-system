@@ -9,8 +9,8 @@ import { createQuotation, getQuotation, updateQuotation, uploadQuotationAttachme
 
 const unitTypes = ["M²", "Meter", "Piece", "Unit", "Set", "Day", "Hour", "Lump Sum", "Custom"];
 const defaultItem = { description: "", unit_type: "M²", quantity: 0, rate: 0, discount: 0, tax: 0, total: 0, is_manual_total: false, notes: "" };
-const defaultRoom = { title: "Living Room", items: [{ ...defaultItem }] };
-const defaultSection = { title: "GROUND FLOOR", rooms: [{ ...defaultRoom }] };
+const defaultRoom = { title: "", items: [{ ...defaultItem }] };
+const defaultSection = { title: "", rooms: [{ ...defaultRoom }] };
 const emptyForm = {
   client_id: "",
   project_id: "",
@@ -121,8 +121,8 @@ export default function QuotationForm() {
     }));
   };
   const updateSection = (sectionIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, title } : section) }));
-  const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "NEW FLOOR / AREA", rooms: [{ title: "New Room", items: [{ ...defaultItem }] }] }] }));
-  const addRoom = (sectionIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title: "New Room", items: [{ ...defaultItem }] }] } : section) }));
+  const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "", rooms: [{ title: "", items: [{ ...defaultItem }] }] }] }));
+  const addRoom = (sectionIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title: "", items: [{ ...defaultItem }] }] } : section) }));
   const updateRoom = (sectionIndex, roomIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, title } : room) } : section) }));
   const addItem = (sectionIndex, roomIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: [...room.items, { ...defaultItem }] } : room) } : section) }));
   const updateItem = (sectionIndex, roomIndex, itemIndex, field, value) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: room.items.map((item, iIndex) => iIndex === itemIndex ? { ...item, [field]: value } : item) } : room) } : section) }));
@@ -148,13 +148,17 @@ export default function QuotationForm() {
       client_id: form.client_id ? Number(form.client_id) : null,
       project_id: form.project_id ? Number(form.project_id) : null,
       profit_percentage: toNumber(form.profit_percentage),
-      sections: form.sections.map((section, sectionIndex) => ({
-        ...section,
-        sort_order: sectionIndex,
-        rooms: section.rooms.map((room, roomIndex) => ({
-          ...room,
-          sort_order: roomIndex,
-          items: room.items.map((item, itemIndex) => ({
+      sections: form.sections.map((section, sectionIndex) => {
+        const sectionTitle = section.title.trim() || "General";
+        return {
+          ...section,
+          title: sectionTitle,
+          sort_order: sectionIndex,
+          rooms: section.rooms.map((room, roomIndex) => ({
+            ...room,
+            title: room.title.trim() || sectionTitle,
+            sort_order: roomIndex,
+            items: room.items.map((item, itemIndex) => ({
             description: item.description,
             unit_type: item.unit_type,
             quantity: item.unit_type === "Lump Sum" ? toNumber(item.quantity || 1) : toNumber(item.quantity),
@@ -165,9 +169,10 @@ export default function QuotationForm() {
             is_manual_total: Boolean(item.is_manual_total || item.unit_type === "Custom"),
             notes: item.notes,
             sort_order: itemIndex,
+            })),
           })),
-        })),
-      })),
+        };
+      }),
     };
     try {
       const quotation = id ? await updateQuotation(id, payload) : await createQuotation(payload);
@@ -232,7 +237,7 @@ export default function QuotationForm() {
           <div className="space-y-5">
             {form.sections.map((section, sectionIndex) => <div key={sectionIndex} className="rounded-2xl bg-brand-soft p-4">
               <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} className={`${fieldInputClass} font-bold uppercase`} />
+                <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} placeholder="Write your section" className={`${fieldInputClass} font-bold uppercase`} />
                 <Button type="button" variant="outline" className="px-3 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
               </div>
               <ScopedImageInput
@@ -242,7 +247,7 @@ export default function QuotationForm() {
               />
               <div className="space-y-4">
                 {section.rooms.map((room, roomIndex) => <div key={roomIndex} className="rounded-xl bg-white p-3">
-                  <input value={room.title} onChange={(event) => updateRoom(sectionIndex, roomIndex, event.target.value)} className={`${fieldInputClass} mb-3 font-semibold`} />
+                  <input value={room.title} onChange={(event) => updateRoom(sectionIndex, roomIndex, event.target.value)} placeholder="Write your room (optional)" className={`${fieldInputClass} mb-3 font-semibold`} />
                   <div className="space-y-2">
                     {room.items.map((item, itemIndex) => {
                       const key = itemKey(sectionIndex, roomIndex, itemIndex);
