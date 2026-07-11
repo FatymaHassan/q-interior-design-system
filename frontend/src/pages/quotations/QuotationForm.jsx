@@ -247,17 +247,17 @@ export default function QuotationForm() {
                     {room.items.map((item, itemIndex) => {
                       const key = itemKey(sectionIndex, roomIndex, itemIndex);
                       return <div key={itemIndex} className="rounded-xl border border-brand-border p-3">
-                        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[2fr_.8fr_.6fr_.7fr_.6fr_.6fr_.8fr_1fr]">
-                          <input value={item.description} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "description", event.target.value)} required placeholder="Wall Decoration" className={fieldInputClass} />
-                          <select value={item.unit_type} onChange={(event) => changeUnitType(sectionIndex, roomIndex, itemIndex, event.target.value)} className={fieldInputClass}>{unitTypes.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>
-                          <input value={item.quantity} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "quantity", event.target.value)} type="number" min="0" step="0.01" placeholder="Qty" className={fieldInputClass} disabled={item.unit_type === "Lump Sum"} />
-                          <input value={item.rate} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "rate", event.target.value)} type="number" min="0" step="0.01" placeholder="Rate" className={fieldInputClass} />
-                          <input value={item.discount} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "discount", event.target.value)} type="number" min="0" step="0.01" placeholder="Disc" className={fieldInputClass} />
-                          <input value={item.tax} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "tax", event.target.value)} type="number" min="0" step="0.01" placeholder="Tax" className={fieldInputClass} />
-                          {item.unit_type === "Custom" || item.unit_type === "Lump Sum"
-                            ? <input value={item.total} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "total", event.target.value)} type="number" min="0" step="0.01" placeholder="Total" className={fieldInputClass} />
-                            : <div className="rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">{formatCurrency(itemTotal(item))}</div>}
-                          <input value={item.notes} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "notes", event.target.value)} placeholder="Notes" className={fieldInputClass} />
+                         <div className="grid grid-cols-1 gap-2 lg:grid-cols-[2fr_.8fr_.6fr_.7fr_.6fr_.6fr_.8fr_1fr]">
+                           <ItemField label="DESCRIPTION"><input value={item.description} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "description", event.target.value)} required placeholder="Wall Decoration" className={fieldInputClass} /></ItemField>
+                           <ItemField label="UNIT"><select value={item.unit_type} onChange={(event) => changeUnitType(sectionIndex, roomIndex, itemIndex, event.target.value)} className={fieldInputClass}>{unitTypes.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></ItemField>
+                           <ItemField label="QTY"><input value={item.quantity} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "quantity", event.target.value)} type="number" min="0" step="0.01" placeholder="0" className={fieldInputClass} disabled={item.unit_type === "Lump Sum"} /></ItemField>
+                           <ItemField label="RATE"><input value={item.rate} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "rate", event.target.value)} type="number" min="0" step="0.01" placeholder="0.00" className={fieldInputClass} /></ItemField>
+                           <ItemField label="DISCOUNT"><input value={item.discount} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "discount", event.target.value)} type="number" min="0" step="0.01" placeholder="0.00" className={fieldInputClass} /></ItemField>
+                           <ItemField label="TAX"><input value={item.tax} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "tax", event.target.value)} type="number" min="0" step="0.01" placeholder="0.00" className={fieldInputClass} /></ItemField>
+                           <ItemField label="TOTAL">{item.unit_type === "Custom" || item.unit_type === "Lump Sum"
+                             ? <input value={item.total} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "total", event.target.value)} type="number" min="0" step="0.01" placeholder="0.00" className={fieldInputClass} />
+                             : <div className="min-h-11 rounded-xl bg-brand-soft px-3 py-3 text-sm font-bold">{formatCurrency(itemTotal(item))}</div>}</ItemField>
+                           <ItemField label="NOTES"><input value={item.notes} onChange={(event) => updateItem(sectionIndex, roomIndex, itemIndex, "notes", event.target.value)} placeholder="Optional notes" className={fieldInputClass} /></ItemField>
                         </div>
                         <ScopedImageInput
                           label="Item images"
@@ -330,6 +330,13 @@ function ScopedImageInput({ label, files, onChange }) {
       </div>)}
     </div>}
   </div>;
+}
+
+function ItemField({ label, children }) {
+  return <label className="block min-w-0">
+    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-brand-muted">{label}</span>
+    {children}
+  </label>;
 }
 
 async function uploadScopedImages(quotationId, form, imageFiles) {
