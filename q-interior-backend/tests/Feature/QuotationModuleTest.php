@@ -202,9 +202,20 @@ class QuotationModuleTest extends TestCase
             ->assertOk();
         $pdf = $response->getContent();
 
-        $this->assertStringContainsString('/Count 2', $pdf);
+        preg_match('/\/Count (\d+)/', $pdf, $pageMatch);
+        $this->assertGreaterThanOrEqual(2, (int) ($pageMatch[1] ?? 0));
         $this->assertStringContainsString('Complete scope line 01', $pdf);
         $this->assertStringContainsString('Complete scope line 35', $pdf);
+        preg_match_all('/\/Contents (\d+) 0 R/', $pdf, $contentMatches);
+        $pageStreams = [];
+        foreach ($contentMatches[1] as $contentObjectId) {
+            preg_match('/' . $contentObjectId . ' 0 obj << \/Length \d+ >> stream\n(.*?)\nendstream/s', $pdf, $streamMatch);
+            $pageStreams[] = $streamMatch[1] ?? '';
+        }
+        $this->assertStringNotContainsString('Complete scope line 35', $pageStreams[0]);
+        $this->assertTrue(collect(array_slice($pageStreams, 1))->contains(
+            fn (string $stream) => str_contains($stream, 'Complete scope line 35')
+        ));
         $this->assertStringContainsString('Subtotal', $pdf);
         $this->assertStringContainsString('$700.00', $pdf);
         $this->assertStringContainsString('$770.00', $pdf);
