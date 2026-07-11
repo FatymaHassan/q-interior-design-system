@@ -9,8 +9,6 @@ import { createQuotation, getQuotation, updateQuotation, uploadQuotationAttachme
 
 const unitTypes = ["M²", "Meter", "Piece", "Unit", "Set", "Day", "Hour", "Lump Sum", "Custom"];
 const defaultItem = { description: "", unit_type: "M²", quantity: 0, rate: 0, discount: 0, tax: 0, total: 0, is_manual_total: false, notes: "" };
-const defaultRoom = { title: "", items: [{ ...defaultItem }] };
-const defaultSection = { title: "", rooms: [{ ...defaultRoom }] };
 const emptyForm = {
   client_id: "",
   project_id: "",
@@ -31,7 +29,7 @@ const emptyForm = {
   terms_conditions: "Duration: Work completed within 4 weeks\nAll materials meet professional interior standards",
   footer_note: "Thank you for considering Q INTERIOR DESIGN STUDIO. We look forward to working with you!",
   notes: "",
-  sections: [{ ...defaultSection }],
+  sections: [],
 };
 
 export default function QuotationForm() {
@@ -44,7 +42,7 @@ export default function QuotationForm() {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [imageFiles, setImageFiles] = useState({ quotation: [], sections: {}, items: {} });
-  const [roomDrafts, setRoomDrafts] = useState({});
+  const [sectionDraft, setSectionDraft] = useState("");
 
   useEffect(() => {
     Promise.all([getClients(), getProjects(), id ? getQuotation(id) : Promise.resolve(null)]).then(([clientData, projectData, quotation]) => {
@@ -72,11 +70,13 @@ export default function QuotationForm() {
           terms_conditions: quotation.termsConditions,
           footer_note: quotation.footerNote,
           notes: quotation.notes,
-          sections: quotation.sections?.length ? quotation.sections.map((section) => ({
-            title: section.title,
-            rooms: (section.rooms || []).map((room) => ({
-              title: room.title,
-              items: (room.items || []).map((item) => ({
+          sections: quotation.sections?.length ? quotation.sections.flatMap((section) => (section.rooms || []).map((room) => {
+            const sectionTitle = sameHeading(section.title, room.title) ? section.title : room.title;
+            return {
+              title: sectionTitle,
+              rooms: [{
+                title: sectionTitle,
+                items: (room.items || []).map((item) => ({
                 description: item.description,
                 unit_type: item.unit_type || (item.area_m2 ? "M²" : "Unit"),
                 quantity: item.quantity || item.area_m2 || 0,
@@ -86,9 +86,10 @@ export default function QuotationForm() {
                 total: item.total || 0,
                 is_manual_total: Boolean(item.is_manual_total),
                 notes: item.notes || "",
-              })),
-            })),
-          })) : [{ ...defaultSection }],
+                })),
+              }],
+            };
+          })) : [],
         });
       }
     }).catch(() => setNotice("Could not load quotation form data."));
@@ -121,16 +122,14 @@ export default function QuotationForm() {
       location: selected?.location || current.location,
     }));
   };
-  const updateSection = (sectionIndex, title) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, title } : section) }));
-  const addSection = () => setForm((current) => ({ ...current, sections: [...current.sections, { title: "", rooms: [{ title: "", items: [{ ...defaultItem }] }] }] }));
-  const addRoom = (sectionIndex) => {
-    const title = String(roomDrafts[sectionIndex] || "").trim();
+  const addSection = () => {
+    const title = sectionDraft.trim();
     if (!title) {
-      setNotice("Write the room name before clicking Add Room.");
+      setNotice("Write the section name before clicking Add Section.");
       return;
     }
-    setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: [...section.rooms, { title, items: [{ ...defaultItem }] }] } : section) }));
-    setRoomDrafts((current) => ({ ...current, [sectionIndex]: "" }));
+    setForm((current) => ({ ...current, sections: [...current.sections, { title, rooms: [{ title, items: [{ ...defaultItem }] }] }] }));
+    setSectionDraft("");
     setNotice("");
   };
   const addItem = (sectionIndex, roomIndex) => setForm((current) => ({ ...current, sections: current.sections.map((section, index) => index === sectionIndex ? { ...section, rooms: section.rooms.map((room, rIndex) => rIndex === roomIndex ? { ...room, items: [...room.items, { ...defaultItem }] } : room) } : section) }));
@@ -149,6 +148,10 @@ export default function QuotationForm() {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (!form.sections.length) {
+      setNotice("Add at least one section and its items before saving the quotation.");
+      return;
+    }
     setSaving(true);
     setNotice("");
     const payload = {
@@ -239,30 +242,28 @@ export default function QuotationForm() {
           <FormField label="Date"><input name="quotation_date" type="date" value={form.quotation_date} onChange={updateField} className={fieldInputClass} /></FormField>
         </div>
         <div className="rounded-2xl border border-brand-border p-4">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-5">
             <h3 className="font-bold text-brand-primary">Scope of Work</h3>
-            <Button type="button" variant="outline" className="px-3 py-2" onClick={addSection}>Add Floor / Section</Button>
+            <p className="mt-1 text-sm text-brand-muted">Create a section such as Living Room, Bedroom, Furniture, or Lighting, then add its items.</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={sectionDraft}
+                onChange={(event) => setSectionDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addSection();
+                  }
+                }}
+                placeholder="Write section name, e.g. Living Room"
+                className={fieldInputClass}
+              />
+              <Button type="button" variant="outline" className="shrink-0 px-4 py-2" onClick={addSection}>Add Section</Button>
+            </div>
           </div>
           <div className="space-y-5">
             {form.sections.map((section, sectionIndex) => <div key={sectionIndex} className="rounded-2xl bg-brand-soft p-4">
-              <div className="mb-3">
-                <input value={section.title} onChange={(event) => updateSection(sectionIndex, event.target.value)} placeholder="Write your section" className={`${fieldInputClass} font-bold uppercase`} />
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    value={roomDrafts[sectionIndex] || ""}
-                    onChange={(event) => setRoomDrafts((current) => ({ ...current, [sectionIndex]: event.target.value }))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addRoom(sectionIndex);
-                      }
-                    }}
-                    placeholder="Write room name"
-                    className={fieldInputClass}
-                  />
-                  <Button type="button" variant="outline" className="shrink-0 px-4 py-2" onClick={() => addRoom(sectionIndex)}>Add Room</Button>
-                </div>
-              </div>
+              <div className="mb-3 rounded-xl bg-brand-primary px-4 py-3 font-bold uppercase text-white">{section.title}</div>
               <ScopedImageInput
                 label="Floor / section images"
                 files={imageFiles.sections[sectionKey(sectionIndex)] || []}
@@ -270,7 +271,6 @@ export default function QuotationForm() {
               />
               <div className="space-y-4">
                 {section.rooms.map((room, roomIndex) => <div key={roomIndex} className="rounded-xl bg-white p-3">
-                  {room.title && !sameHeading(room.title, section.title) && <div className="mb-3 rounded-xl bg-brand-soft px-4 py-3 font-bold text-brand-primary">{room.title}</div>}
                   <div className="space-y-2">
                     {room.items.map((item, itemIndex) => {
                       const key = itemKey(sectionIndex, roomIndex, itemIndex);
